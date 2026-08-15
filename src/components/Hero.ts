@@ -220,14 +220,15 @@ export function renderHero(container: HTMLElement): () => void {
     <!-- Ambient audio and toggle (bottom-left) -->
     <audio id="hero-audio" src="/assets/silent-blade.mp3" loop preload="auto"></audio>
     <button class="hero__audio-toggle" id="hero-audio-toggle" type="button" aria-label="Toggle audio" aria-pressed="false">
-      <svg class="hero__audio-icon hero__audio-icon--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+      <svg class="hero__audio-icon hero__audio-icon--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
         <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
       </svg>
-      <svg class="hero__audio-icon hero__audio-icon--off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="hero__audio-icon hero__audio-icon--off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-        <line x1="23" y1="1" x2="1" y2="23"></line>
+        <line x1="21" y1="9" x2="15" y2="15"></line>
+        <line x1="15" y1="9" x2="21" y2="15"></line>
       </svg>
     </button>
 
