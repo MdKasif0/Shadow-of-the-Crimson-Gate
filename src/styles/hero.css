@@ -889,17 +889,42 @@
   color: var(--color-ivory-muted);
   margin-bottom: 3rem;
 }
-.media-gallery-simple {
-  display: flex;
-  justify-content: center;
+.media-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 .media-item {
-  width: 400px;
-  height: 225px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   background-size: cover;
   background-position: center;
   border: 1px solid rgba(240, 230, 211, 0.2);
   border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.media-item:hover {
+  transform: scale(1.03);
+  border-color: rgba(212, 175, 55, 0.5);
+  box-shadow: 0 8px 30px rgba(139, 26, 26, 0.2);
+  z-index: 10;
+}
+@media (max-width: 900px) {
+  .media-gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 500px) {
+  .media-gallery-grid {
+    grid-template-columns: 1fr;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 1rem;
+  }
 }
 
 /* HERO BG OVERLAY EFFECT */

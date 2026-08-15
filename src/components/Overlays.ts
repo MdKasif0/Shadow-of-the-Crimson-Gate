@@ -206,13 +206,22 @@ export function openCharactersOverlay() {
 }
 
 export function openMediaOverlay() {
+  const galleryAssets = [
+    '/assets/sakura_courtyard.png',
+    '/assets/cursed_forest.png',
+    '/assets/temple.png',
+    '/assets/crimson_oni.png',
+    '/assets/tengu.png',
+    '/assets/player_ronin.png'
+  ];
+
   const content = `
     <h2 class="overlay-title">MEDIA</h2>
-    <div class="overlay-media-content">
-      <h3 class="media-subtitle">THE WORLD IS AWAKENING</h3>
-      <p class="media-text">More artwork and gameplay footage coming soon.</p>
-      <div class="media-gallery-simple">
-        <div class="media-item" style="background-image: url('${ASSETS.HERO_BG}')"></div>
+    <div class="overlay-media-content" style="max-width: 1200px; width: 100%;">
+      <h3 class="media-subtitle">CONCEPT ART & ENVIRONMENTS</h3>
+      <p class="media-text">Explore the beautiful, dark world of Shadow of the Crimson Gate.</p>
+      <div class="media-gallery-grid">
+        ${galleryAssets.map(src => `<div class="media-item" style="background-image: url('${src}')"></div>`).join('')}
       </div>
     </div>
   `;
