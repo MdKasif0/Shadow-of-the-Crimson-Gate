@@ -1,4 +1,4 @@
-import { GAME_TITLE, ASSETS } from '../utils/constants';
+import { GAME_TITLE } from '../utils/constants';
 
 /**
  * Core Overlay Manager to handle mounting, unmounting, and animation.
