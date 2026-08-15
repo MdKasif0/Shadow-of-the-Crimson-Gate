@@ -346,7 +346,6 @@ export function renderHero(container: HTMLElement): () => void {
   const contentEl = section.querySelector('.hero__content') as HTMLElement;
   const taglineEl = section.querySelector('.hero__tagline') as HTMLElement;
   const ctaEl = section.querySelector('.hero__cta') as HTMLElement;
-  const navWrapperEl = section.querySelector('.hero-nav-wrapper') as HTMLElement;
   
   if (contentEl && taglineEl && ctaEl) {
     overlayManager.registerBackgroundTargets([
