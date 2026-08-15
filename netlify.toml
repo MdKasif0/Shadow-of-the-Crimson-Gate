@@ -1,0 +1,6 @@
+[build]
+  command = "node node_modules/esbuild/install.js && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NPM_CONFIG_IGNORE_SCRIPTS = "false"
