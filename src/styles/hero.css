@@ -826,6 +826,43 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   13.5 AUDIO TOGGLE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__audio-toggle {
+  position: absolute;
+  bottom: 30px;
+  left: 36px;
+  z-index: 20;
+  background: rgba(5, 5, 5, 0.4);
+  border: 1px solid rgba(240, 230, 211, 0.1);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(240, 230, 211, 0.5);
+  cursor: pointer;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 1s ease 1s forwards;
+  opacity: 0;
+}
+
+.hero__audio-toggle:hover {
+  background: rgba(5, 5, 5, 0.7);
+  border-color: rgba(240, 230, 211, 0.25);
+  color: rgba(240, 230, 211, 0.9);
+}
+
+.hero__audio-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    14. RESPONSIVE — TABLET (≤ 1024px)
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -935,6 +972,13 @@
     padding: 0.8rem 2.5rem;
     animation: none;
     opacity: 1;
+  }
+
+  .hero__audio-toggle {
+    bottom: 20px;
+    left: 20px;
+    width: 40px;
+    height: 40px;
   }
 
   .hero-nav__toggle {
