@@ -324,17 +324,23 @@ export function renderHero(container: HTMLElement): () => void {
 
   audioToggle.addEventListener('click', toggleAudio, { signal });
 
-  // Attempt to autoplay
-  playAudio();
+  // ── Intro Screen ──
+  const introEl = document.createElement('div');
+  introEl.className = 'hero-intro';
+  introEl.innerHTML = `
+    <button class="hero-intro__btn">CLICK TO ENTER</button>
+  `;
+  container.appendChild(introEl);
 
-  // Play on first interaction if autoplay failed
-  const unlockAudio = () => {
+  const introBtn = introEl.querySelector('.hero-intro__btn') as HTMLButtonElement;
+  introBtn.addEventListener('click', () => {
+    introEl.style.opacity = '0';
+    introEl.style.pointerEvents = 'none';
     if (!isPlaying) {
       playAudio();
     }
-    document.removeEventListener('click', unlockAudio);
-  };
-  document.addEventListener('click', unlockAudio, { once: true, signal });
+    setTimeout(() => introEl.remove(), 1000);
+  });
 
   container.appendChild(section);
 

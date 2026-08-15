@@ -938,6 +938,40 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   11.6 INTRO SCREEN
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--color-black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 1s ease;
+}
+
+.hero-intro__btn {
+  background: none;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  color: var(--color-ivory);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  padding: 1rem 2rem;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.hero-intro__btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+  color: var(--color-gold-bright);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    12. KEYFRAMES
    ═══════════════════════════════════════════════════════════════════════════ */
 
