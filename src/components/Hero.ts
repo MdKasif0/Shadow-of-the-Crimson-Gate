@@ -218,7 +218,7 @@ export function renderHero(container: HTMLElement): () => void {
     </button>
 
     <!-- Ambient audio and toggle (bottom-left) -->
-    <audio id="hero-audio" src="/assets/silent-blade.mp3" loop preload="auto"></audio>
+    <audio id="hero-audio" src="/assets/silent-blade.mp3" loop preload="auto" autoplay></audio>
     <button class="hero__audio-toggle" id="hero-audio-toggle" type="button" aria-label="Toggle audio" aria-pressed="false">
       <svg class="hero__audio-icon hero__audio-icon--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -324,23 +324,17 @@ export function renderHero(container: HTMLElement): () => void {
 
   audioToggle.addEventListener('click', toggleAudio, { signal });
 
-  // ── Intro Screen ──
-  const introEl = document.createElement('div');
-  introEl.className = 'hero-intro';
-  introEl.innerHTML = `
-    <button class="hero-intro__btn">CLICK TO ENTER</button>
-  `;
-  container.appendChild(introEl);
+  // Attempt to autoplay
+  playAudio();
 
-  const introBtn = introEl.querySelector('.hero-intro__btn') as HTMLButtonElement;
-  introBtn.addEventListener('click', () => {
-    introEl.style.opacity = '0';
-    introEl.style.pointerEvents = 'none';
+  // Play on first interaction if autoplay failed
+  const unlockAudio = () => {
     if (!isPlaying) {
       playAudio();
     }
-    setTimeout(() => introEl.remove(), 1000);
-  });
+    document.removeEventListener('click', unlockAudio);
+  };
+  document.addEventListener('click', unlockAudio, { once: true, signal });
 
   container.appendChild(section);
 
