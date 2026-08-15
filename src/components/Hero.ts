@@ -93,8 +93,8 @@ function createSpirit(index: number): HTMLElement {
 
 // ─── SVG Arrow Icon ──────────────────────────────────────────────────────────
 
-function arrowSVG(): string {
-  return `<svg class="hero__cta-arrow" viewBox="0 0 24 24" fill="none"
+function arrowSVG(className: string = 'hero__cta-arrow'): string {
+  return `<svg class="${className}" viewBox="0 0 24 24" fill="none"
     stroke="currentColor" stroke-width="2" stroke-linecap="round"
     stroke-linejoin="round" aria-hidden="true">
     <path d="M5 12h14M12 5l7 7-7 7"/>
@@ -107,24 +107,39 @@ function buildNavHTML(): string {
   const links = NAV_ITEMS.map((item) => {
     if (item.href) {
       const isHome = item.href === '#/';
-      return `<a href="${item.href}" class="hero-nav__link${isHome ? ' hero-nav__link--active' : ''}" id="${item.id}">${item.label}</a>`;
+      return `<a href="${item.href}" class="hero-nav__link${isHome ? ' hero-nav__link--active' : ''}" id="${item.id}">
+        <span class="hero-nav__link-text">${item.label}</span>
+      </a>`;
     }
-    return `<span class="hero-nav__link hero-nav__link--future" id="${item.id}" aria-disabled="true">${item.label}</span>`;
+    return `<span class="hero-nav__link hero-nav__link--future" id="${item.id}" aria-disabled="true">
+      <span class="hero-nav__link-text">${item.label}</span>
+    </span>`;
   }).join('');
 
   return `
-    <nav class="hero-nav" aria-label="Main navigation">
-      <div class="hero-nav__links" id="nav-links">
-        ${links}
-        <a href="#/${ROUTES.GAME}" class="hero-nav__cta" id="nav-play">Play</a>
-      </div>
-      <button class="hero-nav__toggle" id="nav-toggle" type="button"
-              aria-label="Toggle navigation menu" aria-expanded="false">
-        <span class="hero-nav__bar" aria-hidden="true"></span>
-        <span class="hero-nav__bar" aria-hidden="true"></span>
-        <span class="hero-nav__bar" aria-hidden="true"></span>
-      </button>
-    </nav>
+    <div class="hero-nav-wrapper">
+      <nav class="hero-nav" aria-label="Main navigation">
+        <div class="hero-nav__emblem" aria-hidden="true">
+          <div class="hero-nav__emblem-inner"></div>
+        </div>
+
+        <div class="hero-nav__links" id="nav-links">
+          ${links}
+          <a href="#/${ROUTES.GAME}" class="hero-nav__cta" id="nav-play">
+            <span class="hero-nav__cta-text">PLAY</span>
+            ${arrowSVG('hero-nav__cta-arrow')}
+          </a>
+        </div>
+
+        <button class="hero-nav__toggle" id="nav-toggle" type="button"
+                aria-label="Toggle navigation menu" aria-expanded="false">
+          <span class="hero-nav__bar" aria-hidden="true"></span>
+          <span class="hero-nav__bar" aria-hidden="true"></span>
+          <span class="hero-nav__bar" aria-hidden="true"></span>
+        </button>
+      </nav>
+      <div class="hero-nav__atmospheric-gradient" aria-hidden="true"></div>
+    </div>
   `;
 }
 
