@@ -1,0 +1,19 @@
+{
+  "name": "shadow-of-the-crimson-gate",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shadow of the Crimson Gate — A cinematic Japanese fantasy 2D web game",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.87.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

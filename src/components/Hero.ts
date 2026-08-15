@@ -1,0 +1,309 @@
+/**
+ * Hero Component
+ *
+ * Renders the full-viewport cinematic hero section for the landing page.
+ *
+ * Features:
+ *   - Background image with ken-burns (CSS) + mouse parallax (JS)
+ *   - Atmospheric overlays (gradient, vignette, bottom fog)
+ *   - Floating navigation with mobile hamburger menu
+ *   - Staggered title reveal (SHADOW / OF THE / CRIMSON GATE)
+ *   - Sakura petal particles + spirit glow particles
+ *   - Ambient glow effects
+ *   - Play button with cursor-tracking glow
+ *   - Cinematic transition on Play click before navigating to /game
+ */
+
+import {
+  GAME_TITLE,
+  HERO_SUBTITLE,
+  HERO_TAGLINE,
+  NAV_ITEMS,
+  ROUTES,
+  PARALLAX,
+  PARTICLES,
+  TIMING,
+} from '../utils/constants';
+
+// ─── Internal Constants ──────────────────────────────────────────────────────
+
+const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+const PREFERS_REDUCED_MOTION = window.matchMedia(
+  '(prefers-reduced-motion: reduce)'
+).matches;
+const ENABLE_PARALLAX = !IS_TOUCH && !PREFERS_REDUCED_MOTION;
+
+// ─── Particle Helpers ────────────────────────────────────────────────────────
+
+/** Creates a single sakura petal element with randomized animation. */
+function createPetal(index: number): HTMLElement {
+  const el = document.createElement('div');
+  const isWhite = Math.random() > 0.6;
+
+  el.className = `hero__petal ${isWhite ? 'hero__petal--white' : 'hero__petal--pink'}`;
+
+  const left = Math.random() * 100;
+  const size = 6 + Math.random() * 9;
+  const duration = 8 + Math.random() * 7;
+  const delay = Math.random() * 14;
+  const drift = -40 + Math.random() * 100;
+  const spin = 360 + Math.random() * 360;
+
+  el.style.left = `${left}%`;
+  el.style.width = `${size}px`;
+  el.style.height = `${size * 0.8}px`;
+  el.style.animationDuration = `${duration}s`;
+  el.style.animationDelay = `${delay}s`;
+  el.style.setProperty('--drift', `${drift}px`);
+  el.style.setProperty('--spin', `${spin}deg`);
+  el.style.transform = `rotate(${index * 37}deg)`;
+
+  return el;
+}
+
+/** Creates a single spirit/glow particle element. */
+function createSpirit(index: number): HTMLElement {
+  const el = document.createElement('div');
+  const isGold = Math.random() > 0.4;
+
+  el.className = `hero__spirit ${isGold ? 'hero__spirit--gold' : 'hero__spirit--teal'}`;
+
+  const left = 15 + Math.random() * 70;
+  const bottom = 10 + Math.random() * 40;
+  const size = 2 + Math.random() * 3;
+  const duration = 10 + Math.random() * 10;
+  const delay = Math.random() * 16;
+  const rise = -(15 + Math.random() * 20);
+  const wander = -15 + Math.random() * 30;
+
+  el.style.left = `${left}%`;
+  el.style.bottom = `${bottom}%`;
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+  el.style.animationDuration = `${duration}s`;
+  el.style.animationDelay = `${delay}s`;
+  el.style.setProperty('--rise', `${rise}vh`);
+  el.style.setProperty('--wander', `${wander}px`);
+
+  // Stagger initial position for variety
+  void index;
+
+  return el;
+}
+
+// ─── SVG Arrow Icon ──────────────────────────────────────────────────────────
+
+function arrowSVG(): string {
+  return `<svg class="hero__cta-arrow" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+    stroke-linejoin="round" aria-hidden="true">
+    <path d="M5 12h14M12 5l7 7-7 7"/>
+  </svg>`;
+}
+
+// ─── Navigation HTML ─────────────────────────────────────────────────────────
+
+function buildNavHTML(): string {
+  const links = NAV_ITEMS.map((item) => {
+    if (item.href) {
+      const isHome = item.href === '#/';
+      return `<a href="${item.href}" class="hero-nav__link${isHome ? ' hero-nav__link--active' : ''}" id="${item.id}">${item.label}</a>`;
+    }
+    return `<span class="hero-nav__link hero-nav__link--future" id="${item.id}" aria-disabled="true">${item.label}</span>`;
+  }).join('');
+
+  return `
+    <nav class="hero-nav" aria-label="Main navigation">
+      <div class="hero-nav__links" id="nav-links">
+        ${links}
+        <a href="#/${ROUTES.GAME}" class="hero-nav__cta" id="nav-play">Play</a>
+      </div>
+      <button class="hero-nav__toggle" id="nav-toggle" type="button"
+              aria-label="Toggle navigation menu" aria-expanded="false">
+        <span class="hero-nav__bar" aria-hidden="true"></span>
+        <span class="hero-nav__bar" aria-hidden="true"></span>
+        <span class="hero-nav__bar" aria-hidden="true"></span>
+      </button>
+    </nav>
+  `;
+}
+
+// ─── Title Lines ─────────────────────────────────────────────────────────────
+
+/** Splits "Shadow of the Crimson Gate" into cinematic hierarchy lines. */
+function buildTitleHTML(): string {
+  return `
+    <h1 class="hero__title">
+      <span class="hero__title-line hero__title-line--lg">Shadow</span>
+      <span class="hero__title-line hero__title-line--sm">of the</span>
+      <span class="hero__title-line hero__title-line--lg">Crimson Gate</span>
+    </h1>
+  `;
+}
+
+// ─── Main Render ─────────────────────────────────────────────────────────────
+
+/**
+ * Renders the cinematic hero section into the given container.
+ * Returns a cleanup function to remove listeners and cancel animation frames.
+ */
+export function renderHero(container: HTMLElement): () => void {
+  const controller = new AbortController();
+  const { signal } = controller;
+
+  let rafId: number | null = null;
+  let isTransitioning = false;
+
+  // ── Build DOM ──
+
+  const section = document.createElement('section');
+  section.className = 'hero';
+  section.id = 'hero-section';
+  section.setAttribute('role', 'banner');
+  section.setAttribute('aria-label', `${GAME_TITLE} hero section`);
+
+  section.innerHTML = `
+    ${buildNavHTML()}
+
+    <!-- Background: wrapper for ken-burns, inner for parallax -->
+    <div class="hero__bg-wrap" aria-hidden="true">
+      <div class="hero__bg" id="hero-bg"></div>
+    </div>
+
+    <!-- Atmospheric overlays -->
+    <div class="hero__overlay hero__overlay--gradient" aria-hidden="true"></div>
+    <div class="hero__overlay hero__overlay--vignette" aria-hidden="true"></div>
+    <div class="hero__overlay hero__overlay--bottom" aria-hidden="true"></div>
+
+    <!-- Particles -->
+    <div class="hero__petals" id="hero-petals" aria-hidden="true"></div>
+    <div class="hero__spirits" id="hero-spirits" aria-hidden="true"></div>
+
+    <!-- Ambient glow -->
+    <div class="hero__glow hero__glow--warm" aria-hidden="true"></div>
+    <div class="hero__glow hero__glow--cool" aria-hidden="true"></div>
+
+    <!-- Title content (lower-left) -->
+    <div class="hero__content">
+      ${buildTitleHTML()}
+      <p class="hero__subtitle">${HERO_SUBTITLE}</p>
+    </div>
+
+    <!-- Bottom atmospheric text -->
+    <p class="hero__tagline">${HERO_TAGLINE}</p>
+
+    <!-- Play button (bottom-right) -->
+    <button class="hero__cta" id="hero-play" type="button"
+            aria-label="Play — enter the game">
+      <span class="hero__cta-label">Play</span>
+      ${arrowSVG()}
+      <span class="hero__cta-glow" aria-hidden="true"></span>
+    </button>
+
+    <!-- Transition curtain -->
+    <div class="hero__curtain" aria-hidden="true"></div>
+  `;
+
+  // ── Inject Particles ──
+
+  const petalsContainer = section.querySelector('#hero-petals') as HTMLElement;
+  for (let i = 0; i < PARTICLES.PETAL_COUNT; i++) {
+    petalsContainer.appendChild(createPetal(i));
+  }
+
+  const spiritsContainer = section.querySelector('#hero-spirits') as HTMLElement;
+  for (let i = 0; i < PARTICLES.SPIRIT_COUNT; i++) {
+    spiritsContainer.appendChild(createSpirit(i));
+  }
+
+  // ── Mount ──
+
+  container.appendChild(section);
+
+  // ── Parallax ──
+
+  const bgElement = section.querySelector('#hero-bg') as HTMLElement;
+
+  if (ENABLE_PARALLAX && bgElement) {
+    let targetX = 0;
+    let targetY = 0;
+    let currentX = 0;
+    let currentY = 0;
+
+    section.addEventListener('mousemove', (e: MouseEvent) => {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      targetX = ((e.clientX - cx) / cx) * PARALLAX.STRENGTH_X;
+      targetY = ((e.clientY - cy) / cy) * PARALLAX.STRENGTH_Y;
+    }, { signal });
+
+    const animateParallax = () => {
+      if (!isTransitioning) {
+        currentX += (targetX - currentX) * PARALLAX.LERP;
+        currentY += (targetY - currentY) * PARALLAX.LERP;
+        bgElement.style.transform =
+          `translate3d(${-currentX}px, ${-currentY}px, 0)`;
+      }
+      rafId = requestAnimationFrame(animateParallax);
+    };
+
+    rafId = requestAnimationFrame(animateParallax);
+  }
+
+  // ── Play Button ──
+
+  const playButton = section.querySelector('#hero-play') as HTMLButtonElement;
+
+  // Cursor-tracking glow
+  playButton.addEventListener('mousemove', (e: MouseEvent) => {
+    const rect = playButton.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    playButton.style.setProperty('--glow-x', `${x}px`);
+    playButton.style.setProperty('--glow-y', `${y}px`);
+  }, { signal });
+
+  // Play click → cinematic transition → navigate
+  playButton.addEventListener('click', () => {
+    if (isTransitioning) return;
+    isTransitioning = true;
+
+    section.classList.add('hero--transitioning');
+
+    setTimeout(() => {
+      window.location.hash = `#/${ROUTES.GAME}`;
+    }, TIMING.PLAY_TRANSITION);
+  }, { signal });
+
+  // ── Mobile Navigation Toggle ──
+
+  const toggleButton = section.querySelector('#nav-toggle') as HTMLButtonElement;
+  const navLinks = section.querySelector('#nav-links') as HTMLElement;
+
+  toggleButton.addEventListener('click', () => {
+    const isOpen = navLinks.classList.toggle('hero-nav__links--open');
+    toggleButton.classList.toggle('hero-nav__toggle--open', isOpen);
+    toggleButton.setAttribute('aria-expanded', String(isOpen));
+  }, { signal });
+
+  // Close mobile menu when a link inside is clicked
+  navLinks.addEventListener('click', (e: Event) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('hero-nav__link') ||
+        target.classList.contains('hero-nav__cta')) {
+      navLinks.classList.remove('hero-nav__links--open');
+      toggleButton.classList.remove('hero-nav__toggle--open');
+      toggleButton.setAttribute('aria-expanded', 'false');
+    }
+  }, { signal });
+
+  // ── Cleanup ──
+
+  return () => {
+    controller.abort();
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  };
+}

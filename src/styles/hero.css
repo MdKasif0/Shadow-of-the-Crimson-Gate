@@ -1,0 +1,903 @@
+/**
+ * Hero Section Styles — Shadow of the Crimson Gate
+ *
+ * Full-viewport cinematic hero with atmospheric overlays, ken-burns
+ * background, floating navigation, parallax, sakura particles,
+ * spirit effects, staggered title reveal, and play button.
+ *
+ * Sections:
+ *   1. Base Container
+ *   2. Navigation
+ *   3. Background
+ *   4. Overlays
+ *   5. Particles — Sakura Petals
+ *   6. Particles — Spirit Particles
+ *   7. Ambient Glow
+ *   8. Title & Content
+ *   9. Bottom Tagline
+ *  10. Play Button (CTA)
+ *  11. Transition Curtain
+ *  12. Keyframes
+ *  13. Game Placeholder Page
+ *  14. Responsive — Tablet
+ *  15. Responsive — Mobile
+ *  16. Responsive — Small Mobile
+ *  17. Reduced Motion
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. BASE CONTAINER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 500px;
+  overflow: hidden;
+  background-color: var(--color-black);
+  isolation: isolate;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. NAVIGATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero-nav {
+  position: absolute;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  background: rgba(8, 8, 8, 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(240, 230, 211, 0.06);
+  border-radius: 100px;
+  padding: 0.3rem 0.35rem 0.3rem 1.5rem;
+  opacity: 0;
+  animation: fadeIn 0.8s ease 0.2s forwards;
+}
+
+.hero-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.hero-nav__link {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(240, 230, 211, 0.45);
+  text-decoration: none;
+  padding: 0.5rem 0.95rem;
+  cursor: pointer;
+  transition: color 0.25s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.hero-nav__link:hover,
+.hero-nav__link--active {
+  color: var(--color-ivory);
+}
+
+.hero-nav__link--future {
+  cursor: default;
+}
+
+.hero-nav__link--future:hover {
+  color: rgba(240, 230, 211, 0.45);
+}
+
+.hero-nav__cta {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ivory);
+  text-decoration: none;
+  background: rgba(139, 26, 26, 0.2);
+  border: 1px solid rgba(139, 26, 26, 0.25);
+  border-radius: 100px;
+  padding: 0.4rem 1.15rem;
+  margin-left: 0.3rem;
+  transition: background 0.25s ease, border-color 0.25s ease;
+  white-space: nowrap;
+}
+
+.hero-nav__cta:hover {
+  background: rgba(139, 26, 26, 0.35);
+  border-color: rgba(139, 26, 26, 0.45);
+  color: var(--color-ivory);
+}
+
+/* ── Hamburger Toggle ── */
+
+.hero-nav__toggle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 34px;
+  height: 34px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 7px;
+}
+
+.hero-nav__bar {
+  display: block;
+  width: 18px;
+  height: 1.5px;
+  background: var(--color-ivory);
+  border-radius: 1px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform-origin: center;
+}
+
+.hero-nav__toggle--open .hero-nav__bar:nth-child(1) {
+  transform: translateY(5.5px) rotate(45deg);
+}
+
+.hero-nav__toggle--open .hero-nav__bar:nth-child(2) {
+  opacity: 0;
+}
+
+.hero-nav__toggle--open .hero-nav__bar:nth-child(3) {
+  transform: translateY(-5.5px) rotate(-45deg);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. BACKGROUND
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Wrapper handles the ken-burns scale animation */
+.hero__bg-wrap {
+  position: absolute;
+  inset: -2%;
+  z-index: 1;
+  animation: kenBurns 25s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/** Inner element has the image and receives parallax transforms via JS */
+.hero__bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('/assets/hero-bg-image.png');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  will-change: transform;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. OVERLAYS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/** Color grading — subtle teal-dark wash, keeps artwork visible */
+.hero__overlay--gradient {
+  z-index: 2;
+  background: linear-gradient(
+    180deg,
+    rgba(5, 5, 5, 0.3) 0%,
+    rgba(12, 32, 32, 0.12) 30%,
+    rgba(8, 8, 8, 0.03) 50%,
+    rgba(8, 8, 8, 0.12) 70%,
+    rgba(5, 5, 5, 0.35) 100%
+  );
+}
+
+/** Vignette — dramatic edge darkening, center stays open */
+.hero__overlay--vignette {
+  z-index: 3;
+  background: radial-gradient(
+    ellipse 75% 65% at 50% 45%,
+    transparent 0%,
+    rgba(5, 5, 5, 0.1) 45%,
+    rgba(5, 5, 5, 0.4) 75%,
+    rgba(5, 5, 5, 0.75) 100%
+  );
+}
+
+/** Bottom fade — grounds the composition, supports text readability */
+.hero__overlay--bottom {
+  top: auto;
+  height: 45%;
+  z-index: 4;
+  background: linear-gradient(
+    to top,
+    rgba(5, 5, 5, 0.82) 0%,
+    rgba(5, 5, 5, 0.45) 30%,
+    rgba(5, 5, 5, 0.12) 55%,
+    transparent 100%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. PARTICLES — SAKURA PETALS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__petals {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.hero__petal {
+  position: absolute;
+  top: -15px;
+  border-radius: 50% 0 50% 0;
+  opacity: 0;
+  animation: petalDrift linear infinite;
+  will-change: transform;
+}
+
+.hero__petal--pink {
+  background: radial-gradient(
+    ellipse at 30% 30%,
+    rgba(255, 183, 197, 0.85),
+    rgba(219, 112, 147, 0.45)
+  );
+}
+
+.hero__petal--white {
+  background: radial-gradient(
+    ellipse at 30% 30%,
+    rgba(255, 245, 238, 0.7),
+    rgba(240, 230, 211, 0.35)
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. PARTICLES — SPIRIT PARTICLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__spirits {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.hero__spirit {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  animation: spiritRise linear infinite;
+  will-change: transform;
+}
+
+.hero__spirit--gold {
+  background: #c4a35a;
+  box-shadow:
+    0 0 6px rgba(196, 163, 90, 0.5),
+    0 0 14px rgba(196, 163, 90, 0.15);
+}
+
+.hero__spirit--teal {
+  background: #2a5a5a;
+  box-shadow:
+    0 0 6px rgba(42, 90, 90, 0.5),
+    0 0 14px rgba(42, 90, 90, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. AMBIENT GLOW
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__glow {
+  position: absolute;
+  z-index: 5;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(60px);
+}
+
+.hero__glow--warm {
+  width: 250px;
+  height: 250px;
+  bottom: 12%;
+  left: 45%;
+  background: radial-gradient(circle, rgba(139, 26, 26, 0.08), transparent 70%);
+  animation: glowPulse 8s ease-in-out infinite alternate;
+}
+
+.hero__glow--cool {
+  width: 300px;
+  height: 300px;
+  top: 8%;
+  right: 12%;
+  background: radial-gradient(circle, rgba(26, 58, 58, 0.06), transparent 70%);
+  animation: glowPulse 8s ease-in-out infinite alternate-reverse;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. TITLE & CONTENT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__content {
+  position: absolute;
+  left: 8%;
+  top: 55%;
+  z-index: 10;
+  max-width: 650px;
+}
+
+.hero__title {
+  font-family: var(--font-display);
+  margin: 0;
+  line-height: 1;
+}
+
+.hero__title-line {
+  display: block;
+  text-transform: uppercase;
+  color: var(--color-ivory);
+  opacity: 0;
+  transform: translateY(25px);
+  animation: titleReveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hero__title-line--lg {
+  font-size: clamp(2.2rem, 5.5vw, 4.8rem);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-shadow:
+    0 0 35px rgba(196, 163, 90, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.hero__title-line--sm {
+  font-size: clamp(0.8rem, 1.8vw, 1.15rem);
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  color: var(--color-ivory-muted);
+  margin: 0.3em 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Staggered reveal for each title line */
+.hero__title-line:nth-child(1) { animation-delay: 0.4s; }
+.hero__title-line:nth-child(2) { animation-delay: 0.7s; }
+.hero__title-line:nth-child(3) { animation-delay: 1.0s; }
+
+.hero__subtitle {
+  font-family: var(--font-ui);
+  font-size: clamp(0.6rem, 1.1vw, 0.8rem);
+  font-weight: 300;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(240, 230, 211, 0.4);
+  margin-top: 1.5rem;
+  opacity: 0;
+  animation: fadeIn 1s ease 1.6s forwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9. BOTTOM TAGLINE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__tagline {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  font-family: var(--font-ui);
+  font-size: 0.55rem;
+  font-weight: 300;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(240, 230, 211, 0.25);
+  white-space: nowrap;
+  opacity: 0;
+  animation: fadeIn 0.8s ease 2.2s forwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   10. PLAY BUTTON (CTA)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__cta {
+  position: absolute;
+  right: 5%;
+  bottom: 6%;
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1.6rem;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-ivory);
+  background: rgba(10, 10, 10, 0.45);
+  border: 1px solid rgba(240, 230, 211, 0.12);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.2s ease,
+    box-shadow 0.3s ease;
+  opacity: 0;
+  animation: fadeInUp 0.8s ease 2s forwards;
+}
+
+/** Idle glow pulse ring */
+.hero__cta::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 9px;
+  box-shadow: 0 0 12px rgba(240, 230, 211, 0.03);
+  animation: ctaPulse 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/** Cursor-tracking glow — positioned via --glow-x / --glow-y */
+.hero__cta-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle 55px at var(--glow-x, 50%) var(--glow-y, 50%),
+    rgba(240, 230, 211, 0.1),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.hero__cta:hover .hero__cta-glow {
+  opacity: 1;
+}
+
+.hero__cta-label {
+  position: relative;
+  z-index: 1;
+}
+
+.hero__cta-arrow {
+  position: relative;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  opacity: 0.35;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+/* Hover */
+.hero__cta:hover {
+  background: rgba(10, 10, 10, 0.6);
+  border-color: rgba(240, 230, 211, 0.22);
+  transform: scale(1.04);
+  box-shadow: 0 0 25px rgba(240, 230, 211, 0.04);
+}
+
+.hero__cta:hover .hero__cta-arrow {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
+/* Active / Click */
+.hero__cta:active {
+  transform: scale(0.97);
+  transition-duration: 0.1s;
+}
+
+.hero__cta:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   11. TRANSITION CURTAIN
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hero__curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(5, 5, 5, 0);
+  pointer-events: none;
+  transition: background 0.5s ease;
+}
+
+.hero--transitioning .hero__curtain {
+  background: rgba(5, 5, 5, 0.85);
+  pointer-events: all;
+}
+
+.hero--transitioning .hero__content {
+  transition: opacity 0.5s ease, filter 0.5s ease;
+  opacity: 0.15;
+  filter: blur(3px);
+}
+
+.hero--transitioning .hero__cta {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  opacity: 0 !important;
+  transform: scale(0.94) !important;
+}
+
+.hero--transitioning .hero__tagline {
+  transition: opacity 0.4s ease;
+  opacity: 0 !important;
+}
+
+.hero--transitioning .hero-nav {
+  transition: opacity 0.4s ease;
+  opacity: 0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   12. KEYFRAMES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes kenBurns {
+  0%   { transform: scale(1); }
+  100% { transform: scale(1.04); }
+}
+
+@keyframes titleReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes petalDrift {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0) rotate(0deg) scale(0.9);
+  }
+  8%  { opacity: 0.7; }
+  50% { opacity: 0.45; }
+  92% { opacity: 0.1; }
+  100% {
+    opacity: 0;
+    transform:
+      translateY(105vh)
+      translateX(var(--drift, 60px))
+      rotate(var(--spin, 540deg))
+      scale(0.3);
+  }
+}
+
+@keyframes spiritRise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0);
+  }
+  12% { opacity: 0.6; }
+  75% { opacity: 0.2; }
+  100% {
+    opacity: 0;
+    transform:
+      translateY(var(--rise, -25vh))
+      translateX(var(--wander, 15px));
+  }
+}
+
+@keyframes glowPulse {
+  0%   { opacity: 0.35; transform: scale(0.92); }
+  100% { opacity: 0.65; transform: scale(1.08); }
+}
+
+@keyframes ctaPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(240, 230, 211, 0.03); }
+  50%      { box-shadow: 0 0 22px rgba(240, 230, 211, 0.07); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   13. GAME PLACEHOLDER PAGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.game-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: radial-gradient(
+    ellipse at center,
+    var(--color-teal) 0%,
+    var(--color-charcoal) 50%,
+    var(--color-black) 100%
+  );
+  padding: var(--space-lg);
+}
+
+.game-placeholder__title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ivory);
+  margin-bottom: var(--space-md);
+}
+
+.game-placeholder__status {
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  color: var(--color-ivory-muted);
+  letter-spacing: 0.08em;
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.game-placeholder__back {
+  margin-top: var(--space-xl);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  background: none;
+  border: 1px solid rgba(196, 163, 90, 0.3);
+  padding: 0.6rem 1.8rem;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.game-placeholder__back:hover {
+  color: var(--color-gold-bright);
+  border-color: var(--color-gold);
+}
+
+.game-placeholder__back:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 4px;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   14. RESPONSIVE — TABLET (≤ 1024px)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .hero__content {
+    left: 6%;
+    top: 53%;
+  }
+
+  .hero__cta {
+    right: 4%;
+    bottom: 5%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   15. RESPONSIVE — MOBILE (≤ 768px)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* ── Navigation ── */
+  .hero-nav {
+    top: 1rem;
+    right: 1rem;
+    left: auto;
+    transform: none;
+    padding: 0.25rem;
+    /* Remove backdrop-filter on mobile — it creates a new containing block
+       that traps position:fixed children (#nav-links overlay) inside the pill */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(8, 8, 8, 0.7);
+  }
+
+  .hero-nav__links {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    background: rgba(5, 5, 5, 0.96);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.4s ease, visibility 0.4s;
+    z-index: 100;
+  }
+
+  .hero-nav__links--open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .hero-nav__link {
+    font-size: 0.9rem;
+    letter-spacing: 0.22em;
+    padding: 0.8rem 1.5rem;
+    color: rgba(240, 230, 211, 0.6);
+  }
+
+  .hero-nav__link--active {
+    color: var(--color-ivory);
+  }
+
+  .hero-nav__link--future {
+    color: rgba(240, 230, 211, 0.3);
+  }
+
+  .hero-nav__cta {
+    margin-left: 0;
+    margin-top: 0.8rem;
+    font-size: 0.8rem;
+    padding: 0.6rem 2.2rem;
+  }
+
+  .hero-nav__toggle {
+    display: flex;
+    position: relative;
+    z-index: 101;
+  }
+
+  /* ── Title ── */
+  .hero__content {
+    left: 5%;
+    top: auto;
+    bottom: 20%;
+    max-width: 90%;
+  }
+
+  .hero__title-line--lg {
+    font-size: clamp(1.8rem, 9vw, 2.8rem);
+  }
+
+  .hero__title-line--sm {
+    font-size: clamp(0.65rem, 2.5vw, 0.9rem);
+    letter-spacing: 0.18em;
+  }
+
+  .hero__subtitle {
+    margin-top: 1rem;
+    letter-spacing: 0.14em;
+  }
+
+  /* ── Play Button ── */
+  .hero__cta {
+    right: 50%;
+    transform: translateX(50%);
+    bottom: 4%;
+  }
+
+  .hero__cta:hover {
+    transform: translateX(50%) scale(1.04);
+  }
+
+  .hero__cta:active {
+    transform: translateX(50%) scale(0.97);
+  }
+
+  /* ── Tagline ── */
+  .hero__tagline {
+    display: none;
+  }
+
+  /* ── Ambient ── */
+  .hero__glow--warm,
+  .hero__glow--cool {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   16. RESPONSIVE — SMALL MOBILE (≤ 480px)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .hero__content {
+    left: 4%;
+    bottom: 18%;
+  }
+
+  .hero__title-line--lg {
+    font-size: clamp(1.6rem, 9vw, 2.4rem);
+  }
+
+  .hero__subtitle {
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+  }
+
+  .hero__cta {
+    padding: 0.65rem 1.4rem;
+    font-size: 0.7rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   17. REDUCED MOTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero__bg-wrap {
+    animation: none;
+    transform: scale(1.02);
+  }
+
+  .hero__petal,
+  .hero__spirit {
+    animation: none;
+    display: none;
+  }
+
+  .hero__glow--warm,
+  .hero__glow--cool {
+    animation: none;
+  }
+
+  .hero__cta::before {
+    animation: none;
+  }
+
+  .hero__title-line,
+  .hero__subtitle,
+  .hero__tagline,
+  .hero__cta,
+  .hero-nav {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
