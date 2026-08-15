@@ -25,6 +25,14 @@ import {
   TIMING,
 } from '../utils/constants';
 
+import {
+  OverlayManager,
+  openWorldOverlay,
+  openLoreOverlay,
+  openCharactersOverlay,
+  openMediaOverlay
+} from './Overlays';
+
 // ─── Internal Constants ──────────────────────────────────────────────────────
 
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -105,23 +113,17 @@ function arrowSVG(className: string = 'hero__cta-arrow'): string {
 
 function buildNavHTML(): string {
   const links = NAV_ITEMS.map((item) => {
-    if (item.href) {
-      const isHome = item.href === '#/';
-      return `<a href="${item.href}" class="hero-nav__link${isHome ? ' hero-nav__link--active' : ''}" id="${item.id}">
-        <span class="hero-nav__link-text">${item.label}</span>
-      </a>`;
-    }
-    return `<span class="hero-nav__link hero-nav__link--future" id="${item.id}" aria-disabled="true">
+    return `<button class="hero-nav__link" data-overlay="${item.overlayId}" id="${item.id}">
       <span class="hero-nav__link-text">${item.label}</span>
-    </span>`;
+    </button>`;
   }).join('');
 
   return `
     <div class="hero-nav-wrapper">
       <nav class="hero-nav" aria-label="Main navigation">
-        <div class="hero-nav__emblem" aria-hidden="true">
+        <button class="hero-nav__emblem" id="hero-emblem" type="button" aria-label="Home">
           <div class="hero-nav__emblem-inner"></div>
-        </div>
+        </button>
 
         <div class="hero-nav__links" id="nav-links">
           ${links}
@@ -253,15 +255,46 @@ export function renderHero(container: HTMLElement): () => void {
   const iconOff = audioToggle.querySelector('.hero__audio-icon--off') as HTMLElement;
 
   let isPlaying = false;
-  audio.volume = 0.6; // slightly reduced ambient volume
+  const savedAudioPref = localStorage.getItem('sotcg_audio');
+  const shouldPlay = savedAudioPref !== 'off';
+  audio.volume = 0; // Start at 0 for fade in
+
+  const fadeAudioIn = () => {
+    let vol = 0;
+    audio.volume = vol;
+    const fade = setInterval(() => {
+      if (vol < 0.20) {
+        vol += 0.01;
+        audio.volume = vol;
+      } else {
+        clearInterval(fade);
+      }
+    }, 50);
+  };
+
+  const fadeAudioOut = () => {
+    let vol = audio.volume;
+    const fade = setInterval(() => {
+      if (vol > 0.02) {
+        vol -= 0.02;
+        audio.volume = vol;
+      } else {
+        audio.volume = 0;
+        audio.pause();
+        clearInterval(fade);
+      }
+    }, 50);
+  };
 
   const playAudio = async () => {
+    if (!shouldPlay) return;
     try {
       await audio.play();
       isPlaying = true;
       iconOn.style.display = 'block';
       iconOff.style.display = 'none';
       audioToggle.setAttribute('aria-pressed', 'true');
+      fadeAudioIn();
     } catch (err) {
       console.log('Autoplay blocked. User interaction required to play audio.');
     }
@@ -274,8 +307,17 @@ export function renderHero(container: HTMLElement): () => void {
       iconOn.style.display = 'none';
       iconOff.style.display = 'block';
       audioToggle.setAttribute('aria-pressed', 'false');
+      localStorage.setItem('sotcg_audio', 'off');
     } else {
-      playAudio();
+      localStorage.setItem('sotcg_audio', 'on');
+      // Reset volume instantly on toggle
+      audio.volume = 0.20;
+      audio.play().then(() => {
+        isPlaying = true;
+        iconOn.style.display = 'block';
+        iconOff.style.display = 'none';
+        audioToggle.setAttribute('aria-pressed', 'true');
+      }).catch(e => console.error(e));
     }
   };
 
@@ -293,9 +335,45 @@ export function renderHero(container: HTMLElement): () => void {
   };
   document.addEventListener('click', unlockAudio, { once: true, signal });
 
-  // ── Mount ──
-
   container.appendChild(section);
+
+  // ── Overlay Manager Registration ──
+
+  const overlayManager = OverlayManager.getInstance();
+  
+  // Register elements that should blur when overlay opens
+  const contentEl = section.querySelector('.hero__content') as HTMLElement;
+  const taglineEl = section.querySelector('.hero__tagline') as HTMLElement;
+  const ctaEl = section.querySelector('.hero__cta') as HTMLElement;
+  const navWrapperEl = section.querySelector('.hero-nav-wrapper') as HTMLElement;
+  
+  if (contentEl && taglineEl && ctaEl) {
+    overlayManager.registerBackgroundTargets([
+      contentEl, taglineEl, ctaEl
+    ]);
+  }
+
+  // Emblem closes overlay
+  const emblemBtn = section.querySelector('#hero-emblem') as HTMLButtonElement;
+  emblemBtn.addEventListener('click', () => {
+    overlayManager.closeOverlay();
+  }, { signal });
+
+  // Nav Links open overlays
+  const overlayBtns = section.querySelectorAll('.hero-nav__link');
+  overlayBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const target = e.currentTarget as HTMLButtonElement;
+      const overlayId = target.getAttribute('data-overlay');
+      
+      switch(overlayId) {
+        case 'world': openWorldOverlay(); break;
+        case 'lore': openLoreOverlay(); break;
+        case 'characters': openCharactersOverlay(); break;
+        case 'media': openMediaOverlay(); break;
+      }
+    }, { signal });
+  });
 
   // ── Parallax ──
 
@@ -346,6 +424,7 @@ export function renderHero(container: HTMLElement): () => void {
     isTransitioning = true;
 
     section.classList.add('hero--transitioning');
+    if (isPlaying) fadeAudioOut();
 
     setTimeout(() => {
       window.location.hash = `#/${ROUTES.GAME}`;
@@ -366,8 +445,7 @@ export function renderHero(container: HTMLElement): () => void {
   // Close mobile menu when a link inside is clicked
   navLinks.addEventListener('click', (e: Event) => {
     const target = e.target as HTMLElement;
-    if (target.classList.contains('hero-nav__link') ||
-        target.classList.contains('hero-nav__cta')) {
+    if (target.closest('.hero-nav__link') || target.closest('.hero-nav__cta')) {
       navLinks.classList.remove('hero-nav__links--open');
       toggleButton.classList.remove('hero-nav__toggle--open');
       toggleButton.setAttribute('aria-expanded', 'false');

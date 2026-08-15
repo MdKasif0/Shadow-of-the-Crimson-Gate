@@ -23,10 +23,10 @@ export const ROUTES = {
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: 'Home', href: '#/', id: 'nav-home' },
-  { label: 'World', href: null, id: 'nav-world' },
-  { label: 'Lore', href: null, id: 'nav-lore' },
-  { label: 'About', href: null, id: 'nav-about' },
+  { label: 'World', id: 'nav-world', overlayId: 'world' },
+  { label: 'Lore', id: 'nav-lore', overlayId: 'lore' },
+  { label: 'Characters', id: 'nav-characters', overlayId: 'characters' },
+  { label: 'Media', id: 'nav-media', overlayId: 'media' },
 ];
 
 // ─── Assets ──────────────────────────────────────────────────────────────────

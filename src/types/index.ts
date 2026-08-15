@@ -21,7 +21,6 @@ export interface Route {
 /** Navigation item */
 export interface NavItem {
   label: string;
-  /** Hash route to navigate to, or null for future/disabled links */
-  href: string | null;
   id: string;
+  overlayId: string;
 }

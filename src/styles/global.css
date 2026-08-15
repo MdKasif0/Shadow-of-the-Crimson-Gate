@@ -58,7 +58,10 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  scroll-behavior: smooth;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
 }
 
 body {
@@ -67,12 +70,17 @@ body {
   line-height: 1.6;
   color: var(--color-ivory);
   background-color: var(--color-black);
-  overflow-x: hidden;
-  min-height: 100vh;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
 }
 
 #app {
-  min-height: 100vh;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
   position: relative;
 }
 
