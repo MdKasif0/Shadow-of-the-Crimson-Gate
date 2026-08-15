@@ -6,16 +6,17 @@
 
 *Shadow of the Crimson Gate* is an upcoming 2D action-adventure web game. Currently, this repository houses the **AAA-quality, highly immersive landing page** and the foundational architecture necessary for the eventual Phaser 3 game integration.
 
-The project features a heavily atmospheric, cinematic hero section built without UI frameworks like React—opting instead for raw performance using vanilla TypeScript, CSS custom properties, and optimized DOM manipulation.
+The project features a heavily atmospheric, cinematic hero section built without UI frameworks like React—opting instead for raw performance using vanilla TypeScript, CSS custom properties, and an advanced custom-built Overlay architecture. The experience is designed to feel like a high-end game's title screen rather than a traditional marketing website.
 
 ## ✨ Features
 
-- **Cinematic Landing Page:** A stunning 100vh hero section that immerses the user immediately.
+- **Strict Single-Screen Experience:** The entire application is rigidly locked to a non-scrollable `100vw` × `100dvh` viewport, entirely preventing traditional page scrolling.
+- **Cinematic Overlay Architecture:** Instead of routing to new pages, navigation triggers a sophisticated `OverlayManager` that seamlessly dims and blurs the background while injecting full-screen lore, character, and media panels.
+- **Ambient Audio Subsystem:** High-quality background audio that respects browser autoplay policies, gracefully fading in upon the user's first interaction and saving mute preferences via `localStorage`.
 - **Hardware-Accelerated Effects:** CSS-based sakura petal and spirit particle systems that run smoothly without heavy JavaScript canvas calculations.
 - **Dynamic Mouse Parallax:** Depth-of-field movement tied to cursor position on desktop, using smooth `requestAnimationFrame` interpolation.
-- **Responsive & Accessible:** Fully responsive layout with a custom mobile hamburger navigation and viewport-aware typography (`clamp()`).
 - **Reduced Motion Support:** Automatically disables parallax and particle animations for users who prefer reduced motion.
-- **Game Ready Architecture:** A hash-based client-side router (`/` and `#/game`) is already implemented, alongside placeholder game states, ready for Phaser 3 initialization.
+- **Game Ready:** A hash-based client-side router is prepared for transitioning from the title screen into the actual Phaser 3 game canvas.
 
 ## 🛠️ Technology Stack
 
@@ -29,19 +30,20 @@ The project features a heavily atmospheric, cinematic hero section built without
 ```text
 src/
 ├── components/
-│   └── Hero.ts          # Handles the cinematic landing page animations & parallax
+│   ├── Hero.ts          # Handles the cinematic landing page animations & parallax
+│   └── Overlays.ts      # Singleton OverlayManager for World, Lore, Characters, Media
 ├── game/
 │   └── Game.ts          # Placeholder for future Phaser 3 instance
 ├── pages/
 │   ├── Home.ts          # Renders the Home View
 │   └── Game.ts          # Renders the Game View (Loading Placeholder)
 ├── styles/
-│   ├── global.css       # CSS Variables, resets, and typography
-│   └── hero.css         # Hero layout, particles, and responsive breakpoints
+│   ├── global.css       # CSS Variables, resets, typography, and viewport locks
+│   └── hero.css         # Hero layout, particles, overlays, and responsive breakpoints
 ├── types/
 │   └── index.ts         # TypeScript interfaces
 ├── utils/
-│   └── constants.ts     # Global configuration, timings, and routes
+│   └── constants.ts     # Global configuration, timings, and navigation structure
 ├── main.ts              # Entry point & Hash-based Router
 └── vite-env.d.ts        # Vite environment types
 ```
@@ -81,7 +83,9 @@ To build the project for production, run:
 npm run build
 ```
 
-This will output the optimized static files into the `dist/` directory, ready to be deployed to any static hosting provider.
+This will output the optimized static files into the `dist/` directory.
+
+> **Note on Netlify Deployment:** This repository contains a `netlify.toml` file to explicitly handle `esbuild` native postinstall scripts that are sometimes blocked by Netlify's secure `allow-scripts` environment.
 
 ## 🎨 Design Philosophy
 
