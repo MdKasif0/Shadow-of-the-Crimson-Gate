@@ -127,10 +127,10 @@ function buildNavHTML(): string {
 
         <div class="hero-nav__links" id="nav-links">
           ${links}
-          <a href="#/${ROUTES.GAME}" class="hero-nav__cta" id="nav-play">
+          <button type="button" class="hero-nav__cta" id="nav-play">
             <span class="hero-nav__cta-text">PLAY</span>
             ${arrowSVG('hero-nav__cta-arrow')}
-          </a>
+          </button>
         </div>
 
         <button class="hero-nav__toggle" id="nav-toggle" type="button"
@@ -419,7 +419,7 @@ export function renderHero(container: HTMLElement): () => void {
   }, { signal });
 
   // Play click → cinematic transition → navigate
-  playButton.addEventListener('click', () => {
+  const handlePlayClick = () => {
     if (isTransitioning) return;
     isTransitioning = true;
 
@@ -429,7 +429,14 @@ export function renderHero(container: HTMLElement): () => void {
     setTimeout(() => {
       window.location.hash = `#/${ROUTES.GAME}`;
     }, TIMING.PLAY_TRANSITION);
-  }, { signal });
+  };
+
+  playButton.addEventListener('click', handlePlayClick, { signal });
+  
+  const navPlayButton = section.querySelector('#nav-play') as HTMLButtonElement;
+  if (navPlayButton) {
+    navPlayButton.addEventListener('click', handlePlayClick, { signal });
+  }
 
   // ── Mobile Navigation Toggle ──
 
