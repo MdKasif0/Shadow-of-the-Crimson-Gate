@@ -1,41 +1,43 @@
-/**
- * Game Configuration (Future)
- *
- * Stub file for the Phaser 3 game configuration.
- * This will be expanded when actual gameplay is implemented.
- *
- * DO NOT initialize Phaser or create game instances here yet.
- */
+import Phaser from 'phaser';
+import { GAME_CONFIG } from './config/gameConfig';
+import { BootScene } from './scenes/BootScene';
+import { PreloadScene } from './scenes/PreloadScene';
+import { TempleScene } from './scenes/TempleScene';
+import { ExpeditionScene } from './scenes/ExpeditionScene';
+import { CombatScene } from './scenes/CombatScene';
+import { UIScene } from './scenes/UIScene';
+import { VictoryScene } from './scenes/VictoryScene';
+import { GameOverScene } from './scenes/GameOverScene';
 
-import { PHASER_CONFIG } from '../utils/constants';
-
-/**
- * Placeholder Phaser configuration object.
- * This will be passed to `new Phaser.Game(config)` in a future step.
- */
-export const gameConfig = {
-  type: 'AUTO' as const,
-  width: PHASER_CONFIG.WIDTH,
-  height: PHASER_CONFIG.HEIGHT,
-  parent: PHASER_CONFIG.PARENT_ID,
-  backgroundColor: '#050505',
-  physics: {
-    default: 'arcade',
-    arcade: {
-      gravity: { x: 0, y: 300 },
-      debug: false,
+export function createPhaserGame(containerId: string): Phaser.Game {
+  const config: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
+    width: GAME_CONFIG.WIDTH,
+    height: GAME_CONFIG.HEIGHT,
+    parent: containerId,
+    backgroundColor: GAME_CONFIG.BG_COLOR,
+    physics: {
+      default: 'arcade',
+      arcade: {
+        gravity: { x: 0, y: GAME_CONFIG.PHYSICS.GRAVITY_Y },
+        debug: GAME_CONFIG.PHYSICS.DEBUG
+      }
     },
-  },
-  scene: [] as unknown[],
-} as const;
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    scene: [
+      BootScene,
+      PreloadScene,
+      TempleScene,
+      ExpeditionScene,
+      CombatScene,
+      UIScene,
+      VictoryScene,
+      GameOverScene
+    ]
+  };
 
-/**
- * Future: Initialize the Phaser game.
- * This function is a stub and will be implemented when gameplay begins.
- */
-export function initializeGame(): void {
-  // Will be implemented in a future step:
-  // import Phaser from 'phaser';
-  // const game = new Phaser.Game(gameConfig);
-  console.info('[Game] Phaser game initialization pending. Game systems not yet implemented.');
+  return new Phaser.Game(config);
 }

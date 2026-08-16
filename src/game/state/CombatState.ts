@@ -1,0 +1,21 @@
+export enum PlayerState {
+  IDLE = 'IDLE',
+  WALK = 'WALK',
+  ATTACK = 'ATTACK',
+  HEAVY_ATTACK = 'HEAVY_ATTACK',
+  DASH = 'DASH',
+  PARRY = 'PARRY',
+  HURT = 'HURT',
+  DEAD = 'DEAD'
+}
+
+export enum CombatState {
+  INTRO = 'INTRO',
+  WAVE_ACTIVE = 'WAVE_ACTIVE',
+  WAVE_COMPLETE = 'WAVE_COMPLETE',
+  NEXT_WAVE = 'NEXT_WAVE',
+  BOSS_INTRO = 'BOSS_INTRO',
+  BOSS_ACTIVE = 'BOSS_ACTIVE',
+  BOSS_DEFEATED = 'BOSS_DEFEATED',
+  VICTORY = 'VICTORY'
+}
