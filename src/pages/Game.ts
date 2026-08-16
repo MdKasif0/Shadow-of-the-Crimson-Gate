@@ -9,8 +9,7 @@
 
 import type { PageComponent } from '../types/index';
 import { ROUTES, PHASER_CONFIG } from '../utils/constants';
-import { createPhaserGame } from '../game/Game';
-import type Phaser from 'phaser';
+import { init3DGame, ThreeGame } from '../game/Game';
 
 function navigateHome(): void {
   window.location.hash = `#/${ROUTES.HOME}`;
@@ -18,7 +17,7 @@ function navigateHome(): void {
 
 export function createGamePage(): PageComponent {
   let backButton: HTMLButtonElement | null = null;
-  let gameInstance: Phaser.Game | null = null;
+  let gameInstance: ThreeGame | null = null;
 
   return {
     render(container: HTMLElement): void {
@@ -48,8 +47,8 @@ export function createGamePage(): PageComponent {
       backButton = page.querySelector('#game-back-button') as HTMLButtonElement;
       backButton.addEventListener('click', navigateHome);
 
-      // Boot Phaser
-      gameInstance = createPhaserGame(PHASER_CONFIG.PARENT_ID);
+      // Boot Three.js Game
+      gameInstance = init3DGame(PHASER_CONFIG.PARENT_ID);
     },
 
     destroy(): void {
@@ -59,7 +58,7 @@ export function createGamePage(): PageComponent {
       }
 
       if (gameInstance) {
-        gameInstance.destroy(true);
+        gameInstance.destroy();
         gameInstance = null;
       }
 
