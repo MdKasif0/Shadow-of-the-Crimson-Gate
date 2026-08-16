@@ -207,12 +207,12 @@ export function openCharactersOverlay() {
 
 export function openMediaOverlay() {
   const galleryAssets = [
-    '/assets/sakura_courtyard.png',
-    '/assets/cursed_forest.png',
-    '/assets/temple.png',
-    '/assets/crimson_oni.png',
-    '/assets/tengu.png',
-    '/assets/player_ronin.png'
+    '/assets/environments/courtyard/sakura_courtyard.png',
+    '/assets/environments/forest/cursed_forest.png',
+    '/assets/environments/temple/temple.png',
+    '/assets/boss/crimson-oni/crimson_oni.png',
+    '/assets/characters/tengu/tengu.png',
+    '/assets/characters/player/player_ronin.png'
   ];
 
   const content = `
