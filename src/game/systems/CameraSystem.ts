@@ -7,8 +7,17 @@ export class CameraSystem {
     this.camera = scene.cameras.main;
   }
 
+  public setBounds(width: number, height: number): void {
+    this.camera.setBounds(0, 0, width, height);
+  }
+
+  public follow(target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container): void {
+    // Basic follow logic to start, which can be expanded later
+    this.camera.startFollow(target, true, 0.1, 0.1);
+  }
+
   public followPlayer(player: Phaser.GameObjects.Sprite): void {
-    // Implement smooth interpolation and deadzones later
+    this.follow(player);
   }
 
   public shakeLight(): void {

@@ -10,5 +10,10 @@ export const GAME_CONFIG = {
     DEADZONE_WIDTH: 200,
     DEADZONE_HEIGHT: 200,
     LERP: 0.1
-  }
+  },
+  WORLD: {
+    WIDTH: 3840,
+    HEIGHT: 2160
+  },
+  DEBUG_MODE: true
 };
