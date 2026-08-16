@@ -17,7 +17,9 @@ export const GAME_CONFIG = {
   },
   PLAYER: {
     START_X: 1920,
-    START_Y: 1080
+    START_Y: 1080,
+    MOVE_SPEED: 300
   },
+
   DEBUG_MODE: true
 };

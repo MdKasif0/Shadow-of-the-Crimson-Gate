@@ -1,3 +1,6 @@
+import Phaser from 'phaser';
+import { GAME_CONFIG } from '../config/gameConfig';
+
 export class CameraSystem {
   private scene: Phaser.Scene;
   private camera: Phaser.Cameras.Scene2D.Camera;
@@ -12,8 +15,11 @@ export class CameraSystem {
   }
 
   public follow(target: Phaser.GameObjects.Sprite | Phaser.GameObjects.Container): void {
-    // Basic follow logic to start, which can be expanded later
-    this.camera.startFollow(target, true, 0.1, 0.1);
+    // Smooth follow logic with lerp and deadzone
+    this.camera.startFollow(target, true, GAME_CONFIG.CAMERA.LERP, GAME_CONFIG.CAMERA.LERP);
+    if (GAME_CONFIG.CAMERA.DEADZONE_WIDTH > 0 && GAME_CONFIG.CAMERA.DEADZONE_HEIGHT > 0) {
+      this.camera.setDeadzone(GAME_CONFIG.CAMERA.DEADZONE_WIDTH, GAME_CONFIG.CAMERA.DEADZONE_HEIGHT);
+    }
   }
 
   public followPlayer(player: Phaser.GameObjects.Sprite): void {

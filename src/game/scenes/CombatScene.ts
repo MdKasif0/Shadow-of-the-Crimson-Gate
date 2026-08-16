@@ -77,7 +77,7 @@ export class CombatScene extends Phaser.Scene {
 
     // Background - Atmospheric Fog
     const bgFog = this.add.tileSprite(cx, cy, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT, 'VFXFogAtmospheric')
-      .setAlpha(0.6).setScrollFactor(0.1);
+      .setAlpha(0.6).setScrollFactor(0.08);
     this.backgroundLayer.add(bgFog);
 
     // Background - Temple
@@ -93,21 +93,21 @@ export class CombatScene extends Phaser.Scene {
     this.groundLayer.add(ground);
 
     // Foreground Props
-    const torii = this.add.image(cx, cy - 100, 'PropTorii');
+    const torii = this.add.image(cx, cy - 100, 'PropTorii').setScrollFactor(0.60);
     this.foregroundLayer.add(torii);
     
-    const shrine = this.add.image(cx - 400, cy - 200, 'PropShrine');
+    const shrine = this.add.image(cx - 400, cy - 200, 'PropShrine').setScrollFactor(0.60);
     this.foregroundLayer.add(shrine);
     
-    const lanterns = this.add.image(cx + 400, cy - 100, 'PropLanterns');
+    const lanterns = this.add.image(cx + 400, cy - 100, 'PropLanterns').setScrollFactor(0.60);
     this.foregroundLayer.add(lanterns);
 
-    const foregroundProps = this.add.image(cx, cy + 400, 'PropForeground').setScrollFactor(1.1);
+    const foregroundProps = this.add.image(cx, cy + 400, 'PropForeground').setScrollFactor(0.60);
     this.foregroundLayer.add(foregroundProps);
 
     // Foreground Mist
     const fgMist = this.add.tileSprite(cx, cy, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT, 'VFXFogForeground')
-      .setAlpha(0.3).setScrollFactor(1.2);
+      .setAlpha(0.3).setScrollFactor(0.60);
     this.foregroundLayer.add(fgMist);
 
     // Lighting
