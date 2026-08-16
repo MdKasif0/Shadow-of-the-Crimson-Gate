@@ -67,7 +67,69 @@ export class CombatScene extends Phaser.Scene {
     this.vfxLayer = this.add.layer().setDepth(DEPTH.PARTICLES);
     this.lightingLayer = this.add.layer().setDepth(DEPTH.LIGHTING);
 
-    // 5. Initialize Groups
+    // 5. Environment Asset Positioning & Layering
+    const cx = GAME_CONFIG.WORLD.WIDTH / 2;
+    const cy = GAME_CONFIG.WORLD.HEIGHT / 2;
+
+    // Background - Mountains with subtle parallax
+    const mountains = this.add.image(cx, cy - 400, 'EnvMountains').setScrollFactor(0.05);
+    this.backgroundLayer.add(mountains);
+
+    // Background - Atmospheric Fog
+    const bgFog = this.add.tileSprite(cx, cy, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT, 'VFXFogAtmospheric')
+      .setAlpha(0.6).setScrollFactor(0.1);
+    this.backgroundLayer.add(bgFog);
+
+    // Background - Temple
+    const temple = this.add.image(cx, cy - 300, 'EnvTemple').setScrollFactor(0.15);
+    this.backgroundLayer.add(temple);
+
+    // Midground - Sakura Courtyard
+    const courtyard = this.add.image(cx, cy, 'EnvCourtyard').setScrollFactor(0.35);
+    this.midgroundLayer.add(courtyard);
+
+    // Ground - Playable area
+    const ground = this.add.image(cx, cy + 200, 'EnvCourtyardGround').setScrollFactor(1.0);
+    this.groundLayer.add(ground);
+
+    // Foreground Props
+    const torii = this.add.image(cx, cy - 100, 'PropTorii');
+    this.foregroundLayer.add(torii);
+    
+    const shrine = this.add.image(cx - 400, cy - 200, 'PropShrine');
+    this.foregroundLayer.add(shrine);
+    
+    const lanterns = this.add.image(cx + 400, cy - 100, 'PropLanterns');
+    this.foregroundLayer.add(lanterns);
+
+    const foregroundProps = this.add.image(cx, cy + 400, 'PropForeground').setScrollFactor(1.1);
+    this.foregroundLayer.add(foregroundProps);
+
+    // Foreground Mist
+    const fgMist = this.add.tileSprite(cx, cy, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT, 'VFXFogForeground')
+      .setAlpha(0.3).setScrollFactor(1.2);
+    this.foregroundLayer.add(fgMist);
+
+    // Lighting
+    const moonlight = this.add.image(cx, cy, 'LightMoonlight').setAlpha(0.4).setScrollFactor(0).setBlendMode(Phaser.BlendModes.ADD);
+    this.lightingLayer.add(moonlight);
+    
+    const lanternGlow = this.add.image(cx + 400, cy - 100, 'LightLantern').setAlpha(0.6).setBlendMode(Phaser.BlendModes.ADD);
+    this.lightingLayer.add(lanternGlow);
+
+    // Fog Animation
+    this.tweens.add({
+      targets: [bgFog, fgMist],
+      tilePositionX: '+=1000',
+      duration: 50000,
+      repeat: -1
+    });
+
+    // VFX Particles
+    this.vfxSystem.spawnSakuraPetals();
+    this.vfxSystem.spawnSpirits();
+
+    // 6. Initialize Groups
     this.enemies = this.add.group({
       runChildUpdate: true
     });
@@ -75,7 +137,23 @@ export class CombatScene extends Phaser.Scene {
     // Launch HUD
     this.scene.launch('UIScene');
 
-    // 6. Development Debug Mode
+    // 7. Temporary Dev Camera Target
+    const devTarget = this.add.rectangle(cx, cy, 50, 50, 0x00ff00, 0.0);
+    this.physics.add.existing(devTarget);
+    this.cameraSystem.follow(devTarget as any);
+
+    // Dev Target Controls (Arrow Keys)
+    const cursors = this.input.keyboard?.createCursorKeys();
+    this.events.on('update', () => {
+      const body = (devTarget as any).body;
+      body.setVelocity(0);
+      if (cursors?.left.isDown) body.setVelocityX(-500);
+      else if (cursors?.right.isDown) body.setVelocityX(500);
+      if (cursors?.up.isDown) body.setVelocityY(-500);
+      else if (cursors?.down.isDown) body.setVelocityY(500);
+    });
+
+    // 8. Development Debug Mode
     if (GAME_CONFIG.DEBUG_MODE) {
       this.debugText = this.add.text(10, 10, '', {
         fontSize: '16px',
