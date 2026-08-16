@@ -4,48 +4,39 @@
 
 ![Shadow of the Crimson Gate Hero](public/assets/hero-bg-image.png)
 
-*Shadow of the Crimson Gate* is an upcoming 2D action-adventure web game. Currently, this repository houses the **AAA-quality, highly immersive landing page** and the foundational architecture necessary for the eventual Phaser 3 game integration.
-
-The project features a heavily atmospheric, cinematic hero section built without UI frameworks like React—opting instead for raw performance using vanilla TypeScript, CSS custom properties, and an advanced custom-built Overlay architecture. The experience is designed to feel like a high-end game's title screen rather than a traditional marketing website.
+*Shadow of the Crimson Gate* is a 2D action-adventure web game. It features a premium, immersive landing page that transitions seamlessly into a playable Phaser 3 game environment.
 
 ## ✨ Features
 
-- **Strict Single-Screen Experience:** The entire application is rigidly locked to a non-scrollable `100vw` × `100dvh` viewport, entirely preventing traditional page scrolling.
-- **Cinematic Overlay Architecture:** Instead of routing to new pages, navigation triggers a sophisticated `OverlayManager` that seamlessly dims and blurs the background while injecting full-screen lore, character, and media panels.
-- **Ambient Audio Subsystem:** High-quality background audio that respects browser autoplay policies, gracefully fading in upon the user's first interaction and saving mute preferences via `localStorage`.
-- **Hardware-Accelerated Effects:** CSS-based sakura petal and spirit particle systems that run smoothly without heavy JavaScript canvas calculations.
-- **Dynamic Mouse Parallax:** Depth-of-field movement tied to cursor position on desktop, using smooth `requestAnimationFrame` interpolation.
-- **Reduced Motion Support:** Automatically disables parallax and particle animations for users who prefer reduced motion.
-- **Game Ready:** A hash-based client-side router is prepared for transitioning from the title screen into the actual Phaser 3 game canvas.
+- **Cinematic Game World:** A fully playable 2.5D environment featuring deep parallax scrolling, dynamic layering, and atmospheric lighting.
+- **Fluid Arcade Physics:** Control the Ronin protagonist with responsive 8-way directional movement and state-driven animations.
+- **Procedural VFX:** Highly optimized, programmatic Sakura petals and spirit particles using custom object pooling and sinusoidal math.
+- **Strict Single-Screen Experience:** The application is rigidly locked to a non-scrollable viewport, preventing traditional page scrolling.
+- **Seamless Architecture:** A custom hash-based router transitions users from the vanilla TypeScript title screen directly into the Phaser 3 canvas.
+- **Ambient Audio:** High-quality background audio that respects browser autoplay policies and persists user preferences.
 
 ## 🛠️ Technology Stack
 
 - **Core:** TypeScript, HTML5, Vanilla CSS
+- **Game Engine:** [Phaser 3](https://phaser.io/)
 - **Build Tool:** [Vite](https://vitejs.dev/)
-- **Game Engine:** [Phaser 3](https://phaser.io/) *(Scaffolded and prepared)*
-- **No unnecessary bloat:** No React, no heavy state-management libraries, ensuring the quickest time-to-interactive for the landing page.
+- **Architecture:** Zero frontend frameworks (No React/Vue) to ensure maximum performance and minimal time-to-interactive.
 
 ## 📂 Project Structure
 
 ```text
 src/
-├── components/
-│   ├── Hero.ts          # Handles the cinematic landing page animations & parallax
-│   └── Overlays.ts      # Singleton OverlayManager for World, Lore, Characters, Media
-├── game/
-│   └── Game.ts          # Placeholder for future Phaser 3 instance
-├── pages/
-│   ├── Home.ts          # Renders the Home View
-│   └── Game.ts          # Renders the Game View (Loading Placeholder)
-├── styles/
-│   ├── global.css       # CSS Variables, resets, typography, and viewport locks
-│   └── hero.css         # Hero layout, particles, overlays, and responsive breakpoints
-├── types/
-│   └── index.ts         # TypeScript interfaces
-├── utils/
-│   └── constants.ts     # Global configuration, timings, and navigation structure
-├── main.ts              # Entry point & Hash-based Router
-└── vite-env.d.ts        # Vite environment types
+├── components/    # Landing page UI overlays and cinematic hero
+├── game/          # Core Phaser 3 game engine
+│   ├── config/    # Environment, depth, and system configurations
+│   ├── entities/  # Player and enemy physics/animation controllers
+│   ├── scenes/    # Preloader, Combat, and UI scenes
+│   └── systems/   # VFX, Camera, and Audio managers
+├── pages/         # High-level route views (Home, Game)
+├── styles/        # CSS Variables and resets
+├── types/         # TypeScript interfaces
+├── utils/         # Global utilities
+└── main.ts        # Entry point & Hash-based Router
 ```
 
 ## 🚀 Getting Started
@@ -84,8 +75,6 @@ npm run build
 ```
 
 This will output the optimized static files into the `dist/` directory.
-
-> **Note on Netlify Deployment:** This repository contains a `netlify.toml` file to explicitly handle `esbuild` native postinstall scripts that are sometimes blocked by Netlify's secure `allow-scripts` environment.
 
 ## 🎨 Design Philosophy
 
