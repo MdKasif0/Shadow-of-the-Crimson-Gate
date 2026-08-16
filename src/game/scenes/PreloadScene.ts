@@ -18,7 +18,10 @@ export class PreloadScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Characters
-    this.load.image('Player', ASSET_PATHS.CHARACTERS.PLAYER);
+    this.load.spritesheet('Player', ASSET_PATHS.CHARACTERS.PLAYER, {
+      frameWidth: 128,
+      frameHeight: 128
+    });
     this.load.image('BasicYokai', ASSET_PATHS.CHARACTERS.YOKAI_BASIC);
     this.load.image('ShadowYokai', ASSET_PATHS.CHARACTERS.YOKAI_SHADOW);
     this.load.image('Tengu', ASSET_PATHS.CHARACTERS.TENGU);

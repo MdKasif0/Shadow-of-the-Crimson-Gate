@@ -15,5 +15,9 @@ export const GAME_CONFIG = {
     WIDTH: 3840,
     HEIGHT: 2160
   },
+  PLAYER: {
+    START_X: 1920,
+    START_Y: 1080
+  },
   DEBUG_MODE: true
 };

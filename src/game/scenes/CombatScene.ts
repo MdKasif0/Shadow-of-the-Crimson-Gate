@@ -137,23 +137,14 @@ export class CombatScene extends Phaser.Scene {
     // Launch HUD
     this.scene.launch('UIScene');
 
-    // 7. Temporary Dev Camera Target
-    const devTarget = this.add.rectangle(cx, cy, 50, 50, 0x00ff00, 0.0);
-    this.physics.add.existing(devTarget);
-    this.cameraSystem.follow(devTarget as any);
+    // 7. Spawn Player
+    this.player = new Player(this, GAME_CONFIG.PLAYER.START_X, GAME_CONFIG.PLAYER.START_Y);
+    this.entityLayer.add(this.player);
 
-    // Dev Target Controls (Arrow Keys)
-    const cursors = this.input.keyboard?.createCursorKeys();
-    this.events.on('update', () => {
-      const body = (devTarget as any).body;
-      body.setVelocity(0);
-      if (cursors?.left.isDown) body.setVelocityX(-500);
-      else if (cursors?.right.isDown) body.setVelocityX(500);
-      if (cursors?.up.isDown) body.setVelocityY(-500);
-      else if (cursors?.down.isDown) body.setVelocityY(500);
-    });
+    // 8. Camera Follow Player
+    this.cameraSystem.follow(this.player);
 
-    // 8. Development Debug Mode
+    // 9. Development Debug Mode
     if (GAME_CONFIG.DEBUG_MODE) {
       this.debugText = this.add.text(10, 10, '', {
         fontSize: '16px',
@@ -173,15 +164,23 @@ export class CombatScene extends Phaser.Scene {
     this.events.once('shutdown', this.cleanup, this);
   }
 
-  update(_time: number, _delta: number) {
+  update(time: number, delta: number) {
     this.bossSystem.update();
+
+    if (this.player) {
+      this.player.updateEntity(time, delta);
+    }
 
     if (GAME_CONFIG.DEBUG_MODE && this.debugText) {
       this.debugText.setText([
         `FPS: ${Math.round(this.game.loop.actualFps)}`,
         `Scene: CombatScene`,
         `Camera: (${Math.round(this.cameras.main.scrollX)}, ${Math.round(this.cameras.main.scrollY)})`,
-        `World Size: ${GAME_CONFIG.WORLD.WIDTH}x${GAME_CONFIG.WORLD.HEIGHT}`
+        `World Size: ${GAME_CONFIG.WORLD.WIDTH}x${GAME_CONFIG.WORLD.HEIGHT}`,
+        `Player Pos: (${Math.round(this.player.x)}, ${Math.round(this.player.y)})`,
+        `Player State: ${this.player.currentState}`,
+        `Player Facing: ${this.player.facing}`,
+        `Player Depth: ${this.player.depth}`
       ]);
     }
   }

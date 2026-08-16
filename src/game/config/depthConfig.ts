@@ -12,3 +12,7 @@ export const DEPTH = {
   LIGHTING: 300,
   HUD: 1000
 };
+
+export function getEntityDepth(y: number): number {
+  return DEPTH.ENTITY_BASE + Math.round(y);
+}
