@@ -126,8 +126,9 @@ export class CombatScene extends Phaser.Scene {
     });
 
     // VFX Particles
-    this.vfxSystem.spawnSakuraPetals();
-    this.vfxSystem.spawnSpirits();
+    this.vfxSystem.init();
+    this.vfxSystem.startAmbientPetals();
+    this.vfxSystem.startAmbientSpirits();
 
     // 6. Initialize Groups
     this.enemies = this.add.group({
@@ -148,10 +149,20 @@ export class CombatScene extends Phaser.Scene {
     if (GAME_CONFIG.DEBUG_MODE) {
       this.debugText = this.add.text(10, 10, '', {
         fontSize: '16px',
-        color: '#00ff00',
+        color: '#ffffff',
         backgroundColor: '#00000088',
-        padding: { x: 5, y: 5 }
-      }).setScrollFactor(0).setDepth(DEPTH.HUD + 1);
+        padding: { x: 10, y: 10 }
+      }).setScrollFactor(0).setDepth(DEPTH.HUD);
+
+      // VFX Toggles
+      if (this.input.keyboard) {
+        this.input.keyboard.on('keydown-P', () => {
+          this.vfxSystem.ambientPetalsEnabled ? this.vfxSystem.stopAmbientPetals() : this.vfxSystem.startAmbientPetals();
+        });
+        this.input.keyboard.on('keydown-O', () => {
+          this.vfxSystem.ambientSpiritsEnabled ? this.vfxSystem.stopAmbientSpirits() : this.vfxSystem.startAmbientSpirits();
+        });
+      }
     }
 
     // Keybindings
@@ -166,6 +177,7 @@ export class CombatScene extends Phaser.Scene {
 
   update(time: number, delta: number) {
     this.bossSystem.update();
+    this.vfxSystem.update(time, delta);
 
     if (this.player) {
       this.player.updateEntity(time, delta);

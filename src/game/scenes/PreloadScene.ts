@@ -36,12 +36,10 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('EnvCourtyard', ASSET_PATHS.ENVIRONMENTS.COURTYARD);
     this.load.image('EnvCourtyardGround', ASSET_PATHS.ENVIRONMENTS.COURTYARD_GROUND);
     
-    // VFX & Particles
+    // VFX
     this.load.image('VFXSlash', ASSET_PATHS.VFX.SLASH);
     this.load.image('VFXFogAtmospheric', ASSET_PATHS.VFX.FOG_ATMOSPHERIC);
     this.load.image('VFXFogForeground', ASSET_PATHS.VFX.FOG_FOREGROUND);
-    this.load.image('VFXPetals', ASSET_PATHS.VFX.PETALS);
-    this.load.image('VFXSpirits', ASSET_PATHS.VFX.SPIRITS);
     
     // Lighting
     this.load.image('LightLantern', ASSET_PATHS.LIGHTING.LANTERN);

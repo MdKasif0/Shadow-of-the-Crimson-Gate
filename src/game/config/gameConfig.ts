@@ -7,9 +7,21 @@ export const GAME_CONFIG = {
     DEBUG: false
   },
   CAMERA: {
+    LERP: 0.1,
     DEADZONE_WIDTH: 200,
-    DEADZONE_HEIGHT: 200,
-    LERP: 0.1
+    DEADZONE_HEIGHT: 200
+  },
+  VFX: {
+    QUALITY_LEVEL: 'HIGH', // 'LOW', 'MEDIUM', 'HIGH'
+    MAX_PETALS: { LOW: 15, MEDIUM: 25, HIGH: 35 },
+    MAX_SPIRITS: { LOW: 6, MEDIUM: 12, HIGH: 18 },
+    WIND: {
+      PETAL_WIND_SPEED: 0.5,
+      PETAL_FALL_SPEED: 0.3,
+      PETAL_SWAY_AMOUNT: 1.5,
+      PETAL_SWAY_FREQUENCY: 0.002,
+      PETAL_SPAWN_RATE: 2000 // ms
+    }
   },
   WORLD: {
     WIDTH: 3840,
