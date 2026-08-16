@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import { CameraSystem } from '../systems/CameraSystem';
 import { WaveSystem } from '../systems/WaveSystem';
 import { BossSystem } from '../systems/BossSystem';
@@ -7,6 +8,7 @@ import { AudioSystem } from '../systems/AudioSystem';
 import { Player } from '../entities/Player';
 import { GAME_CONFIG } from '../config/gameConfig';
 import { DEPTH } from '../config/depthConfig';
+import { ENV_CONFIG } from '../config/environmentConfig';
 
 export class CombatScene extends Phaser.Scene {
   // Systems
@@ -70,51 +72,79 @@ export class CombatScene extends Phaser.Scene {
     // 5. Environment Asset Positioning & Layering
     const cx = GAME_CONFIG.WORLD.WIDTH / 2;
     const cy = GAME_CONFIG.WORLD.HEIGHT / 2;
+    const bgScale = ENV_CONFIG.SCALE.BASE_BG;
+    const propScale = ENV_CONFIG.SCALE.PROPS;
 
     // Background - Mountains with subtle parallax
-    const mountains = this.add.image(cx, cy - 400, 'EnvMountains').setScrollFactor(0.05);
+    const mountains = this.add.image(cx, cy - 800, 'EnvMountains')
+      .setScale(bgScale)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.MOUNTAINS);
     this.backgroundLayer.add(mountains);
 
     // Background - Atmospheric Fog
     const bgFog = this.add.tileSprite(cx, cy, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT, 'VFXFogAtmospheric')
-      .setAlpha(0.6).setScrollFactor(0.08);
+      .setAlpha(0.6)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.DISTANT_FOG);
     this.backgroundLayer.add(bgFog);
 
     // Background - Temple
-    const temple = this.add.image(cx, cy - 300, 'EnvTemple').setScrollFactor(0.15);
+    // Shifted slightly up so the ground seamlessly blends at the base
+    const temple = this.add.image(cx, cy - 400, 'EnvTemple')
+      .setScale(bgScale)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.TEMPLE);
     this.backgroundLayer.add(temple);
 
     // Midground - Sakura Courtyard
-    const courtyard = this.add.image(cx, cy, 'EnvCourtyard').setScrollFactor(0.35);
+    const courtyard = this.add.image(cx, cy - 100, 'EnvCourtyard')
+      .setScale(bgScale)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.MIDGROUND);
     this.midgroundLayer.add(courtyard);
 
-    // Ground - Playable area
-    const ground = this.add.image(cx, cy + 200, 'EnvCourtyardGround').setScrollFactor(1.0);
+    // Ground - Playable area anchored securely at 1.0 scroll factor
+    const ground = this.add.image(cx, cy + 300, 'EnvCourtyardGround')
+      .setScale(bgScale)
+      .setScrollFactor(1.0);
     this.groundLayer.add(ground);
 
-    // Foreground Props
-    const torii = this.add.image(cx, cy - 100, 'PropTorii').setScrollFactor(0.60);
+    // Foreground Props - Framing the edges of the playable arena
+    const torii = this.add.image(cx - 1400, cy, 'PropTorii')
+      .setScale(propScale)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.FOREGROUND);
     this.foregroundLayer.add(torii);
     
-    const shrine = this.add.image(cx - 400, cy - 200, 'PropShrine').setScrollFactor(0.60);
+    const shrine = this.add.image(cx + 1200, cy + 100, 'PropShrine')
+      .setScale(propScale)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.FOREGROUND);
     this.foregroundLayer.add(shrine);
     
-    const lanterns = this.add.image(cx + 400, cy - 100, 'PropLanterns').setScrollFactor(0.60);
+    const lanterns = this.add.image(cx - 1200, cy + 500, 'PropLanterns')
+      .setScale(propScale)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.FOREGROUND);
     this.foregroundLayer.add(lanterns);
 
-    const foregroundProps = this.add.image(cx, cy + 400, 'PropForeground').setScrollFactor(0.60);
+    const foregroundProps = this.add.image(cx + 1000, cy + 700, 'PropForeground')
+      .setScale(propScale)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.FOREGROUND);
     this.foregroundLayer.add(foregroundProps);
 
     // Foreground Mist
-    const fgMist = this.add.tileSprite(cx, cy, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT, 'VFXFogForeground')
-      .setAlpha(0.3).setScrollFactor(0.60);
+    const fgMist = this.add.tileSprite(cx, cy + 500, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT / 2, 'VFXFogForeground')
+      .setAlpha(0.3)
+      .setScrollFactor(ENV_CONFIG.PARALLAX.FOREGROUND);
     this.foregroundLayer.add(fgMist);
 
     // Lighting
-    const moonlight = this.add.image(cx, cy, 'LightMoonlight').setAlpha(0.4).setScrollFactor(0).setBlendMode(Phaser.BlendModes.ADD);
+    const moonlight = this.add.image(cx, cy, 'LightMoonlight')
+      .setScale(bgScale)
+      .setAlpha(0.3)
+      .setScrollFactor(0)
+      .setBlendMode(Phaser.BlendModes.ADD);
     this.lightingLayer.add(moonlight);
     
-    const lanternGlow = this.add.image(cx + 400, cy - 100, 'LightLantern').setAlpha(0.6).setBlendMode(Phaser.BlendModes.ADD);
+    const lanternGlow = this.add.image(cx + 1200, cy + 100, 'LightLantern')
+      .setScale(propScale)
+      .setAlpha(0.5)
+      .setBlendMode(Phaser.BlendModes.ADD);
     this.lightingLayer.add(lanternGlow);
 
     // Fog Animation
@@ -163,6 +193,22 @@ export class CombatScene extends Phaser.Scene {
           this.vfxSystem.ambientSpiritsEnabled ? this.vfxSystem.stopAmbientSpirits() : this.vfxSystem.startAmbientSpirits();
         });
       }
+
+      // Visual Bounds Debugging
+      const debugGraphics = this.add.graphics().setDepth(DEPTH.HUD);
+      
+      // World Bounds (Red)
+      debugGraphics.lineStyle(4, 0xff0000, 1);
+      debugGraphics.strokeRect(0, 0, GAME_CONFIG.WORLD.WIDTH, GAME_CONFIG.WORLD.HEIGHT);
+
+      // Ground Bounds (Green)
+      debugGraphics.lineStyle(4, 0x00ff00, 1);
+      debugGraphics.strokeRect(
+        ground.x - (ground.width * bgScale) / 2, 
+        ground.y - (ground.height * bgScale) / 2, 
+        ground.width * bgScale, 
+        ground.height * bgScale
+      );
     }
 
     // Keybindings
