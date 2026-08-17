@@ -4,7 +4,10 @@ import { ASSET_PATHS } from '../config/AssetConfig';
 import { PlayerMovement } from './PlayerMovement';
 import { AnimationController } from './AnimationController';
 import { CollisionSystem } from '../physics/CollisionSystem';
+import { CombatSystem } from '../combat/CombatSystem';
+import { PlayerCombatState } from '../combat/CombatState';
 
+// Keep old enum for compatibility or replace it
 export enum PlayerState {
   IDLE = 'idle',
   WALK = 'walk'
@@ -17,6 +20,7 @@ export class Player {
   private movement: PlayerMovement;
   private animationController: AnimationController | null = null;
   public currentState: PlayerState = PlayerState.IDLE;
+  public combatSystem: CombatSystem;
   private collisionSystem: CollisionSystem;
 
   constructor(scene: THREE.Scene, assetManager: AssetManager, collisionSystem: CollisionSystem) {
@@ -28,13 +32,42 @@ export class Player {
     
     // Pass playerRoot and collisionSystem to movement
     this.movement = new PlayerMovement(this.playerRoot, this.collisionSystem);
+    this.combatSystem = new CombatSystem();
+
+    // Hook up visual placeholder for attack since we have no animations
+    this.combatSystem.onAttackActive = () => {
+      // Temporary visual cue: tilt the player forward 15 degrees
+      this.playerRoot.rotation.x = Math.PI / 12;
+    };
+    this.combatSystem.onAttackFinished = () => {
+      // Reset tilt
+      this.playerRoot.rotation.x = 0;
+    };
 
     // Add a personal fill light to make the character readable in the dark environment
     const playerFillLight = new THREE.PointLight(0x88bbff, 1.2, 5);
     playerFillLight.position.set(0, 3, 1);
     this.playerRoot.add(playerFillLight);
 
+    this.handleInput = this.handleInput.bind(this);
+    window.addEventListener('mousedown', this.handleInput);
+    window.addEventListener('keydown', this.handleInput);
+
     this.loadModel();
+  }
+
+  private handleInput(event: MouseEvent | KeyboardEvent): void {
+    const isAttackInput = 
+      (event.type === 'mousedown' && (event as MouseEvent).button === 0) || 
+      (event.type === 'keydown' && (event as KeyboardEvent).code === 'KeyJ');
+
+    if (isAttackInput) {
+      // Prevent browser default behavior like text selection or scrolling
+      if (event.cancelable) event.preventDefault();
+      
+      const facingDirection = new THREE.Vector3(0, 0, 1).applyQuaternion(this.playerRoot.quaternion).normalize();
+      this.combatSystem.tryAttack(facingDirection);
+    }
   }
 
   private async loadModel(): Promise<void> {
@@ -90,10 +123,17 @@ export class Player {
       this.animationController.update(deltaTime);
     }
     
+    this.combatSystem.update(deltaTime);
+    
+    const isAttacking = this.combatSystem.isAttacking();
+    this.movement.setLocked(isAttacking);
     this.movement.update(deltaTime);
     
-    // Determine state based on velocity
-    if (this.movement.isMoving()) {
+    // Determine state based on combat first, then velocity
+    if (isAttacking) {
+      // Use cast for now to connect the two state systems if needed, 
+      // or rely on the visual placeholder for attack
+    } else if (this.movement.isMoving()) {
       this.setState(PlayerState.WALK);
     } else {
       this.setState(PlayerState.IDLE);
@@ -112,5 +152,7 @@ export class Player {
 
   public dispose(): void {
     this.movement.dispose();
+    window.removeEventListener('mousedown', this.handleInput);
+    window.removeEventListener('keydown', this.handleInput);
   }
 }

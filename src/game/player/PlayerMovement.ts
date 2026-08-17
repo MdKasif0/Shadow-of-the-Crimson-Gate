@@ -8,6 +8,7 @@ export class PlayerMovement {
   private playerRoot: THREE.Group;
   private collisionSystem: CollisionSystem;
   private _isMoving: boolean = false;
+  private locked: boolean = false;
   
   constructor(playerRoot: THREE.Group, collisionSystem: CollisionSystem) {
     this.playerRoot = playerRoot;
@@ -37,7 +38,15 @@ export class PlayerMovement {
     return this._isMoving;
   }
 
+  public setLocked(locked: boolean): void {
+    this.locked = locked;
+    if (locked) {
+      this._isMoving = false;
+    }
+  }
+
   public update(deltaTime: number): void {
+    if (this.locked) return;
     this.direction.set(0, 0, 0);
 
     if (this.keys['KeyW'] || this.keys['ArrowUp']) this.direction.z -= 1;

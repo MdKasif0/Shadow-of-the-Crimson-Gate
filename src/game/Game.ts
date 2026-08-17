@@ -148,11 +148,15 @@ export class ThreeGame {
     const fps = Math.round(1 / this.clock.getDelta());
     const pos = this.combatScene.player.playerRoot.position;
     const cam = this.cameraController.camera.position;
+    const combatState = this.combatScene.player.combatSystem.getPlayerState();
+    const combatTimer = this.combatScene.player.combatSystem.getAttackTimer();
 
     debugUI.innerHTML = `
       FPS: ${fps}<br/>
       Player: (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})<br/>
-      Camera: (${cam.x.toFixed(2)}, ${cam.y.toFixed(2)}, ${cam.z.toFixed(2)})
+      Camera: (${cam.x.toFixed(2)}, ${cam.y.toFixed(2)}, ${cam.z.toFixed(2)})<br/>
+      Combat State: <span style="color: yellow;">${combatState.toUpperCase()}</span><br/>
+      Attack Timer: ${combatTimer.toFixed(3)}s
     `;
   }
 
