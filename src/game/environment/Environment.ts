@@ -26,8 +26,8 @@ export class Environment {
       // Use a smaller scale to create "multiple small floors everywhere"
       // Based on visual analysis, the zorilla_floor model has a massive invisible bounding box.
       // Its true visual base size is exactly 1.5 units wide/deep.
-      const gridX = 40;
-      const gridZ = 40;
+      const gridX = 16;
+      const gridZ = 16;
       const manualScale = 3.0;
 
       // True visual spacing without the invisible padding
@@ -57,7 +57,8 @@ export class Environment {
           floorMesh.position.z = -center.z + (startZ + iz * spacingZ);
           
           floorMesh.receiveShadow = true;
-          this.enableShadows(floorMesh);
+          // IMPORTANT: Do not enable castShadow on the floor to save massive performance
+          // We only let it receive shadows from the trees/player/temple
           this.root.add(floorMesh);
         }
       }
