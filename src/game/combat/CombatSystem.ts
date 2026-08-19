@@ -1,56 +1,82 @@
 import * as THREE from 'three';
-import { PlayerCombatState, CombatEvent } from './CombatState';
-import { AttackController } from './AttackController';
+import { GAME_CONFIG } from '../GameConfig';
 
 export class CombatSystem {
-  private attackController: AttackController;
-  private attackDirection: THREE.Vector3 = new THREE.Vector3();
-  
-  // Callbacks for external systems (Player, Animation, etc)
-  public onAttackStarted?: (direction: THREE.Vector3) => void;
-  public onAttackActive?: () => void;
-  public onAttackFinished?: () => void;
+  public comboIndex: number = 0;
+  public attackTimer: number = 0;
+  public isAttacking: boolean = false;
+  public cooldownTimer: number = 0;
+  private comboWindowTimer: number = 0;
+  private queuedAttack: boolean = false;
+  public phase: 'none' | 'windup' | 'active' | 'recovery' = 'none';
 
-  constructor() {
-    this.attackController = new AttackController(this.handleCombatEvent.bind(this));
-  }
-
-  public update(deltaTime: number): void {
-    this.attackController.update(deltaTime);
-  }
-
-  public tryAttack(currentFacingDirection: THREE.Vector3): boolean {
-    if (this.attackController.startAttack()) {
-      // Capture direction at the moment attack starts
-      this.attackDirection.copy(currentFacingDirection).normalize();
-      return true;
+  public tryAttack(): boolean {
+    if (this.isAttacking) {
+      if (this.phase === 'recovery' || this.phase === 'active') {
+        this.queuedAttack = true;
+      }
+      return false;
     }
-    return false;
+    if (this.cooldownTimer > 0) return false;
+    this.startAttack();
+    return true;
   }
 
-  private handleCombatEvent(event: CombatEvent): void {
-    switch (event) {
-      case CombatEvent.ATTACK_STARTED:
-        if (this.onAttackStarted) this.onAttackStarted(this.attackDirection);
-        break;
-      case CombatEvent.ATTACK_ACTIVE:
-        if (this.onAttackActive) this.onAttackActive();
-        break;
-      case CombatEvent.ATTACK_FINISHED:
-        if (this.onAttackFinished) this.onAttackFinished();
-        break;
+  private startAttack(): void {
+    const combo = GAME_CONFIG.PLAYER.ATTACK.COMBO;
+    if (this.comboIndex >= combo.length) this.comboIndex = 0;
+    this.isAttacking = true;
+    this.attackTimer = 0;
+    this.phase = 'windup';
+    this.queuedAttack = false;
+  }
+
+  public update(dt: number): void {
+    if (this.cooldownTimer > 0) this.cooldownTimer -= dt;
+    if (this.comboWindowTimer > 0) {
+      this.comboWindowTimer -= dt;
+      if (this.comboWindowTimer <= 0) this.comboIndex = 0;
+    }
+
+    if (!this.isAttacking) return;
+
+    this.attackTimer += dt;
+    const combo = GAME_CONFIG.PLAYER.ATTACK.COMBO[this.comboIndex];
+    const total = combo.windup + combo.active + combo.recovery;
+
+    if (this.attackTimer < combo.windup) {
+      this.phase = 'windup';
+    } else if (this.attackTimer < combo.windup + combo.active) {
+      this.phase = 'active';
+    } else if (this.attackTimer < total) {
+      this.phase = 'recovery';
+    } else {
+      // Attack finished
+      this.isAttacking = false;
+      this.phase = 'none';
+      this.cooldownTimer = GAME_CONFIG.PLAYER.ATTACK.COOLDOWN;
+      this.comboIndex++;
+      this.comboWindowTimer = GAME_CONFIG.PLAYER.ATTACK.COMBO_WINDOW;
+
+      if (this.queuedAttack && this.comboIndex < GAME_CONFIG.PLAYER.ATTACK.COMBO.length) {
+        this.queuedAttack = false;
+        this.startAttack();
+      }
     }
   }
 
-  public getPlayerState(): PlayerCombatState {
-    return this.attackController.getState();
+  public getAnimState(): string {
+    if (!this.isAttacking) return 'idle';
+    return `attack${this.comboIndex + 1}`;
   }
 
-  public isAttacking(): boolean {
-    return this.attackController.isAttacking();
+  public getCurrentDamage(): number {
+    return GAME_CONFIG.PLAYER.ATTACK.DAMAGE[this.comboIndex] || 25;
   }
 
-  public getAttackTimer(): number {
-    return this.attackController.getTimer();
+  public reset(): void {
+    this.comboIndex = 0; this.attackTimer = 0;
+    this.isAttacking = false; this.cooldownTimer = 0;
+    this.comboWindowTimer = 0; this.phase = 'none'; this.queuedAttack = false;
   }
 }

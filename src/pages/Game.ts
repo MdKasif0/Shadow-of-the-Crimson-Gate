@@ -8,8 +8,11 @@
  */
 
 import type { PageComponent } from '../types/index';
-import { ROUTES, PHASER_CONFIG } from '../utils/constants';
+import { ROUTES } from '../utils/constants';
 import { init3DGame, ThreeGame } from '../game/Game';
+
+const GAME_CONTAINER_ID = 'game-container';
+
 
 function navigateHome(): void {
   window.location.hash = `#/${ROUTES.HOME}`;
