@@ -32,6 +32,14 @@ export class Ronin {
     this.katana.attachTo(this.rig.weaponSlot);
     this.katana.attachSheathTo(this.rig.sheathSlot);
 
+    this.combat.events.addListener({
+      onAttackStarted: (attackId) => {
+        // We will need a reference to hitbox system, but we can just
+        // rely on a flag or pass it, or just let CombatSystem emit it.
+        // Actually, we can just let `Ronin.update` check `attackTimer == 0` for now
+      }
+    });
+
     // 2. Setup Animation
     this.animator = new CharacterAnimator(this.rig);
     
@@ -41,7 +49,7 @@ export class Ronin {
     this.root.add(this.rig.root);
   }
 
-  public update(dt: number, inputManager: InputManager, collisionSystem: any): void {
+  public update(dt: number, inputManager: InputManager, collisionSystem: any, hitboxSystem?: any): void {
     // Process combat inputs
     if (inputManager.isAttackPressed()) {
       this.combat.registerAttackInput();
@@ -67,6 +75,23 @@ export class Ronin {
           // Lunge forward relative to current rotation
           const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation);
           intendedMove = forward.multiplyScalar(attackDef.lungeSpeed * dt);
+
+          if (hitboxSystem) {
+            // Reset memory on the very first frame of ACTIVE
+            if (this.combat['attackTimer'] <= dt) {
+               hitboxSystem.resetAttackMemory('PLAYER');
+            }
+
+            hitboxSystem.addActiveHitbox({
+              ownerId: 'PLAYER',
+              damage: attackDef.damage,
+              position: this.root.position.clone(),
+              direction: forward,
+              range: this.katana.getRange(),
+              hitAngle: this.katana.getHitAngle(),
+              knockback: 10
+            });
+          }
         }
       }
       this.playIdle(); // Stop walking animation

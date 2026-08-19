@@ -2,12 +2,17 @@ import * as THREE from 'three';
 import { WorldGenerator } from '../world/WorldGenerator';
 import { Ronin } from '../characters/Ronin';
 import { CollisionSystem } from '../physics/CollisionSystem';
+import { HitboxSystem } from '../physics/HitboxSystem';
 import { InputManager } from '../core/InputManager';
+import { EnemySpawner } from '../world/EnemySpawner';
+import { Enemy } from '../enemies/Enemy';
 
 export class GameScene {
   public scene: THREE.Scene;
   public player: Ronin;
   public collisionSystem: CollisionSystem;
+  public hitboxSystem: HitboxSystem;
+  public enemies: Enemy[] = [];
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -39,13 +44,41 @@ export class GameScene {
     this.collisionSystem = new CollisionSystem();
     new WorldGenerator(this.scene, this.collisionSystem);
 
+    // Hitbox System
+    this.hitboxSystem = new HitboxSystem(this.scene);
+
     // Generate Player (Ronin)
     this.player = new Ronin();
     this.player.setPosition(0, 0, 0); // Spawn area
     this.scene.add(this.player.root);
+
+    // Generate Enemies
+    const spawner = new EnemySpawner();
+    const yokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(10, 0, 10));
+    this.enemies.push(yokai);
   }
 
   public update(dt: number, inputManager: InputManager): void {
-    this.player.update(dt, inputManager, this.collisionSystem);
+    // 1. Clear hitboxes from last frame
+    this.hitboxSystem.clearActiveHitboxes();
+
+    // 2. Update entities (which may register hitboxes/hurtboxes)
+    this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem);
+    
+    for (const enemy of this.enemies) {
+      enemy.update(dt, this.player.root.position, this.hitboxSystem);
+    }
+
+    // 3. Resolve combat interactions
+    const hits = this.hitboxSystem.checkHits();
+    for (const hit of hits) {
+      const targetEnemy = this.enemies.find(e => e.id === hit.hurtbox.id);
+      if (targetEnemy) {
+        targetEnemy.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
+      }
+    }
+
+    // 4. Update debug visuals
+    this.hitboxSystem.update();
   }
 }

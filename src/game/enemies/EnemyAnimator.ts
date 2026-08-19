@@ -1,0 +1,113 @@
+import { CharacterRig } from '../characters/CharacterRig';
+import { EnemyState } from './EnemyState';
+import { lerp } from '../utils/MathUtils';
+
+export class EnemyAnimator {
+  private rig: CharacterRig;
+  private state: EnemyState = EnemyState.IDLE;
+  
+  private time: number = 0;
+  private stateTime: number = 0;
+
+  // Blending weights
+  private idleWeight: number = 1;
+  private walkWeight: number = 0;
+  private hurtWeight: number = 0;
+  private deadWeight: number = 0;
+
+  constructor(rig: CharacterRig) {
+    this.rig = rig;
+  }
+
+  public setState(newState: EnemyState): void {
+    if (this.state === newState) return;
+    this.state = newState;
+    this.stateTime = 0;
+  }
+
+  public update(dt: number): void {
+    this.time += dt;
+    this.stateTime += dt;
+
+    const tIdle = this.state === EnemyState.IDLE ? 1 : 0;
+    const tWalk = this.state === EnemyState.WALK ? 1 : 0;
+    const tHurt = this.state === EnemyState.HURT ? 1 : 0;
+    const tDead = this.state === EnemyState.DEAD ? 1 : 0;
+
+    const lerpSpeed = 10;
+    this.idleWeight = lerp(this.idleWeight, tIdle, dt * lerpSpeed);
+    this.walkWeight = lerp(this.walkWeight, tWalk, dt * lerpSpeed);
+    
+    // Fast snap for hurt/dead
+    this.hurtWeight = lerp(this.hurtWeight, tHurt, dt * 20);
+    this.deadWeight = lerp(this.deadWeight, tDead, dt * 5); // slower collapse
+
+    this.applyIdle(this.idleWeight);
+    this.applyWalk(this.walkWeight);
+    this.applyHurt(this.hurtWeight);
+    this.applyDead(this.deadWeight);
+  }
+
+  private applyIdle(weight: number): void {
+    if (weight <= 0.01) return;
+    const t = this.time * 2.0;
+    
+    // Yokai hunch
+    this.rig.spine.rotation.x = lerp(this.rig.spine.rotation.x, 0.4, weight);
+    this.rig.chest.rotation.x = lerp(this.rig.chest.rotation.x, 0.2, weight);
+    this.rig.head.rotation.x = lerp(this.rig.head.rotation.x, -0.3 + Math.sin(t*0.5)*0.05, weight);
+    
+    // Breathing
+    this.rig.chest.position.y = 0.25 + Math.sin(t) * 0.03 * weight;
+
+    // Relaxed arms
+    this.rig.leftUpperArm.rotation.set(0.1, 0, 0.2 * weight);
+    this.rig.rightUpperArm.rotation.set(0.1, 0, -0.2 * weight);
+    this.rig.leftLowerArm.rotation.x = -0.2 * weight;
+    this.rig.rightLowerArm.rotation.x = -0.2 * weight;
+  }
+
+  private applyWalk(weight: number): void {
+    if (weight <= 0.01) return;
+    const t = this.time * 8.0;
+
+    // Asymmetrical limp/hunch walk
+    this.rig.spine.rotation.x = lerp(this.rig.spine.rotation.x, 0.5, weight);
+    this.rig.pelvis.position.y = 1.0 - Math.abs(Math.sin(t)) * 0.1 * weight;
+
+    const stride = 0.7;
+    const lLeg = Math.sin(t) * stride;
+    const rLeg = Math.sin(t + Math.PI) * stride;
+
+    this.rig.leftUpperLeg.rotation.x = lLeg * weight;
+    this.rig.rightUpperLeg.rotation.x = rLeg * weight;
+    
+    // Dragging arms
+    this.rig.leftUpperArm.rotation.x = -lLeg * 0.3 * weight;
+    this.rig.rightUpperArm.rotation.x = -rLeg * 0.3 * weight;
+  }
+
+  private applyHurt(weight: number): void {
+    if (weight <= 0.01) return;
+    // Snap back
+    const recoil = Math.sin(Math.min(this.stateTime * 15, Math.PI)) * 0.5;
+    this.rig.spine.rotation.x = lerp(this.rig.spine.rotation.x, -0.3 * recoil, weight);
+    this.rig.head.rotation.x = lerp(this.rig.head.rotation.x, -0.5 * recoil, weight);
+    this.rig.leftUpperArm.rotation.z = lerp(this.rig.leftUpperArm.rotation.z, 0.5, weight);
+    this.rig.rightUpperArm.rotation.z = lerp(this.rig.rightUpperArm.rotation.z, -0.5, weight);
+  }
+
+  private applyDead(weight: number): void {
+    if (weight <= 0.01) return;
+    // Collapse to the floor
+    this.rig.pelvis.position.y = lerp(this.rig.pelvis.position.y, 0.2, weight);
+    this.rig.spine.rotation.x = lerp(this.rig.spine.rotation.x, 1.5, weight); // Face plant
+    this.rig.chest.rotation.x = lerp(this.rig.chest.rotation.x, 0.5, weight);
+    
+    // Limbs sprawl
+    this.rig.leftUpperLeg.rotation.set(-1.0, 0.5, 0.5);
+    this.rig.rightUpperLeg.rotation.set(-1.0, -0.5, -0.5);
+    this.rig.leftUpperArm.rotation.set(-1.5, 0, 0.8);
+    this.rig.rightUpperArm.rotation.set(-1.5, 0, -0.8);
+  }
+}
