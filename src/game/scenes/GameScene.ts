@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-
 import { WorldGenerator } from '../world/WorldGenerator';
+import { Ronin } from '../characters/Ronin';
 
 export class GameScene {
   public scene: THREE.Scene;
+  public player: Ronin;
+  private animTimer: number = 0;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -33,9 +35,24 @@ export class GameScene {
 
     // Generate World
     new WorldGenerator(this.scene);
+
+    // Generate Player (Ronin)
+    this.player = new Ronin();
+    this.player.setPosition(0, 0, 0); // Spawn area
+    this.scene.add(this.player.root);
   }
 
-  public update(_dt: number): void {
-    // Environment animation (e.g. swaying trees/lanterns) will be added later
+  public update(dt: number): void {
+    // Test animation toggle every 3 seconds
+    this.animTimer += dt;
+    if (this.animTimer > 6) {
+      this.animTimer = 0;
+    } else if (this.animTimer > 3) {
+      this.player.playWalk();
+    } else {
+      this.player.playIdle();
+    }
+
+    this.player.update(dt);
   }
 }
