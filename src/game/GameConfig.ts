@@ -1,6 +1,8 @@
 export const GAME_CONFIG = {
   DEBUG_MODE: import.meta.env.DEV, // Show debug info only in dev
 
+  WORLD_SEED: 47291, // Fixed seed for deterministic generation
+
   CAMERA: {
     FOV: 45,
     NEAR: 0.1,
@@ -16,7 +18,14 @@ export const GAME_CONFIG = {
   },
 
   WORLD: {
-    WIDTH: 100,
-    DEPTH: 100,
+    WIDTH: 60,
+    DEPTH: 60,
+    BOUNDS: {
+      MIN_X: -28,
+      MAX_X: 28,
+      MIN_Z: -28,
+      MAX_Z: 28,
+    },
+    SPAWN_AREA_SIZE: 10,
   }
 };
