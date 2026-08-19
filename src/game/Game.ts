@@ -24,15 +24,14 @@ export class ThreeGame {
     // 2. Initialize scene
     this.gameScene = new GameScene();
     
-    // 3. Initialize basic camera (will be moved to CameraController later)
     this.camera = new THREE.PerspectiveCamera(
       GAME_CONFIG.CAMERA.FOV,
       1, // aspect ratio updated in resize()
       GAME_CONFIG.CAMERA.NEAR,
       GAME_CONFIG.CAMERA.FAR
     );
-    this.camera.position.set(0, 0, 10);
-    this.camera.lookAt(0, 0, 0);
+    this.camera.position.set(0, 8, 15);
+    this.camera.lookAt(0, 2, 0);
 
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);

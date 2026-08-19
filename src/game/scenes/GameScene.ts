@@ -15,23 +15,23 @@ export class GameScene {
     this.scene.fog = new THREE.FogExp2(0x060a10, 0.02);
 
     // Lighting Placeholders
-    const ambient = new THREE.AmbientLight(0x1a2a3a, 0.4);
+    const ambient = new THREE.AmbientLight(0xffffff, 2.0);
     this.scene.add(ambient);
     
-    const moonLight = new THREE.DirectionalLight(0x6688cc, 1.5);
-    moonLight.position.set(-15, 25, -10);
-    moonLight.castShadow = true;
-    moonLight.shadow.mapSize.width = 2048;
-    moonLight.shadow.mapSize.height = 2048;
-    moonLight.shadow.camera.near = 0.5;
-    moonLight.shadow.camera.far = 100;
-    const d = 35;
-    moonLight.shadow.camera.left = -d;
-    moonLight.shadow.camera.right = d;
-    moonLight.shadow.camera.top = d;
-    moonLight.shadow.camera.bottom = -d;
-    moonLight.shadow.bias = -0.0005;
-    this.scene.add(moonLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 5.0);
+    dirLight.position.set(20, 40, 30);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 200;
+    const d = 50;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.bias = -0.001;
+    this.scene.add(dirLight);
 
     // Generate World
     new WorldGenerator(this.scene);
