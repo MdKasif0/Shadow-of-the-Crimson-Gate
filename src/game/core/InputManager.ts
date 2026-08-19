@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 // ─── Input Manager ───────────────────────────────────────────────────────────
 // Centralized keyboard + mouse input tracking.
 
@@ -39,10 +41,30 @@ export class InputManager {
     return this.mouseJustPressed || this.isPressed('KeyJ');
   }
 
+  public getMovementDirection(): THREE.Vector3 {
+    const dir = new THREE.Vector3(0, 0, 0);
+    
+    // W / Up
+    if (this.isPressed('KeyW') || this.isPressed('ArrowUp')) dir.z -= 1;
+    // S / Down
+    if (this.isPressed('KeyS') || this.isPressed('ArrowDown')) dir.z += 1;
+    // A / Left
+    if (this.isPressed('KeyA') || this.isPressed('ArrowLeft')) dir.x -= 1;
+    // D / Right
+    if (this.isPressed('KeyD') || this.isPressed('ArrowRight')) dir.x += 1;
+
+    if (dir.lengthSq() > 0) {
+      dir.normalize();
+    }
+    return dir;
+  }
+
   private _onKeyDown(e: KeyboardEvent): void {
     this.keys[e.code] = true;
-    // Prevent scrolling on space
-    if (e.code === 'Space') e.preventDefault();
+    // Prevent scrolling on space and arrows
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+      e.preventDefault();
+    }
   }
   private _onKeyUp(e: KeyboardEvent): void { this.keys[e.code] = false; }
   private _onMouseDown(e: MouseEvent): void {

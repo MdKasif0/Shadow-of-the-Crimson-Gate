@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utils/MathUtils';
+import { CollisionSystem } from '../physics/CollisionSystem';
 
 export class ShrineGenerator {
-  public static generate(random: SeededRandom): THREE.Group {
+  public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Shrines';
 
@@ -80,6 +81,12 @@ export class ShrineGenerator {
       shrine.position.set(pos.x, 0, pos.z);
       shrine.rotation.y = pos.rotY;
       group.add(shrine);
+
+      // Register collision box for the shrine base (approximate)
+      collisionSystem.addBox(new THREE.Box3().setFromCenterAndSize(
+        new THREE.Vector3(pos.x, 2, pos.z),
+        new THREE.Vector3(4, 4, 4)
+      ));
     });
 
     return group;

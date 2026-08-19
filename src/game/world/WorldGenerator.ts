@@ -9,9 +9,10 @@ import { ToriiGenerator } from './ToriiGenerator';
 import { ShrineGenerator } from './ShrineGenerator';
 import { TempleGenerator } from './TempleGenerator';
 import { MountainGenerator } from './MountainGenerator';
+import { CollisionSystem } from '../physics/CollisionSystem';
 
 export class WorldGenerator {
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, collisionSystem: CollisionSystem) {
     const random = new SeededRandom(GAME_CONFIG.WORLD_SEED);
     
     // Group to hold the entire world
@@ -25,24 +26,32 @@ export class WorldGenerator {
     worldGroup.add(MountainGenerator.generate(random));
 
     // 3. Temple (focal point at the back)
-    worldGroup.add(TempleGenerator.generate());
+    worldGroup.add(TempleGenerator.generate(collisionSystem));
 
     // 4. Torii Gate (entrance)
-    const torii = ToriiGenerator.generate();
+    const torii = ToriiGenerator.generate(collisionSystem);
     torii.position.set(0, 0, 15);
+    collisionSystem.addBox(new THREE.Box3(
+      new THREE.Vector3(-4, 0, 14),
+      new THREE.Vector3(-3, 8, 16)
+    ));
+    collisionSystem.addBox(new THREE.Box3(
+      new THREE.Vector3(3, 0, 14),
+      new THREE.Vector3(4, 8, 16)
+    ));
     worldGroup.add(torii);
 
     // 5. Small Shrines
-    worldGroup.add(ShrineGenerator.generate(random));
+    worldGroup.add(ShrineGenerator.generate(random, collisionSystem));
 
     // 6. Lanterns (scattered, guiding path)
-    worldGroup.add(LanternGenerator.generate(random));
+    worldGroup.add(LanternGenerator.generate(random, collisionSystem));
 
     // 7. Trees (sides and background)
-    worldGroup.add(TreeGenerator.generate(random));
+    worldGroup.add(TreeGenerator.generate(random, collisionSystem));
 
     // 8. Rocks (perimeter)
-    worldGroup.add(RockGenerator.generate(random));
+    worldGroup.add(RockGenerator.generate(random, collisionSystem));
 
     scene.add(worldGroup);
   }

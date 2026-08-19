@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Renderer } from './core/Renderer';
 import { GameLoop } from './core/GameLoop';
 import { InputManager } from './core/InputManager';
+import { CameraController } from './core/CameraController';
 import { GameScene } from './scenes/GameScene';
 import { GAME_CONFIG } from './GameConfig';
 
@@ -12,7 +13,7 @@ export class ThreeGame {
   private input: InputManager;
   
   private gameScene: GameScene;
-  private camera: THREE.PerspectiveCamera;
+  private cameraController: CameraController;
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -24,14 +25,7 @@ export class ThreeGame {
     // 2. Initialize scene
     this.gameScene = new GameScene();
     
-    this.camera = new THREE.PerspectiveCamera(
-      GAME_CONFIG.CAMERA.FOV,
-      1, // aspect ratio updated in resize()
-      GAME_CONFIG.CAMERA.NEAR,
-      GAME_CONFIG.CAMERA.FAR
-    );
-    this.camera.position.set(0, 12, 28);
-    this.camera.lookAt(0, 2, 0);
+    this.cameraController = new CameraController();
 
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);
@@ -51,8 +45,13 @@ export class ThreeGame {
   private update(dt: number): void {
     this.input.beginFrame();
 
-    // Update scene logic (e.g., spinning cube)
-    this.gameScene.update(dt);
+    const inputMoveDir = this.input.getMovementDirection();
+
+    // Update scene logic
+    this.gameScene.update(dt, inputMoveDir);
+
+    // Update camera to follow player
+    this.cameraController.update(this.gameScene.player.root.position, dt);
 
     // Optional Debug overlay (e.g., exit debug command)
     if (GAME_CONFIG.DEBUG_MODE && this.input.isPressed('KeyP')) {
@@ -64,7 +63,7 @@ export class ThreeGame {
   }
 
   private render(): void {
-    this.renderer.render(this.gameScene.scene, this.camera);
+    this.renderer.render(this.gameScene.scene, this.cameraController.camera);
   }
 
   private onResize(): void {
@@ -74,8 +73,7 @@ export class ThreeGame {
     const width = container.clientWidth;
     const height = container.clientHeight;
     
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
+    this.cameraController.resize(width, height);
     
     this.renderer.resize();
   }

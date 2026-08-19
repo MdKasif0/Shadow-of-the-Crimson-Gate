@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utils/MathUtils';
 import { GAME_CONFIG } from '../GameConfig';
+import { CollisionSystem } from '../physics/CollisionSystem';
 
 export class TreeGenerator {
-  public static generate(random: SeededRandom): THREE.Group {
+  public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Trees';
 

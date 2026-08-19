@@ -10,11 +10,13 @@ export const GAME_CONFIG = {
     OFFSET_X: -15,
     OFFSET_Y: 20,
     OFFSET_Z: 15,
+    ZOOM: 30, // For Orthographic camera zoom
   },
 
   PLAYER: {
-    SPEED: 8,
+    SPEED: 4,
     HEIGHT: 1.8,
+    COLLISION_RADIUS: 0.4,
   },
 
   WORLD: {

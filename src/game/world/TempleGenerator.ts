@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 
+import { CollisionSystem } from '../physics/CollisionSystem';
+
 export class TempleGenerator {
-  public static generate(): THREE.Group {
+  public static generate(collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Temple';
 
@@ -141,6 +143,13 @@ export class TempleGenerator {
 
     // Position temple at back of courtyard
     group.position.set(0, 0, -18);
+
+    // Register collision
+    const templeBox = new THREE.Box3(
+      new THREE.Vector3(-width / 2, 0, -18 - depth / 2),
+      new THREE.Vector3(width / 2, 10, -18 + depth / 2)
+    );
+    collisionSystem.addBox(templeBox);
 
     return group;
   }

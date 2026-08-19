@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { WorldGenerator } from '../world/WorldGenerator';
 import { Ronin } from '../characters/Ronin';
+import { CollisionSystem } from '../physics/CollisionSystem';
 
 export class GameScene {
   public scene: THREE.Scene;
   public player: Ronin;
-  private animTimer: number = 0;
+  public collisionSystem: CollisionSystem;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -33,8 +34,9 @@ export class GameScene {
     dirLight.shadow.bias = -0.001;
     this.scene.add(dirLight);
 
-    // Generate World
-    new WorldGenerator(this.scene);
+    // Generate World and Collisions
+    this.collisionSystem = new CollisionSystem();
+    new WorldGenerator(this.scene, this.collisionSystem);
 
     // Generate Player (Ronin)
     this.player = new Ronin();
@@ -42,17 +44,7 @@ export class GameScene {
     this.scene.add(this.player.root);
   }
 
-  public update(dt: number): void {
-    // Test animation toggle every 3 seconds
-    this.animTimer += dt;
-    if (this.animTimer > 6) {
-      this.animTimer = 0;
-    } else if (this.animTimer > 3) {
-      this.player.playWalk();
-    } else {
-      this.player.playIdle();
-    }
-
-    this.player.update(dt);
+  public update(dt: number, inputMoveDir: THREE.Vector3): void {
+    this.player.update(dt, inputMoveDir, this.collisionSystem);
   }
 }

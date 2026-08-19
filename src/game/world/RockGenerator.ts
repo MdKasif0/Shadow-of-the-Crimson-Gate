@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utils/MathUtils';
 import { GAME_CONFIG } from '../GameConfig';
+import { CollisionSystem } from '../physics/CollisionSystem';
 
 export class RockGenerator {
-  public static generate(random: SeededRandom): THREE.Group {
+  public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Rocks';
 
@@ -79,6 +80,11 @@ export class RockGenerator {
       
       const variantIndex = Math.floor(random.next() * 3);
       instancedMeshes[variantIndex].setMatrixAt(rockIndex, dummy.matrix);
+      
+      // Register simple sphere collision based on max scale
+      const maxRadius = Math.max(scaleX, scaleZ);
+      collisionSystem.addSphere(new THREE.Vector3(x, 0, z), maxRadius * 0.9);
+
       rockIndex++;
     }
 

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { CollisionSystem } from '../physics/CollisionSystem';
 
 export class ToriiGenerator {
-  public static generate(): THREE.Group {
+  public static generate(collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Torii';
 
@@ -74,6 +75,9 @@ export class ToriiGenerator {
     plate.position.set(0, height * 0.8, 0.1);
     group.add(plate);
 
+    // Register collision for the two pillars (assuming torii is placed at 0,0,15 later, we can't easily add global bounds here unless we know its global position, OR we can add them in GameScene. But wait, ToriiGenerator is generic. It doesn't know its final position!
+    // Wait, in WorldGenerator, Torii is moved to (0,0,15) AFTER generate is called.
+    // I should register them in WorldGenerator or pass the position, or just hardcode the world positions here since this is a specific one-off map.)
     return group;
   }
 }
