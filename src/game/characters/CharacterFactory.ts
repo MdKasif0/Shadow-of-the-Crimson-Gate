@@ -1,18 +1,17 @@
 import * as THREE from 'three';
 import { CharacterRig } from './CharacterRig';
 
-export class CharacterFactory {
-  // Shared materials for the character
-  private static skinMat = new THREE.MeshStandardMaterial({ color: 0xe0c0a0, roughness: 0.5 });
-  private static hairMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, flatShading: true });
-  private static clothMat = new THREE.MeshStandardMaterial({ color: 0x1a2b3c, roughness: 0.9 }); // Dark teal robe
-  private static armorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.7, metalness: 0.2 }); // Charcoal armor
-  private static accentMat = new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.8 }); // Crimson accent
-  private static bladeMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9, roughness: 0.1 });
-  private static wrapMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0 });
+// Shared materials for the character
+const skinMat = new THREE.MeshStandardMaterial({ color: 0xe0c0a0, roughness: 0.5 });
+const hairMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, flatShading: true });
+const clothMat = new THREE.MeshStandardMaterial({ color: 0x1a2b3c, roughness: 0.9 }); // Dark teal robe
+const armorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.7, metalness: 0.2 }); // Charcoal armor
+const accentMat = new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.8 }); // Crimson accent
+const bladeMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9, roughness: 0.1 });
+const wrapMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0 });
 
+export class CharacterFactory {
   public static createRonin(): CharacterRig {
-    const { skinMat, hairMat, clothMat, armorMat, accentMat, bladeMat, wrapMat } = CharacterFactory;
     const rig = new CharacterRig();
 
     // ─── HELPER FUNCTIONS ──────────────────────────────────────────
