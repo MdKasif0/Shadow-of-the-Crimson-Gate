@@ -12,6 +12,7 @@ export class EnemyAnimator {
   // Blending weights
   private idleWeight: number = 1;
   private walkWeight: number = 0;
+  private attackWeight: number = 0;
   private hurtWeight: number = 0;
   private deadWeight: number = 0;
 
@@ -31,6 +32,7 @@ export class EnemyAnimator {
 
     const tIdle = this.state === EnemyState.IDLE ? 1 : 0;
     const tWalk = this.state === EnemyState.WALK ? 1 : 0;
+    const tAttack = this.state === EnemyState.ATTACK ? 1 : 0;
     const tHurt = this.state === EnemyState.HURT ? 1 : 0;
     const tDead = this.state === EnemyState.DEAD ? 1 : 0;
 
@@ -38,12 +40,14 @@ export class EnemyAnimator {
     this.idleWeight = lerp(this.idleWeight, tIdle, dt * lerpSpeed);
     this.walkWeight = lerp(this.walkWeight, tWalk, dt * lerpSpeed);
     
-    // Fast snap for hurt/dead
+    // Fast snap for attacks/hurt/dead
+    this.attackWeight = lerp(this.attackWeight, tAttack, dt * 15);
     this.hurtWeight = lerp(this.hurtWeight, tHurt, dt * 20);
     this.deadWeight = lerp(this.deadWeight, tDead, dt * 5); // slower collapse
 
     this.applyIdle(this.idleWeight);
     this.applyWalk(this.walkWeight);
+    this.applyAttack(this.attackWeight);
     this.applyHurt(this.hurtWeight);
     this.applyDead(this.deadWeight);
   }
@@ -85,6 +89,35 @@ export class EnemyAnimator {
     // Dragging arms
     this.rig.leftUpperArm.rotation.x = -lLeg * 0.3 * weight;
     this.rig.rightUpperArm.rotation.x = -rLeg * 0.3 * weight;
+  }
+
+  private applyAttack(weight: number): void {
+    if (weight <= 0.01) return;
+    
+    const windup = 0.4;
+    const activeEnd = 0.6;
+    
+    // Procedural keyframes based on stateTime
+    if (this.stateTime < windup) {
+      // Windup - pull arms back, twist spine
+      const p = this.stateTime / windup;
+      this.rig.spine.rotation.y = lerp(this.rig.spine.rotation.y, 0.5, p * weight);
+      this.rig.rightUpperArm.rotation.set(0.5, 0, -1.0 * weight);
+      this.rig.rightUpperArm.rotation.x = lerp(this.rig.rightUpperArm.rotation.x, -1.0, p * weight);
+      this.rig.leftUpperArm.rotation.set(-0.5, 0, 0.5 * weight);
+    } else if (this.stateTime < activeEnd) {
+      // Strike - throw arms forward, twist spine back
+      const p = (this.stateTime - windup) / (activeEnd - windup);
+      this.rig.spine.rotation.y = lerp(this.rig.spine.rotation.y, -0.5, p * weight);
+      this.rig.spine.rotation.x = lerp(this.rig.spine.rotation.x, 0.8, p * weight);
+      this.rig.rightUpperArm.rotation.set(-1.5 * weight, 0, -0.2 * weight);
+      this.rig.leftUpperArm.rotation.set(-1.0 * weight, 0, 0.2 * weight);
+    } else {
+      // Recovery - hold strike pose momentarily before idle weight takes over
+      this.rig.spine.rotation.y = lerp(this.rig.spine.rotation.y, 0, weight);
+      this.rig.rightUpperArm.rotation.set(-1.0 * weight, 0, -0.2 * weight);
+      this.rig.leftUpperArm.rotation.set(-0.5 * weight, 0, 0.2 * weight);
+    }
   }
 
   private applyHurt(weight: number): void {

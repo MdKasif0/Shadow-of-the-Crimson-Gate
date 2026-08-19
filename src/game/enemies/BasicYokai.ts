@@ -20,9 +20,11 @@ export class BasicYokai implements Enemy {
   private stateTimer: number = 0;
   
   // AI Params
-  private aggroRange: number = 15;
+  private aggroRange: number = 12;
   private attackRange: number = 2.5;
   private speed: number = 2.5;
+
+  private attackCooldown: number = 0;
 
   constructor(id: string) {
     this.id = id;
@@ -60,6 +62,18 @@ export class BasicYokai implements Enemy {
     this.setState(EnemyState.DEAD);
   }
 
+  public reset(position: THREE.Vector3): void {
+    this.root.position.copy(position);
+    this.health['currentHealth'] = this.health['maxHealth']; // Reset health manually
+    this.health.isDead = false;
+    this.velocity.set(0, 0, 0);
+    this.attackCooldown = 0;
+    this.setState(EnemyState.IDLE);
+    // Reset rotations explicitly
+    this.root.rotation.set(0, 0, 0);
+    // EnemyAnimator state resets gradually, which is fine
+  }
+
   private setState(newState: EnemyState): void {
     if (this.state === EnemyState.DEAD) return; // Can't change state if dead
     this.state = newState;
@@ -67,13 +81,14 @@ export class BasicYokai implements Enemy {
     this.animator.setState(newState);
   }
 
-  public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem): void {
+  public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any): void {
     this.stateTimer += dt;
+    if (this.attackCooldown > 0) this.attackCooldown -= dt;
     this.animator.update(dt);
 
     if (this.state === EnemyState.DEAD) {
       // Allow knockback to settle then stop
-      this.applyVelocity(dt);
+      this.applyVelocity(dt, collisionSystem);
       return; 
     }
 
@@ -86,10 +101,49 @@ export class BasicYokai implements Enemy {
     });
 
     if (this.state === EnemyState.HURT) {
-      this.applyVelocity(dt);
+      this.applyVelocity(dt, collisionSystem);
       if (this.stateTimer > 0.4) {
         this.setState(EnemyState.IDLE);
       }
+      return;
+    }
+
+    if (this.state === EnemyState.ATTACK) {
+      // Procedural attack timing
+      const windup = 0.4;
+      const activeStart = 0.4;
+      const activeEnd = 0.6;
+      const recovery = 1.0;
+
+      if (this.stateTimer >= activeStart && this.stateTimer <= activeEnd) {
+        // Only trigger once per attack by checking the very first frame of active
+        if (this.stateTimer - dt < activeStart) {
+          hitboxSystem.resetAttackMemory(this.id);
+        }
+
+        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.root.rotation.y);
+        hitboxSystem.addActiveHitbox({
+          ownerId: this.id,
+          damage: 15,
+          position: this.root.position.clone(),
+          direction: forward,
+          range: 2.5,
+          hitAngle: Math.PI / 2, // Wide swing
+          knockback: 15
+        });
+        
+        // Small forward lunge
+        this.velocity.copy(forward).multiplyScalar(5);
+      } else {
+        this.velocity.set(0, 0, 0); // Stop moving during windup/recovery
+      }
+
+      if (this.stateTimer >= recovery) {
+        this.setState(EnemyState.IDLE);
+        this.attackCooldown = 1.5; // Cooldown before next attack
+      }
+
+      this.applyVelocity(dt, collisionSystem);
       return;
     }
 
@@ -107,25 +161,52 @@ export class BasicYokai implements Enemy {
       const targetRotation = Math.atan2(dir.x, dir.z);
       this.root.rotation.y = targetRotation; // Instant turn for now
       
-    } else if (distToPlayer <= this.attackRange) {
-      // Attack logic (placeholder)
+    } else if (distToPlayer <= this.attackRange && this.attackCooldown <= 0) {
+      // Attack logic
       this.setState(EnemyState.ATTACK);
       this.velocity.set(0, 0, 0);
+      
+      // Snap to face player instantly when starting attack
+      const dir = playerPos.clone().sub(this.root.position).normalize();
+      this.root.rotation.y = Math.atan2(dir.x, dir.z);
     } else {
-      // Idle
+      // Idle or cooldown
       this.setState(EnemyState.IDLE);
       this.velocity.set(0, 0, 0);
+      
+      // Face player if still in aggro range but cooling down
+      if (distToPlayer < this.aggroRange) {
+        const dir = playerPos.clone().sub(this.root.position).normalize();
+        this.root.rotation.y = Math.atan2(dir.x, dir.z);
+      }
     }
 
-    this.applyVelocity(dt);
+    this.applyVelocity(dt, collisionSystem);
   }
 
-  private applyVelocity(dt: number): void {
+  private applyVelocity(dt: number, collisionSystem: any): void {
     // Apply damping for knockback sliding
     if (this.state === EnemyState.HURT || this.state === EnemyState.DEAD) {
       this.velocity.lerp(new THREE.Vector3(0, 0, 0), dt * 5.0);
     }
+    
+    // Attack lunge damping
+    if (this.state === EnemyState.ATTACK) {
+      this.velocity.lerp(new THREE.Vector3(0, 0, 0), dt * 10.0);
+    }
 
-    this.root.position.addScaledVector(this.velocity, dt);
+    if (this.velocity.lengthSq() > 0.01) {
+      const resolvedMove = collisionSystem.resolveMovement(
+        this.root.position, 
+        this.velocity.clone().multiplyScalar(dt), 
+        0.6
+      );
+      this.root.position.add(resolvedMove);
+      
+      // Clamp to bounds
+      const bounds = { MIN_X: -28, MAX_X: 28, MIN_Z: -28, MAX_Z: 28 };
+      this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, bounds.MIN_X, bounds.MAX_X);
+      this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);
+    }
   }
 }

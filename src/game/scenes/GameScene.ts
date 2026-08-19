@@ -59,6 +59,10 @@ export class GameScene {
   }
 
   public update(dt: number, inputManager: InputManager): void {
+    if (inputManager.isPressed('KeyR')) {
+      this.resetEncounter();
+    }
+
     // 1. Clear hitboxes from last frame
     this.hitboxSystem.clearActiveHitboxes();
 
@@ -66,7 +70,7 @@ export class GameScene {
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem);
     
     for (const enemy of this.enemies) {
-      enemy.update(dt, this.player.root.position, this.hitboxSystem);
+      enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem);
     }
 
     // 3. Resolve combat interactions
@@ -80,5 +84,20 @@ export class GameScene {
 
     // 4. Update debug visuals
     this.hitboxSystem.update();
+  }
+
+  private resetEncounter(): void {
+    // Reset player to spawn
+    this.player.reset(new THREE.Vector3(0, 0, 0));
+    
+    // Reset Yokai to spawn
+    for (const enemy of this.enemies) {
+      enemy.reset(new THREE.Vector3(10, 0, 10));
+    }
+    
+    // Clear hitboxes
+    this.hitboxSystem.clearActiveHitboxes();
+    // Re-initialize any hit memory maps if needed by recreating or clearing
+    // hitboxSystem.activeHitboxes and hitMemory are already handled in update cycle.
   }
 }
