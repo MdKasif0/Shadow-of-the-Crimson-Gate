@@ -31,7 +31,7 @@ export function createGamePage(): PageComponent {
       // Full screen container for the game + an absolute positioned back button overlay
       page.innerHTML = `
         <div style="width: 100vw; height: 100dvh; overflow: hidden; background: #000; position: relative;">
-          <div id="${GAME_CONTAINER_ID}" aria-label="Game canvas container" style="width: 100%; height: 100%;"></div>
+          <div id="${GAME_CONTAINER_ID}" aria-label="Game canvas container" style="width: 100%; height: 100%; overflow: hidden;"></div>
           
           <button
             class="hero-nav__cta"

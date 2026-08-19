@@ -1,67 +1,45 @@
 import * as THREE from 'three';
 
 export class Renderer {
-  public webGLRenderer: THREE.WebGLRenderer;
-  private containerId: string;
+  public webgl: THREE.WebGLRenderer;
+  private container: HTMLElement;
 
   constructor(containerId: string) {
-    this.containerId = containerId;
+    const el = document.getElementById(containerId);
+    if (!el) throw new Error(`Container #${containerId} not found`);
+    this.container = el;
+
+    this.webgl = new THREE.WebGLRenderer({ antialias: true });
     
-    // Initialize WebGLRenderer with optimal settings
-    this.webGLRenderer = new THREE.WebGLRenderer({ 
-      antialias: true,
-      alpha: false, // Ensure cinematic black background if nothing renders
-      powerPreference: 'high-performance'
-    });
+    // Configure robust WebGL settings
+    this.webgl.outputColorSpace = THREE.SRGBColorSpace;
+    this.webgl.toneMapping = THREE.ACESFilmicToneMapping;
+    this.webgl.toneMappingExposure = 1.0;
+    
+    // Cap pixel ratio to 2 for performance
+    const pixelRatio = Math.min(window.devicePixelRatio, 2);
+    this.webgl.setPixelRatio(pixelRatio);
+    
+    // Shadow maps
+    this.webgl.shadowMap.enabled = true;
+    this.webgl.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Color Management for Cinematic Look
-    this.webGLRenderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.webGLRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.webGLRenderer.toneMappingExposure = 0.8; // Tuned for dark atmosphere
-
-    // Shadow Map configuration
-    this.webGLRenderer.shadowMap.enabled = true;
-    this.webGLRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-    // Pixel Ratio capped for performance
-    this.webGLRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    this.attachToDOM();
+    this.container.appendChild(this.webgl.domElement);
     this.resize();
   }
 
-  private attachToDOM(): void {
-    const container = document.getElementById(this.containerId);
-    if (!container) {
-      throw new Error(`[Renderer] Container element with id '${this.containerId}' not found.`);
-    }
-    
-    // Clear any existing children (e.g. old Phaser canvas)
-    container.innerHTML = '';
-    container.appendChild(this.webGLRenderer.domElement);
-  }
-
   public resize(): void {
-    const container = document.getElementById(this.containerId);
-    if (container) {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      this.webGLRenderer.setSize(width, height);
-    } else {
-      // Fallback to window dimensions if container is lost
-      this.webGLRenderer.setSize(window.innerWidth, window.innerHeight);
-    }
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    this.webgl.setSize(width, height);
   }
 
   public render(scene: THREE.Scene, camera: THREE.Camera): void {
-    this.webGLRenderer.render(scene, camera);
+    this.webgl.render(scene, camera);
   }
 
   public destroy(): void {
-    this.webGLRenderer.dispose();
-    const container = document.getElementById(this.containerId);
-    if (container && this.webGLRenderer.domElement.parentElement === container) {
-      container.removeChild(this.webGLRenderer.domElement);
-    }
+    this.webgl.dispose();
+    this.webgl.domElement.remove();
   }
 }
