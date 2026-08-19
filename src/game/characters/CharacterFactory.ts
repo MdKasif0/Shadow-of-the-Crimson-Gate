@@ -25,10 +25,11 @@ export class CharacterFactory {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         if (mesh.material instanceof THREE.MeshStandardMaterial) {
-          mesh.material = mesh.material.clone();
-          mesh.material.color.multiplyScalar(0.5);
-          mesh.material.emissive.set(0x003344);
-          mesh.material.emissiveIntensity = 0.3;
+          const mat = mesh.material.clone() as THREE.MeshStandardMaterial;
+          mat.color.multiplyScalar(0.5);
+          mat.emissive.set(0x003344);
+          mat.emissiveIntensity = 0.3;
+          mesh.material = mat;
         }
       }
     });
@@ -62,9 +63,10 @@ export class CharacterFactory {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         if (mesh.material instanceof THREE.MeshStandardMaterial) {
-          mesh.material = mesh.material.clone();
-          mesh.material.emissive.set(0x330808);
-          mesh.material.emissiveIntensity = 0.4;
+          const mat = mesh.material.clone() as THREE.MeshStandardMaterial;
+          mat.emissive.set(0x330808);
+          mat.emissiveIntensity = 0.4;
+          mesh.material = mat;
         }
       }
     });

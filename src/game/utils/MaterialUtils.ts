@@ -143,8 +143,8 @@ export function createYokaiSkinMaterial(): THREE.MeshStandardMaterial {
 }
 export function createYokaiEyeMaterial(): THREE.MeshBasicMaterial {
   return cached('yokaiEye', () => new THREE.MeshBasicMaterial({
-    color: 0xff2200, emissive: 0xff0000,
-  })) as unknown as THREE.MeshBasicMaterial;
+    color: 0xff2200,
+  }));
 }
 
 // ─── Roof ───────────────────────────────────────────────────────────────────
