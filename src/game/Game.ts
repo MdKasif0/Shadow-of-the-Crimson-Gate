@@ -30,7 +30,7 @@ export class ThreeGame {
       GAME_CONFIG.CAMERA.NEAR,
       GAME_CONFIG.CAMERA.FAR
     );
-    this.camera.position.set(0, 8, 15);
+    this.camera.position.set(0, 12, 28);
     this.camera.lookAt(0, 2, 0);
 
     // 4. Bind window events
