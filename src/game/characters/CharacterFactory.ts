@@ -139,56 +139,6 @@ export class CharacterFactory {
     addMesh(rig.leftFoot, footGeo, wrapMat);
     addMesh(rig.rightFoot, footGeo, wrapMat);
 
-    // ─── KATANA ────────────────────────────────────────────────────
-    
-    // Sheath (Saya)
-    const sheathGeo = new THREE.BoxGeometry(0.05, 0.08, 1.0);
-    sheathGeo.translate(0, 0, -0.4);
-    const sheath = new THREE.Mesh(sheathGeo, armorMat);
-    rig.sheathSlot.add(sheath);
-
-    // Weapon (Katana) in hand
-    const weaponGroup = new THREE.Group();
-    
-    // Handle (Tsuka)
-    const handleGeo = new THREE.BoxGeometry(0.04, 0.05, 0.25);
-    handleGeo.translate(0, 0, 0.125);
-    const handle = new THREE.Mesh(handleGeo, wrapMat);
-    weaponGroup.add(handle);
-
-    // Guard (Tsuba)
-    const guardMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 8), accentMat);
-    guardMesh.rotation.x = Math.PI / 2;
-    guardMesh.position.z = 0.26;
-    weaponGroup.add(guardMesh);
-
-    // Blade
-    const bladeGeo = new THREE.BoxGeometry(0.015, 0.04, 0.8);
-    bladeGeo.translate(0, 0, 0.4);
-    
-    // Curve the blade slightly
-    const bPos = bladeGeo.attributes.position;
-    for(let i=0; i<bPos.count; i++) {
-      const z = bPos.getZ(i);
-      if (z > 0.1) {
-        bPos.setY(i, bPos.getY(i) + Math.pow(z * 0.8, 2) * 0.05);
-      }
-      // Taper tip
-      if (z > 0.75 && bPos.getY(i) > 0) {
-        bPos.setY(i, 0);
-      }
-    }
-    bladeGeo.computeVertexNormals();
-    
-    const blade = new THREE.Mesh(bladeGeo, bladeMat);
-    blade.position.z = 0.27;
-    weaponGroup.add(blade);
-
-    // Position katana in hand (held pointing forward)
-    weaponGroup.rotation.x = Math.PI / 2;
-    weaponGroup.position.set(0, -0.05, 0.05);
-    rig.weaponSlot.add(weaponGroup);
-
     return rig;
   }
 }

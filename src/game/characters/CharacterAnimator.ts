@@ -1,5 +1,6 @@
 import { CharacterRig } from './CharacterRig';
 import { lerp } from '../utils/MathUtils';
+import { CombatPhase } from '../combat/PlayerState';
 
 export enum AnimState {
   IDLE,
@@ -15,9 +16,21 @@ export class CharacterAnimator {
   // Blending weights
   private walkWeight: number = 0;
   private idleWeight: number = 1;
+  private attackWeight: number = 0;
+
+  // Attack state for procedural animation
+  private currentAttackId: string | null = null;
+  private currentCombatPhase: CombatPhase = CombatPhase.NONE;
+  private attackProgress: number = 0; // 0.0 to 1.0 within the current phase
 
   constructor(rig: CharacterRig) {
     this.rig = rig;
+  }
+
+  public setCombatState(attackId: string | null, phase: CombatPhase, progress: number): void {
+    this.currentAttackId = attackId;
+    this.currentCombatPhase = phase;
+    this.attackProgress = progress;
   }
 
   public setState(newState: AnimState): void {
@@ -29,14 +42,18 @@ export class CharacterAnimator {
     this.time += dt;
 
     // Smoothly interpolate weights based on current state
-    const targetWalk = this.state === AnimState.WALK ? 1 : 0;
-    const targetIdle = this.state === AnimState.IDLE ? 1 : 0;
+    const isAttacking = this.currentCombatPhase !== CombatPhase.NONE;
+    const targetWalk = (!isAttacking && this.state === AnimState.WALK) ? 1 : 0;
+    const targetIdle = (!isAttacking && this.state === AnimState.IDLE) ? 1 : 0;
+    const targetAttack = isAttacking ? 1 : 0;
     
     this.walkWeight = lerp(this.walkWeight, targetWalk, dt * 10);
     this.idleWeight = lerp(this.idleWeight, targetIdle, dt * 10);
+    this.attackWeight = lerp(this.attackWeight, targetAttack, dt * 15);
 
     this.applyIdle(this.idleWeight);
     this.applyWalk(this.walkWeight);
+    this.applyAttack(this.attackWeight);
   }
 
   private applyIdle(weight: number): void {
@@ -104,5 +121,109 @@ export class CharacterAnimator {
     // Elbows slightly bent while swinging forward
     this.rig.leftLowerArm.rotation.x = Math.min(0, lLeg) * weight;
     this.rig.rightLowerArm.rotation.x = Math.min(0, rLeg) * weight;
+  }
+
+  private applyAttack(weight: number): void {
+    if (weight <= 0.01 || !this.currentAttackId) return;
+
+    // We reset the base pose to avoid additive distortion if weight == 1
+    // But since we are blending, we just set the rotations that matter.
+    // To properly override, we should interpolate the specific bones.
+
+    const p = this.attackProgress; // 0 to 1
+    const phase = this.currentCombatPhase;
+    
+    // Default pose values to blend from
+    let spineY = 0, spineX = 0;
+    let rArmX = 0, rArmY = 0, rArmZ = 0;
+    let rLowerX = 0;
+    let wristX = 0, wristY = 0;
+
+    if (this.currentAttackId === 'ATTACK_1') {
+      // Right-to-left horizontal slash
+      if (phase === CombatPhase.WINDUP) {
+        // Pull back to the right
+        spineY = lerp(0, -0.5, p);
+        rArmX = lerp(0, -0.5, p);
+        rArmZ = lerp(0, 0.5, p);
+        rLowerX = lerp(0, -0.8, p);
+        wristY = lerp(0, 1.0, p);
+      } else if (phase === CombatPhase.ACTIVE) {
+        // Fast slash to the left
+        spineY = lerp(-0.5, 0.8, p);
+        rArmX = lerp(-0.5, -1.2, p);
+        rArmZ = lerp(0.5, -0.8, p);
+        rLowerX = lerp(-0.8, -0.2, p);
+        wristY = lerp(1.0, -1.0, p);
+      } else if (phase === CombatPhase.RECOVERY) {
+        // Return to neutral
+        spineY = lerp(0.8, 0, p);
+        rArmX = lerp(-1.2, 0, p);
+        rArmZ = lerp(-0.8, 0, p);
+        rLowerX = lerp(-0.2, 0, p);
+        wristY = lerp(-1.0, 0, p);
+      }
+    } 
+    else if (this.currentAttackId === 'ATTACK_2') {
+      // Left-to-right ascending slash
+      if (phase === CombatPhase.WINDUP) {
+        spineY = lerp(0.8, 0.5, p);
+        spineX = lerp(0, 0.2, p);
+        rArmX = lerp(-1.2, 0.2, p);
+        rArmZ = lerp(-0.8, -0.5, p);
+        rLowerX = lerp(-0.2, -1.0, p);
+        wristY = lerp(-1.0, -1.2, p);
+      } else if (phase === CombatPhase.ACTIVE) {
+        spineY = lerp(0.5, -0.6, p);
+        spineX = lerp(0.2, -0.2, p);
+        rArmX = lerp(0.2, -1.5, p);
+        rArmZ = lerp(-0.5, 0.8, p);
+        rLowerX = lerp(-1.0, -0.1, p);
+        wristY = lerp(-1.2, 0.8, p);
+      } else if (phase === CombatPhase.RECOVERY) {
+        spineY = lerp(-0.6, 0, p);
+        spineX = lerp(-0.2, 0, p);
+        rArmX = lerp(-1.5, 0, p);
+        rArmZ = lerp(0.8, 0, p);
+        rLowerX = lerp(-0.1, 0, p);
+        wristY = lerp(0.8, 0, p);
+      }
+    }
+    else if (this.currentAttackId === 'ATTACK_3') {
+      // Overhead heavy downward strike
+      if (phase === CombatPhase.WINDUP) {
+        spineX = lerp(-0.2, 0.5, p);
+        rArmX = lerp(-1.5, -2.8, p); // Raise arm high
+        rArmY = lerp(0, -0.5, p);
+        rArmZ = lerp(0.8, 0, p);
+        rLowerX = lerp(-0.1, -1.5, p);
+        wristX = lerp(0, -0.5, p);
+      } else if (phase === CombatPhase.ACTIVE) {
+        spineX = lerp(0.5, -0.5, p);
+        rArmX = lerp(-2.8, 0.2, p); // Smash down
+        rArmY = lerp(-0.5, 0.2, p);
+        rLowerX = lerp(-1.5, -0.2, p);
+        wristX = lerp(-0.5, 0.8, p);
+      } else if (phase === CombatPhase.RECOVERY) {
+        spineX = lerp(-0.5, 0, p);
+        rArmX = lerp(0.2, 0, p);
+        rArmY = lerp(0.2, 0, p);
+        rLowerX = lerp(-0.2, 0, p);
+        wristX = lerp(0.8, 0, p);
+      }
+    }
+
+    // Blend into the rig
+    this.rig.spine.rotation.y = lerp(this.rig.spine.rotation.y, spineY, weight);
+    this.rig.spine.rotation.x = lerp(this.rig.spine.rotation.x, spineX, weight);
+    
+    this.rig.rightUpperArm.rotation.x = lerp(this.rig.rightUpperArm.rotation.x, rArmX, weight);
+    this.rig.rightUpperArm.rotation.y = lerp(this.rig.rightUpperArm.rotation.y, rArmY, weight);
+    this.rig.rightUpperArm.rotation.z = lerp(this.rig.rightUpperArm.rotation.z, rArmZ, weight);
+    
+    this.rig.rightLowerArm.rotation.x = lerp(this.rig.rightLowerArm.rotation.x, rLowerX, weight);
+    
+    this.rig.rightHand.rotation.x = lerp(this.rig.rightHand.rotation.x, wristX, weight);
+    this.rig.rightHand.rotation.y = lerp(this.rig.rightHand.rotation.y, wristY, weight);
   }
 }

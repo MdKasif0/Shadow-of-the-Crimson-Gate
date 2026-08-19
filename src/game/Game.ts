@@ -45,10 +45,8 @@ export class ThreeGame {
   private update(dt: number): void {
     this.input.beginFrame();
 
-    const inputMoveDir = this.input.getMovementDirection();
-
     // Update scene logic
-    this.gameScene.update(dt, inputMoveDir);
+    this.gameScene.update(dt, this.input);
 
     // Update camera to follow player
     this.cameraController.update(this.gameScene.player.root.position, dt);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { WorldGenerator } from '../world/WorldGenerator';
 import { Ronin } from '../characters/Ronin';
 import { CollisionSystem } from '../physics/CollisionSystem';
+import { InputManager } from '../core/InputManager';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -44,7 +45,7 @@ export class GameScene {
     this.scene.add(this.player.root);
   }
 
-  public update(dt: number, inputMoveDir: THREE.Vector3): void {
-    this.player.update(dt, inputMoveDir, this.collisionSystem);
+  public update(dt: number, inputManager: InputManager): void {
+    this.player.update(dt, inputManager, this.collisionSystem);
   }
 }
