@@ -80,11 +80,24 @@ export class CameraController {
     // We only clamp the focus target, then re-apply offset
     const clampedTarget = this.currentPos.clone().sub(this.offset);
     
-    clampedTarget.x = THREE.MathUtils.clamp(clampedTarget.x, this.minX + viewWidth, this.maxX - viewWidth);
+    const clampMinX = this.minX + viewWidth;
+    const clampMaxX = this.maxX - viewWidth;
+    if (clampMinX < clampMaxX) {
+      clampedTarget.x = THREE.MathUtils.clamp(clampedTarget.x, clampMinX, clampMaxX);
+    } else {
+      clampedTarget.x = (this.minX + this.maxX) / 2;
+    }
     
     // Because camera is angled at 45 degrees, the visible Z depth on the ground plane is roughly viewDepth / sin(45)
     const zVisibleDepth = viewDepth * 1.414;
-    clampedTarget.z = THREE.MathUtils.clamp(clampedTarget.z, this.minZ + zVisibleDepth, this.maxZ - zVisibleDepth*0.2);
+    const clampMinZ = this.minZ + zVisibleDepth;
+    const clampMaxZ = this.maxZ - zVisibleDepth*0.2;
+    
+    if (clampMinZ < clampMaxZ) {
+      clampedTarget.z = THREE.MathUtils.clamp(clampedTarget.z, clampMinZ, clampMaxZ);
+    } else {
+      clampedTarget.z = (this.minZ + this.maxZ) / 2;
+    }
     
     this.currentPos.copy(clampedTarget).add(this.offset);
 
