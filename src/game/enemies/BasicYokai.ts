@@ -18,6 +18,7 @@ export class BasicYokai implements Enemy {
   
   private velocity: THREE.Vector3 = new THREE.Vector3();
   private stateTimer: number = 0;
+  private isDeathVfxPlayed: boolean = false;
   
   // AI Params
   private aggroRange: number = 12;
@@ -68,9 +69,11 @@ export class BasicYokai implements Enemy {
     this.health.isDead = false;
     this.velocity.set(0, 0, 0);
     this.attackCooldown = 0;
+    this.isDeathVfxPlayed = false;
     this.setState(EnemyState.IDLE);
     // Reset rotations explicitly
     this.root.rotation.set(0, 0, 0);
+    this.root.visible = true; // Restore visibility
     // EnemyAnimator state resets gradually, which is fine
   }
 
@@ -81,12 +84,18 @@ export class BasicYokai implements Enemy {
     this.animator.setState(newState);
   }
 
-  public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any): void {
+  public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any): void {
     this.stateTimer += dt;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     this.animator.update(dt);
 
     if (this.state === EnemyState.DEAD) {
+      if (!this.isDeathVfxPlayed && vfx) {
+        vfx.spawnDeath(this.root.position);
+        this.isDeathVfxPlayed = true;
+        this.root.visible = false; // Hide mesh, only show particles
+      }
+      
       // Allow knockback to settle then stop
       this.applyVelocity(dt, collisionSystem);
       return; 

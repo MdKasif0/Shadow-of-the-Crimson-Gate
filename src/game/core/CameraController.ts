@@ -8,6 +8,10 @@ export class CameraController {
   // Offset relative to the target
   private offset: THREE.Vector3;
   private currentPos: THREE.Vector3;
+  
+  // Shake mechanics
+  private shakeIntensity: number = 0;
+  private shakeOffset: THREE.Vector3 = new THREE.Vector3();
 
   // The world boundary to clamp the camera against
   private minX: number;
@@ -56,6 +60,10 @@ export class CameraController {
     this.camera.updateProjectionMatrix();
   }
 
+  public addShake(intensity: number): void {
+    this.shakeIntensity = Math.min(this.shakeIntensity + intensity, 2.0); // Cap max shake
+  }
+
   public update(target: THREE.Vector3, dt: number): void {
     // 1. Determine desired camera position (tracking the player)
     // To place player in lower-middle, we shift the camera's focus point *forward* along the Z axis (or adjust offset).
@@ -101,8 +109,23 @@ export class CameraController {
     
     this.currentPos.copy(clampedTarget).add(this.offset);
 
+    // Apply procedural shake
+    if (this.shakeIntensity > 0.01) {
+      this.shakeOffset.set(
+        (Math.random() - 0.5) * this.shakeIntensity,
+        (Math.random() - 0.5) * this.shakeIntensity,
+        0 // mostly XY shake for orthographic
+      );
+      this.currentPos.add(this.shakeOffset);
+      
+      // Decay shake
+      this.shakeIntensity = THREE.MathUtils.lerp(this.shakeIntensity, 0, dt * 10);
+    } else {
+      this.shakeIntensity = 0;
+    }
+
     // 4. Apply position and rotation
     this.camera.position.copy(this.currentPos);
-    this.camera.lookAt(clampedTarget);
+    this.camera.lookAt(clampedTarget); // look at un-shaken target for stability, or shake target too? Unshaken is usually better
   }
 }

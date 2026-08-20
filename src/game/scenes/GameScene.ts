@@ -6,6 +6,8 @@ import { HitboxSystem } from '../physics/HitboxSystem';
 import { InputManager } from '../core/InputManager';
 import { EnemySpawner } from '../world/EnemySpawner';
 import { Enemy } from '../enemies/Enemy';
+import { CameraController } from '../core/CameraController';
+import { VFXManager } from '../vfx/VFXManager';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -13,8 +15,13 @@ export class GameScene {
   public collisionSystem: CollisionSystem;
   public hitboxSystem: HitboxSystem;
   public enemies: Enemy[] = [];
+  public vfx: VFXManager;
+  public cameraController: CameraController;
+  
+  private hitStopTimer: number = 0;
 
-  constructor() {
+  constructor(cameraController: CameraController) {
+    this.cameraController = cameraController;
     this.scene = new THREE.Scene();
     
     // Atmosphere Placeholder
@@ -56,6 +63,9 @@ export class GameScene {
     const spawner = new EnemySpawner();
     const yokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(10, 0, 10));
     this.enemies.push(yokai);
+
+    // Initialize VFX
+    this.vfx = new VFXManager(this.scene, this.cameraController);
   }
 
   public update(dt: number, inputManager: InputManager): void {
@@ -63,22 +73,42 @@ export class GameScene {
       this.resetEncounter();
     }
 
+    this.vfx.update(dt);
+
+    if (this.hitStopTimer > 0) {
+      this.hitStopTimer -= dt;
+      return; // Skip entity updates to create freeze-frame
+    }
+
     // 1. Clear hitboxes from last frame
     this.hitboxSystem.clearActiveHitboxes();
 
     // 2. Update entities (which may register hitboxes/hurtboxes)
-    this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem);
+    this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
     
     for (const enemy of this.enemies) {
-      enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem);
+      enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx);
     }
 
     // 3. Resolve combat interactions
     const hits = this.hitboxSystem.checkHits();
     for (const hit of hits) {
-      const targetEnemy = this.enemies.find(e => e.id === hit.hurtbox.id);
-      if (targetEnemy) {
-        targetEnemy.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
+      const isPlayerHit = hit.hurtbox.id === 'PLAYER';
+      
+      if (isPlayerHit) {
+        this.player.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
+        this.vfx.spawnHurt(hit.hitbox.position);
+        this.cameraController.addShake(1.5);
+      } else {
+        const targetEnemy = this.enemies.find(e => e.id === hit.hurtbox.id);
+        if (targetEnemy) {
+          targetEnemy.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
+          // Assuming damage > 15 is heavy hit for now
+          const isHeavy = hit.hitbox.damage > 15; 
+          this.vfx.spawnHit(hit.hitbox.position, hit.hitbox.direction, isHeavy);
+          this.cameraController.addShake(isHeavy ? 1.0 : 0.5);
+          this.hitStopTimer = isHeavy ? 0.07 : 0.04;
+        }
       }
     }
 

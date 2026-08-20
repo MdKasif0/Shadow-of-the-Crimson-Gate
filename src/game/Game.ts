@@ -22,10 +22,10 @@ export class ThreeGame {
     this.renderer = new Renderer(containerId);
     this.input = new InputManager();
     
-    // 2. Initialize scene
-    this.gameScene = new GameScene();
-    
     this.cameraController = new CameraController();
+
+    // 2. Initialize scene
+    this.gameScene = new GameScene(this.cameraController);
 
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);

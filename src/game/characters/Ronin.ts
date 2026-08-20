@@ -100,7 +100,7 @@ export class Ronin {
     this.dashSystem['cooldownTimer'] = 0;
   }
 
-  public update(dt: number, inputManager: InputManager, collisionSystem: any, hitboxSystem?: any): void {
+  public update(dt: number, inputManager: InputManager, collisionSystem: any, hitboxSystem?: any, vfx?: any): void {
     // I-Frames timer
     if (this.state.invulnerabilityTimer > 0) {
       this.state.invulnerabilityTimer -= dt;
@@ -149,6 +149,7 @@ export class Ronin {
       // Also instantly snap rotation to dash dir
       this.targetRotation = Math.atan2(this.dashSystem.dashDirection.x, this.dashSystem.dashDirection.z);
       this.playWalk(); // Need a dash animation, but walk sped up works
+      if (vfx && Math.random() > 0.5) vfx.spawnDash(this.root.position, this.targetRotation);
     } else if (isAttacking) {
       // During an attack, standard movement is ignored.
       // But we can apply an attack lunge during the ACTIVE phase
@@ -163,6 +164,12 @@ export class Ronin {
             // Reset memory on the very first frame of ACTIVE
             if (this.combat['attackTimer'] <= dt) {
                hitboxSystem.resetAttackMemory('PLAYER');
+               
+               // Spawn Slash VFX exactly once per attack
+               if (vfx) {
+                 const typeNum = parseInt(this.state.currentAttackId.replace('ATTACK_', '')) || 1;
+                 vfx.spawnSlash(this.root.position, forward, typeNum);
+               }
             }
 
             hitboxSystem.addActiveHitbox({
