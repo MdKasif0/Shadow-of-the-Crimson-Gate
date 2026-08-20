@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EnemyState } from './EnemyState';
 import { EnemyConfig } from './EnemyConfig';
+import { AttackRole } from '../combat/AttackDirector';
 
 /**
  * EnemyAI — Config-driven reusable AI state machine.
@@ -31,8 +32,31 @@ export class EnemyAI {
     playerPos: THREE.Vector3,
     attackCooldown: number,
     currentState: EnemyState,
-    dt: number
+    dt: number,
+    role: AttackRole = AttackRole.PRIMARY_MELEE,
+    homePosition: THREE.Vector3 | null = null,
+    leashRadius: number = 25
   ): AIDecision {
+    // 1. Check Leash Boundary
+    if (homePosition) {
+      const distToHome = enemyPos.distanceTo(homePosition);
+      if (currentState === EnemyState.LEASH) {
+        if (distToHome < leashRadius * 0.5) {
+          // Returned enough, resume normal logic
+          return { state: EnemyState.IDLE, moveDirection: new THREE.Vector3(), facingAngle: 0 };
+        } else {
+          // Keep running home
+          const toHome = homePosition.clone().sub(enemyPos);
+          toHome.y = 0;
+          const dirToHome = toHome.lengthSq() > 0.001 ? toHome.normalize() : new THREE.Vector3(0,0,1);
+          return { state: EnemyState.LEASH, moveDirection: dirToHome, facingAngle: Math.atan2(dirToHome.x, dirToHome.z) };
+        }
+      } else if (distToHome > leashRadius) {
+        // Trigger leash
+        return { state: EnemyState.LEASH, moveDirection: new THREE.Vector3(), facingAngle: 0 };
+      }
+    }
+
     const toPlayer = playerPos.clone().sub(enemyPos);
     toPlayer.y = 0; // Flatten for horizontal AI logic
     const distToPlayer = toPlayer.length();
@@ -60,8 +84,35 @@ export class EnemyAI {
     }
 
     // In combat zone — decide based on aggression and cooldown
+    // In combat zone — decide based on aggression and cooldown
     const inAttackRange = distToPlayer <= this.config.attackRange;
     const canAttack = attackCooldown <= 0;
+
+    if (role === AttackRole.WAITING) {
+      // Keep distance, circle around
+      if (distToPlayer < this.config.attackRange * 2) {
+         const retreatDir = dirToPlayer.clone().negate();
+         return { state: EnemyState.RETREAT, moveDirection: retreatDir, facingAngle };
+      }
+      this.strafeTimer += dt;
+      if (this.strafeTimer > 2.0) {
+        this.strafeDir *= -1;
+        this.strafeTimer = 0;
+      }
+      return { state: EnemyState.STRAFE, moveDirection: this.computeStrafeDirection(dirToPlayer), facingAngle };
+    }
+
+    if (role === AttackRole.FLANKER) {
+      // Try to get to the side of the player before engaging fully
+      // But if close and can attack, just attack
+      if (inAttackRange && canAttack && Math.random() < this.config.aggression) {
+        return { state: EnemyState.ATTACK, moveDirection: new THREE.Vector3(), facingAngle };
+      }
+      
+      // Compute flank position (offset by strafeDir)
+      const flankDir = this.computeStrafeDirection(dirToPlayer).add(dirToPlayer).normalize();
+      return { state: EnemyState.WALK, moveDirection: flankDir, facingAngle };
+    }
 
     // Attack if in range, off cooldown, and aggression roll succeeds
     if (inAttackRange && canAttack) {

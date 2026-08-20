@@ -6,5 +6,6 @@ export enum EnemyState {
   RETREAT,
   ATTACK,
   HURT,
-  DEAD
+  DEAD,
+  LEASH
 }

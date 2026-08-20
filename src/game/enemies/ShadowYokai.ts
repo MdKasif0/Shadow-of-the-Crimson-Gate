@@ -8,6 +8,7 @@ import { EnemyFactory } from './EnemyFactory';
 import { HitboxSystem } from '../combat/HitboxSystem';
 import { EnemyAI } from './EnemyAI';
 import { SHADOW_YOKAI_CONFIG, EnemyConfig } from './EnemyConfig';
+import { AttackRole } from '../combat/AttackDirector';
 
 export class ShadowYokai implements Enemy {
   public id: string;
@@ -25,6 +26,16 @@ export class ShadowYokai implements Enemy {
   private stateTimer: number = 0;
   private isDeathVfxPlayed: boolean = false;
   private attackCooldown: number = 0;
+  private role: AttackRole = AttackRole.FLANKER;
+  private homePosition: THREE.Vector3 | null = null;
+
+  public assignRole(role: AttackRole): void {
+    this.role = role;
+  }
+
+  public setHomePosition(pos: THREE.Vector3): void {
+    this.homePosition = pos.clone();
+  }
 
   // Shadow Aura
   private auraTime: number = 0;
@@ -111,7 +122,7 @@ export class ShadowYokai implements Enemy {
     this.animator.setState(newState);
   }
 
-  public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any): void {
+  public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any, projectileSystem?: any, allEnemies?: Enemy[]): void {
     this.stateTimer += dt;
     this.auraTime += dt;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
@@ -162,8 +173,24 @@ export class ShadowYokai implements Enemy {
       return;
     }
 
+    // ─── Separation Force ───
+    if (allEnemies) {
+      for (const other of allEnemies) {
+        if (other.id === this.id || other.health.isDead) continue;
+        const dist = this.root.position.distanceTo(other.root.position);
+        if (dist < this.config.collisionRadius * 2.5) {
+          const pushDir = this.root.position.clone().sub(other.root.position);
+          pushDir.y = 0;
+          if (pushDir.lengthSq() > 0.001) {
+            pushDir.normalize();
+            this.velocity.add(pushDir.multiplyScalar(20 * dt));
+          }
+        }
+      }
+    }
+
     // ─── AI Decision ───
-    const decision = this.ai.decide(this.root.position, playerPos, this.attackCooldown, this.state, dt);
+    const decision = this.ai.decide(this.root.position, playerPos, this.attackCooldown, this.state, dt, this.role, this.homePosition);
     
     if (this.state !== decision.state) {
       this.setState(decision.state);

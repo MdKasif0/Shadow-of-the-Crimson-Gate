@@ -5,9 +5,11 @@ import { CollisionSystem } from '../collision/CollisionSystem';
 import { HitboxSystem } from '../combat/HitboxSystem';
 import { DamageSystem } from '../combat/DamageSystem';
 import { InputManager } from '../core/InputManager';
-import { EnemySpawner } from '../world/EnemySpawner';
 import { Enemy } from '../enemies/Enemy';
 import { CameraController } from '../camera/CameraController';
+import { EncounterManager } from '../encounters/EncounterManager';
+import { EncounterConfig } from '../encounters/EncounterConfig';
+import { AttackDirector } from '../combat/AttackDirector';
 import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
 import { LightingSystem } from '../lighting/LightingSystem';
@@ -24,9 +26,10 @@ export class GameScene {
   public vfx: VFXManager;
   public cameraController: CameraController;
   
+  private encounterManager: EncounterManager;
+  private attackDirector: AttackDirector;
+  
   private hitStopTimer: number = 0;
-  private encounterActive: boolean = false;
-  private isEncounterCompleted: boolean = false;
 
   private lighting: LightingSystem;
   private atmosphere: AtmosphereSystem;
@@ -47,15 +50,42 @@ export class GameScene {
     this.player.setPosition(0, 0, 0);
     this.scene.add(this.player.root);
 
-    // TEST ARENA: Spawn all 3 enemies
-    const spawner = new EnemySpawner();
-    const basicYokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(-4, 0, -8));
-    const shadowYokai = spawner.spawnShadowYokai(this.scene, new THREE.Vector3(0, 0, -8));
-    const tengu = spawner.spawnTengu(this.scene, new THREE.Vector3(4, 0, -8));
-    
-    this.enemies.push(basicYokai);
-    this.enemies.push(shadowYokai);
-    this.enemies.push(tengu);
+    this.encounterManager = new EncounterManager();
+    this.attackDirector = new AttackDirector();
+
+    // TEST ENCOUNTER A: 2 Basic Yokai
+    this.encounterManager.registerEncounter({
+      id: 'encA',
+      center: new THREE.Vector3(-15, 0, -15),
+      activationRadius: 15,
+      leashRadius: 25,
+      waves: [
+        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'BASIC_YOKAI', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
+      ]
+    });
+
+    // TEST ENCOUNTER B: 1 Basic, 1 Shadow
+    this.encounterManager.registerEncounter({
+      id: 'encB',
+      center: new THREE.Vector3(15, 0, -15),
+      activationRadius: 15,
+      leashRadius: 25,
+      waves: [
+        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
+      ]
+    });
+
+    // TEST ENCOUNTER C: 1 Basic, 1 Shadow, 1 Tengu (Waves)
+    this.encounterManager.registerEncounter({
+      id: 'encC',
+      center: new THREE.Vector3(0, 0, -25),
+      activationRadius: 15,
+      leashRadius: 25,
+      waves: [
+        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(0, 0, 0) }], delayAfterComplete: 2.0 },
+        { enemies: [{ type: 'SHADOW_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'TENGU', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
+      ]
+    });
 
     this.vfx = new VFXManager(this.scene, this.cameraController);
 
@@ -83,31 +113,15 @@ export class GameScene {
     this.hitboxSystem.clearActiveHitboxes();
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
     this.projectileSystem.update(dt, this.player, this.vfx, this.cameraController);
+    // Encounter Update
+    this.encounterManager.update(dt, this.player.root.position, this.scene);
+    this.enemies = this.encounterManager.getActiveEnemies();
     
-    // Encounter Trigger Logic
-    if (!this.encounterActive && !this.isEncounterCompleted) {
-      for (const enemy of this.enemies) {
-        if (enemy.health.isDead) continue;
-        const dist = this.player.root.position.distanceTo(enemy.root.position);
-        if (dist < 12) {
-          this.encounterActive = true;
-          EventBus.emit('encounterStarted');
-          // For testing, just show the first alive enemy's health on trigger
-          EventBus.emit('enemyHealth', { 
-            current: enemy.health.currentHealth, 
-            max: enemy.health.maxHealth, 
-            delta: 0,
-            name: enemy.enemyType.replace('_', ' ')
-          });
-          break;
-        }
-      }
-    }
+    // Group AI Update
+    this.attackDirector.update(dt, this.enemies, this.player.root.position);
 
     for (const enemy of this.enemies) {
-      if (this.encounterActive || this.isEncounterCompleted) {
-        enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem);
-      }
+      enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem, this.enemies);
     }
 
     const hits = this.hitboxSystem.checkHits();
@@ -131,12 +145,7 @@ export class GameScene {
         }
       }
 
-      // Check if ALL enemies are dead
-      if (!this.isEncounterCompleted && this.enemies.every(e => e.health.isDead)) {
-        this.encounterActive = false;
-        this.isEncounterCompleted = true;
-        EventBus.emit('encounterComplete');
-      }
+      // We moved encounter complete logic to Encounter.ts
     }
 
     this.hitboxSystem.update();
@@ -144,19 +153,12 @@ export class GameScene {
 
   public resetEncounter(): void {
     this.player.reset(new THREE.Vector3(0, 0, 0));
-    
-    if (this.enemies[0]) this.enemies[0].reset(new THREE.Vector3(-4, 0, -8));
-    if (this.enemies[1]) this.enemies[1].reset(new THREE.Vector3(0, 0, -8));
-    if (this.enemies[2]) this.enemies[2].reset(new THREE.Vector3(4, 0, -8));
+    this.encounterManager.resetAll(this.scene);
     
     this.hitboxSystem.clearActiveHitboxes();
     this.projectileSystem.clearAll();
     this.hitStopTimer = 0;
     
-    this.encounterActive = false;
-    this.isEncounterCompleted = false;
-
     EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
-    EventBus.emit('encounterComplete'); 
   }
 }
