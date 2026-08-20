@@ -34,8 +34,9 @@ export class EnemyAI {
     dt: number
   ): AIDecision {
     const toPlayer = playerPos.clone().sub(enemyPos);
+    toPlayer.y = 0; // Flatten for horizontal AI logic
     const distToPlayer = toPlayer.length();
-    const dirToPlayer = toPlayer.normalize();
+    const dirToPlayer = distToPlayer > 0.001 ? toPlayer.normalize() : new THREE.Vector3(0, 0, 1);
     const facingAngle = Math.atan2(dirToPlayer.x, dirToPlayer.z);
 
     // Dead, Hurt, or currently Attacking — don't change state
