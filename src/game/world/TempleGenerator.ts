@@ -141,13 +141,13 @@ export class TempleGenerator {
       group.add(finial);
     }
 
-    // Position temple at back of courtyard
-    group.position.set(0, 0, -18);
+    // Position temple at back of level (Temple Approach zone)
+    group.position.set(0, 0, -65);
 
     // Register collision
     const templeBox = new THREE.Box3(
-      new THREE.Vector3(-width / 2, 0, -18 - depth / 2),
-      new THREE.Vector3(width / 2, 10, -18 + depth / 2)
+      new THREE.Vector3(-width / 2, 0, -65 - depth / 2),
+      new THREE.Vector3(width / 2, 10, -65 + depth / 2)
     );
     collisionSystem.addBox(templeBox);
 

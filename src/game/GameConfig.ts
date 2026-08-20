@@ -21,12 +21,12 @@ export const GAME_CONFIG = {
 
   WORLD: {
     WIDTH: 60,
-    DEPTH: 60,
+    DEPTH: 160,
     BOUNDS: {
       MIN_X: -28,
       MAX_X: 28,
-      MIN_Z: -28,
-      MAX_Z: 28,
+      MIN_Z: -80,
+      MAX_Z: 60,
     },
     SPAWN_AREA_SIZE: 10,
   }

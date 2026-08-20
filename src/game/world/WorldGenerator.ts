@@ -25,21 +25,35 @@ export class WorldGenerator {
     // 2. Mountains (distant background)
     worldGroup.add(MountainGenerator.generate(random));
 
-    // 3. Temple (focal point at the back)
+    // 3. Temple (focal point - now at Temple Approach zone)
     worldGroup.add(TempleGenerator.generate(collisionSystem));
 
-    // 4. Torii Gate (entrance)
-    const torii = ToriiGenerator.generate(collisionSystem);
-    torii.position.set(0, 0, 15);
+    // 4. Entrance Torii Gate (at entrance zone z=55)
+    const entranceTorii = ToriiGenerator.generate(collisionSystem);
+    entranceTorii.position.set(0, 0, 55);
     collisionSystem.addBox(new THREE.Box3(
-      new THREE.Vector3(-4, 0, 14),
-      new THREE.Vector3(-3, 8, 16)
+      new THREE.Vector3(-4, 0, 54),
+      new THREE.Vector3(-3, 8, 56)
     ));
     collisionSystem.addBox(new THREE.Box3(
-      new THREE.Vector3(3, 0, 14),
-      new THREE.Vector3(4, 8, 16)
+      new THREE.Vector3(3, 0, 54),
+      new THREE.Vector3(4, 8, 56)
     ));
-    worldGroup.add(torii);
+    worldGroup.add(entranceTorii);
+
+    // 4b. Courtyard Torii (marking courtyard boundary z=20)
+    const courtyardTorii = ToriiGenerator.generate(collisionSystem);
+    courtyardTorii.position.set(0, 0, 20);
+    courtyardTorii.scale.setScalar(0.85); // Slightly smaller
+    collisionSystem.addBox(new THREE.Box3(
+      new THREE.Vector3(-3.5, 0, 19),
+      new THREE.Vector3(-2.5, 7, 21)
+    ));
+    collisionSystem.addBox(new THREE.Box3(
+      new THREE.Vector3(2.5, 0, 19),
+      new THREE.Vector3(3.5, 7, 21)
+    ));
+    worldGroup.add(courtyardTorii);
 
     // 5. Small Shrines
     worldGroup.add(ShrineGenerator.generate(random, collisionSystem));
