@@ -57,7 +57,7 @@ export class LanternGenerator {
     pointLight.position.set(0, 2.5, 0);
     prefab.add(pointLight);
 
-    const lanternCount = 8;
+    const lanternCount = 20; // Increased for expanded world
     const bounds = GAME_CONFIG.WORLD.BOUNDS;
 
     let placed = 0;
@@ -65,12 +65,13 @@ export class LanternGenerator {
       const x = random.range(bounds.MIN_X + 5, bounds.MAX_X - 5);
       const z = random.range(bounds.MIN_Z + 5, bounds.MAX_Z - 5);
       
-      // Prefer placing near the path (x near 0)
-      if (Math.abs(x) > 8 && random.next() > 0.3) continue;
+      // Prefer placing near the path (x near 6 to 10)
+      if (Math.abs(x) < 4 || Math.abs(x) > 12) {
+        if (random.next() > 0.2) continue;
+      }
       
-      const distFromCenter = Math.sqrt(x*x + z*z);
-      if (distFromCenter < 5) continue; // Keep spawn clear
-      if (z < -5 && Math.abs(x) < 8) continue; // Keep temple entrance clear
+      // Keep temple entrance clear
+      if (z < -45 && Math.abs(x) < 8) continue;
 
       const lantern = prefab.clone();
       lantern.position.set(x, 0, z);

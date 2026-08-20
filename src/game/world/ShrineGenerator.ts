@@ -70,10 +70,10 @@ export class ShrineGenerator {
       return shrine;
     };
 
-    // Place a couple of shrines in the courtyard
+    // Place a couple of decorative shrines in the courtyard
     const positions = [
-      { x: -12, z: 8, rotY: Math.PI / 4 },
-      { x: 12, z: 8, rotY: -Math.PI / 4 }
+      { x: -12, z: 25, rotY: Math.PI / 4 },
+      { x: 12, z: 25, rotY: -Math.PI / 4 }
     ];
 
     positions.forEach(pos => {
@@ -88,6 +88,17 @@ export class ShrineGenerator {
         new THREE.Vector3(4, 4, 4)
       ));
     });
+
+    // Place the Main Interactable Shrine in the Shrine Area
+    const mainShrine = createShrine();
+    mainShrine.position.set(0, 0, -10);
+    mainShrine.scale.setScalar(1.2);
+    group.add(mainShrine);
+
+    collisionSystem.addBox(new THREE.Box3().setFromCenterAndSize(
+      new THREE.Vector3(0, 2, -10),
+      new THREE.Vector3(5, 5, 5)
+    ));
 
     return group;
   }

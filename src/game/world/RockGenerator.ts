@@ -8,7 +8,7 @@ export class RockGenerator {
     const group = new THREE.Group();
     group.name = 'Rocks';
 
-    const rockCount = 45;
+    const rockCount = 120; // Increased for expanded world
     const geometries: THREE.BufferGeometry[] = [];
 
     // Create 3 variant rock geometries
@@ -57,12 +57,15 @@ export class RockGenerator {
       const x = random.range(bounds.MIN_X - 5, bounds.MAX_X + 5);
       const z = random.range(bounds.MIN_Z - 5, bounds.MAX_Z + 5);
       
-      const distFromCenter = Math.sqrt(x*x + z*z);
-      // Avoid spawn area and center
-      if (distFromCenter < 12) continue;
+      const distFromCenter = Math.abs(x);
+      // Avoid main path
+      if (distFromCenter < 8) continue;
       
       // Avoid temple area
-      if (z < -10 && Math.abs(x) < 15) continue;
+      if (z < -45 && Math.abs(x) < 18) continue;
+      
+      // Avoid shrines
+      if (z > -15 && z < 10 && Math.abs(x) < 15) continue;
 
       dummy.position.set(x, 0, z);
       

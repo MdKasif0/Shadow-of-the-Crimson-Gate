@@ -16,6 +16,13 @@ import { LightingSystem } from '../lighting/LightingSystem';
 import { AtmosphereSystem } from '../atmosphere/AtmosphereSystem';
 import { ProjectileSystem } from '../combat/ProjectileSystem';
 
+import { ZoneManager } from '../world/ZoneManager';
+import { InteractionSystem } from '../interaction/InteractionSystem';
+import { ShrineInteraction } from '../interaction/ShrineInteraction';
+import { ObjectiveManager } from '../progression/ObjectiveManager';
+import { ObjectiveUI } from '../ui/ObjectiveUI';
+import { EncounterTelegraphVFX } from '../vfx/EncounterTelegraphVFX';
+
 export class GameScene {
   public scene: THREE.Scene;
   public player: Ronin;
@@ -33,6 +40,12 @@ export class GameScene {
 
   private lighting: LightingSystem;
   private atmosphere: AtmosphereSystem;
+  
+  private zoneManager: ZoneManager;
+  private interactionSystem: InteractionSystem;
+  private objectiveManager: ObjectiveManager;
+  private objectiveUI: ObjectiveUI;
+  private telegraphVfx: EncounterTelegraphVFX;
 
   constructor(cameraController: CameraController) {
     this.cameraController = cameraController;
@@ -40,6 +53,7 @@ export class GameScene {
     
     this.atmosphere = new AtmosphereSystem(this.scene);
     this.lighting = new LightingSystem(this.scene);
+    this.zoneManager = new ZoneManager();
 
     this.collisionSystem = new CollisionSystem();
     new WorldGenerator(this.scene, this.collisionSystem);
@@ -47,16 +61,16 @@ export class GameScene {
     this.projectileSystem = new ProjectileSystem(this.scene);
 
     this.player = new Ronin();
-    this.player.setPosition(0, 0, 0);
+    this.player.setPosition(0, 0, 50); // Start at entrance
     this.scene.add(this.player.root);
 
     this.encounterManager = new EncounterManager();
     this.attackDirector = new AttackDirector();
 
-    // TEST ENCOUNTER A: 2 Basic Yokai
+    // COURTYARD ENCOUNTER
     this.encounterManager.registerEncounter({
-      id: 'encA',
-      center: new THREE.Vector3(-15, 0, -15),
+      id: 'enc_courtyard',
+      center: new THREE.Vector3(0, 0, 15),
       activationRadius: 15,
       leashRadius: 25,
       waves: [
@@ -64,64 +78,105 @@ export class GameScene {
       ]
     });
 
-    // TEST ENCOUNTER B: 1 Basic, 1 Shadow
+    // SHRINE ENCOUNTER
     this.encounterManager.registerEncounter({
-      id: 'encB',
-      center: new THREE.Vector3(15, 0, -15),
-      activationRadius: 15,
-      leashRadius: 25,
+      id: 'enc_shrine',
+      center: new THREE.Vector3(0, 0, -10),
+      activationRadius: 12,
+      leashRadius: 20,
       waves: [
-        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
-      ]
-    });
-
-    // TEST ENCOUNTER C: 1 Basic, 1 Shadow, 1 Tengu (Waves)
-    this.encounterManager.registerEncounter({
-      id: 'encC',
-      center: new THREE.Vector3(0, 0, -25),
-      activationRadius: 15,
-      leashRadius: 25,
-      waves: [
-        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(0, 0, 0) }], delayAfterComplete: 2.0 },
         { enemies: [{ type: 'SHADOW_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'TENGU', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
       ]
     });
 
+    // FOREST ENCOUNTER
+    this.encounterManager.registerEncounter({
+      id: 'enc_forest',
+      center: new THREE.Vector3(0, 0, -35),
+      activationRadius: 10,
+      leashRadius: 18,
+      waves: [
+        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(0, 0, -2) }, { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(0, 0, 2) }], delayAfterComplete: 0 }
+      ]
+    });
+    
+    // TEMPLE APPROACH ENCOUNTER
+    this.encounterManager.registerEncounter({
+      id: 'enc_temple',
+      center: new THREE.Vector3(0, 0, -60),
+      activationRadius: 14,
+      leashRadius: 22,
+      waves: [
+        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 1.5 },
+        { enemies: [{ type: 'SHADOW_YOKAI', offset: new THREE.Vector3(0, 0, -3) }, { type: 'TENGU', offset: new THREE.Vector3(0, 0, 3) }], delayAfterComplete: 0 }
+      ]
+    });
+
     this.vfx = new VFXManager(this.scene, this.cameraController);
+    this.telegraphVfx = new EncounterTelegraphVFX(this.scene, this.encounterManager);
+
+    this.interactionSystem = new InteractionSystem();
+    // Register the main shrine
+    this.interactionSystem.register(new ShrineInteraction(new THREE.Vector3(0, 0, -10)));
+
+    this.objectiveManager = new ObjectiveManager();
+    this.objectiveUI = new ObjectiveUI();
 
     EventBus.on('restartEncounter', () => {
       this.resetEncounter();
     });
     
+    EventBus.on('shrineActivated', () => {
+      this.player['health'].heal(this.player['health'].maxHealth);
+      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+    });
+
     setTimeout(() => {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     }, 100);
   }
 
+  private time: number = 0;
+
   public update(dt: number, inputManager: InputManager): void {
+    this.time += dt;
+
     if (inputManager.isPressed('KeyR')) {
       this.resetEncounter();
     }
 
     this.vfx.update(dt);
+    this.telegraphVfx.update(dt, this.time);
 
     if (this.hitStopTimer > 0) {
       this.hitStopTimer -= dt;
       return; 
     }
 
+    // Zone & Atmosphere updates
+    const playerPos = this.player.root.position;
+    const { fogDensity, fogColor, ambientColor, ambientIntensity } = this.zoneManager.getBlendedAtmosphere(playerPos);
+    this.atmosphere.update(dt, fogDensity, fogColor);
+    this.lighting.update(dt, ambientColor, ambientIntensity);
+    
+    const zoneId = this.zoneManager.getCurrentZoneId();
+    this.objectiveManager.onZoneEntered(zoneId);
+
+    // Systems updates
+    this.interactionSystem.update(playerPos, inputManager);
     this.hitboxSystem.clearActiveHitboxes();
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
     this.projectileSystem.update(dt, this.player, this.vfx, this.cameraController);
+    
     // Encounter Update
-    this.encounterManager.update(dt, this.player.root.position, this.scene);
+    this.encounterManager.update(dt, playerPos, this.scene);
     this.enemies = this.encounterManager.getActiveEnemies();
     
     // Group AI Update
-    this.attackDirector.update(dt, this.enemies, this.player.root.position);
+    this.attackDirector.update(dt, this.enemies, playerPos);
 
     for (const enemy of this.enemies) {
-      enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem, this.enemies);
+      enemy.update(dt, playerPos, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem, this.enemies);
     }
 
     const hits = this.hitboxSystem.checkHits();
@@ -131,7 +186,7 @@ export class GameScene {
       );
       this.hitStopTimer = hitStopTime;
 
-      // Update UI for the enemy that was hit (if any)
+      // Update UI for the enemy that was hit
       const hitEnemy = hits.find(h => h.hurtbox.id !== 'player');
       if (hitEnemy) {
         const enemy = this.enemies.find(e => e.id === hitEnemy.hurtbox.id);
@@ -144,15 +199,13 @@ export class GameScene {
           });
         }
       }
-
-      // We moved encounter complete logic to Encounter.ts
     }
 
     this.hitboxSystem.update();
   }
 
   public resetEncounter(): void {
-    this.player.reset(new THREE.Vector3(0, 0, 0));
+    this.player.reset(new THREE.Vector3(0, 0, 50));
     this.encounterManager.resetAll(this.scene);
     
     this.hitboxSystem.clearActiveHitboxes();

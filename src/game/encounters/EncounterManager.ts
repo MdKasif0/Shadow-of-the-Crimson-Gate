@@ -25,10 +25,14 @@ export class EncounterManager {
 
   public getActiveEnemies(): Enemy[] {
     const active: Enemy[] = [];
-    for (const enc of this.encounters) {
-      active.push(...enc.getActiveEnemies());
+    for (const encounter of this.encounters.values()) {
+      active.push(...encounter.getActiveEnemies());
     }
     return active;
+  }
+
+  public getAllEncounters(): Encounter[] {
+    return Array.from(this.encounters.values());
   }
 
   public resetAll(scene: THREE.Scene): void {

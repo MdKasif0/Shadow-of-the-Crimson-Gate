@@ -89,8 +89,9 @@ export class CameraController {
     }
     
     const zVisibleDepth = viewDepth * 1.414;
+    // We only constrain Z so the camera can move fully from +60 to -80.
     const clampMinZ = this.minZ + zVisibleDepth;
-    const clampMaxZ = this.maxZ - zVisibleDepth * 0.2;
+    const clampMaxZ = this.maxZ - zVisibleDepth * 0.2; // Keep spawn visible
     
     if (clampMinZ < clampMaxZ) {
       clampedTarget.z = THREE.MathUtils.clamp(clampedTarget.z, clampMinZ, clampMaxZ);

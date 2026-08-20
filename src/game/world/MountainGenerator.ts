@@ -12,13 +12,12 @@ export class MountainGenerator {
       fog: true // Crucial: let them fade into fog naturally
     });
 
-    const mtnCount = 12;
-    const radius = GAME_CONFIG.WORLD.WIDTH * 0.8;
+    const mtnCount = 24; // Increased for longer level
 
     for (let i = 0; i < mtnCount; i++) {
       // Create jagged low-poly mountains
       const segments = Math.floor(random.range(4, 7));
-      const geo = new THREE.ConeGeometry(random.range(15, 30), random.range(20, 45), segments);
+      const geo = new THREE.ConeGeometry(random.range(15, 35), random.range(25, 60), segments);
       
       // Jitter vertices
       const pos = geo.attributes.position;
@@ -32,14 +31,22 @@ export class MountainGenerator {
 
       const mesh = new THREE.Mesh(geo, material);
       
-      // Place in a semi-circle behind the temple
-      const angle = Math.PI + (random.next() - 0.5) * Math.PI * 1.5; // Back half
+      // Place around the perimeter
+      const isSide = random.next() > 0.3;
+      let mx, mz;
       
-      mesh.position.set(
-        Math.cos(angle) * radius,
-        -5, // sink them slightly
-        Math.sin(angle) * radius - 15 // push them back
-      );
+      if (isSide) {
+        // Place along the sides (X = ±40 to ±60, Z = -90 to 70)
+        const side = random.next() > 0.5 ? 1 : -1;
+        mx = side * random.range(35, 60);
+        mz = random.range(-90, 70);
+      } else {
+        // Place at the very back behind temple (Z = -90 to -120)
+        mx = random.range(-40, 40);
+        mz = random.range(-90, -120);
+      }
+      
+      mesh.position.set(mx, -5, mz);
       
       mesh.rotation.y = random.next() * Math.PI;
 

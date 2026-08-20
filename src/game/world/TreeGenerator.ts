@@ -8,7 +8,7 @@ export class TreeGenerator {
     const group = new THREE.Group();
     group.name = 'Trees';
 
-    const treeCount = 20;
+    const treeCount = 80; // Increased for expanded world
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1a1a, roughness: 0.9 });
     
     // Foliage instancing setup
@@ -35,14 +35,26 @@ export class TreeGenerator {
 
     let placed = 0;
     while (placed < treeCount) {
+      // Favor placing more trees in the forest zone (-50 to -20)
+      const isForest = random.next() > 0.6;
       const x = random.range(bounds.MIN_X - 10, bounds.MAX_X + 10);
-      const z = random.range(bounds.MIN_Z - 10, bounds.MAX_Z + 10);
+      const z = isForest 
+        ? random.range(-50, -20)
+        : random.range(bounds.MIN_Z - 10, bounds.MAX_Z + 10);
       
-      const distFromCenter = Math.sqrt(x*x + z*z);
-      // Keep clear of spawn and central path
-      if (Math.abs(x) < 8 || distFromCenter < 12) continue;
-      // Keep clear of temple
-      if (z < -8 && Math.abs(x) < 16) continue;
+      const distFromCenter = Math.abs(x);
+      
+      // Keep main path clear
+      if (distFromCenter < 5) continue;
+      
+      // Keep temple clear
+      if (z < -45 && distFromCenter < 18) continue;
+      
+      // Keep courtyard center clear
+      if (z > 0 && z < 40 && distFromCenter < 12) continue;
+
+      // Keep entrance clear
+      if (z > 50 && distFromCenter < 8) continue;
 
       const tree = new THREE.Group();
       tree.position.set(x, 0, z);
