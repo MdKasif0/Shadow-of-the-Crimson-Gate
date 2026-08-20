@@ -5,6 +5,7 @@ import { InputManager } from './core/InputManager';
 import { CameraController } from './core/CameraController';
 import { GameScene } from './scenes/GameScene';
 import { GAME_CONFIG } from './GameConfig';
+import { GameHUD } from './ui/GameHUD';
 
 export class ThreeGame {
   private containerId: string;
@@ -14,6 +15,9 @@ export class ThreeGame {
   
   private gameScene: GameScene;
   private cameraController: CameraController;
+  private hud: GameHUD;
+  
+  private isPaused: boolean = false;
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -26,6 +30,15 @@ export class ThreeGame {
 
     // 2. Initialize scene
     this.gameScene = new GameScene(this.cameraController);
+    
+    // 3. Initialize HUD
+    this.hud = new GameHUD(containerId);
+    
+    import('./core/EventBus').then(({ EventBus }) => {
+      EventBus.on('gamePauseToggled', (paused: boolean) => {
+        this.isPaused = paused;
+      });
+    });
 
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);
@@ -43,6 +56,8 @@ export class ThreeGame {
   }
 
   private update(dt: number): void {
+    if (this.isPaused) return; // Skip updating game logic if paused
+    
     this.input.beginFrame();
 
     // Update scene logic

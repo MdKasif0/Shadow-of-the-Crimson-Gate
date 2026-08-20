@@ -1,5 +1,5 @@
 export const GAME_CONFIG = {
-  DEBUG_MODE: import.meta.env.DEV, // Show debug info only in dev
+  DEBUG_MODE: false, // Hidden by default for final gameplay slice
 
   WORLD_SEED: 47291, // Fixed seed for deterministic generation
 

@@ -1,28 +1,34 @@
-// ─── Event Bus ───────────────────────────────────────────────────────────────
-// Simple pub/sub for game-wide events without tight coupling.
+// A simple global event bus for decoupling game logic from UI
 
-type Callback = (...args: any[]) => void;
+type EventHandler = (data?: any) => void;
 
 export class EventBus {
-  private listeners: Map<string, Callback[]> = new Map();
+  private static handlers: Map<string, EventHandler[]> = new Map();
 
-  public on(event: string, callback: Callback): void {
-    if (!this.listeners.has(event)) this.listeners.set(event, []);
-    this.listeners.get(event)!.push(callback);
+  public static on(event: string, handler: EventHandler): void {
+    if (!this.handlers.has(event)) {
+      this.handlers.set(event, []);
+    }
+    this.handlers.get(event)!.push(handler);
   }
 
-  public off(event: string, callback: Callback): void {
-    const cbs = this.listeners.get(event);
-    if (cbs) this.listeners.set(event, cbs.filter(cb => cb !== callback));
+  public static off(event: string, handler: EventHandler): void {
+    if (!this.handlers.has(event)) return;
+    const handlers = this.handlers.get(event)!;
+    const index = handlers.indexOf(handler);
+    if (index > -1) {
+      handlers.splice(index, 1);
+    }
   }
 
-  public emit(event: string, ...args: any[]): void {
-    const cbs = this.listeners.get(event);
-    if (cbs) cbs.forEach(cb => cb(...args));
+  public static emit(event: string, data?: any): void {
+    if (!this.handlers.has(event)) return;
+    for (const handler of this.handlers.get(event)!) {
+      handler(data);
+    }
   }
 
-  public clear(): void { this.listeners.clear(); }
+  public static clear(): void {
+    this.handlers.clear();
+  }
 }
-
-// Singleton game event bus
-export const gameEvents = new EventBus();

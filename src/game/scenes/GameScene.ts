@@ -8,6 +8,8 @@ import { EnemySpawner } from '../world/EnemySpawner';
 import { Enemy } from '../enemies/Enemy';
 import { CameraController } from '../core/CameraController';
 import { VFXManager } from '../vfx/VFXManager';
+import { EventBus } from '../core/EventBus';
+import { EnemyState } from '../enemies/EnemyState';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -19,6 +21,8 @@ export class GameScene {
   public cameraController: CameraController;
   
   private hitStopTimer: number = 0;
+  private encounterActive: boolean = false;
+  private isEncounterCompleted: boolean = false;
 
   constructor(cameraController: CameraController) {
     this.cameraController = cameraController;
@@ -61,11 +65,22 @@ export class GameScene {
 
     // Generate Enemies
     const spawner = new EnemySpawner();
-    const yokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(10, 0, 10));
+    // Spawn far enough away so encounter doesn't start instantly
+    const yokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(12, 0, 12));
     this.enemies.push(yokai);
 
     // Initialize VFX
     this.vfx = new VFXManager(this.scene, this.cameraController);
+
+    // Event Bus Bindings
+    EventBus.on('restartEncounter', () => {
+      this.resetEncounter();
+    });
+    
+    // Initial UI state
+    setTimeout(() => {
+      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+    }, 100);
   }
 
   public update(dt: number, inputManager: InputManager): void {
@@ -83,11 +98,25 @@ export class GameScene {
     // 1. Clear hitboxes from last frame
     this.hitboxSystem.clearActiveHitboxes();
 
-    // 2. Update entities (which may register hitboxes/hurtboxes)
+    // 2. Update entities
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
     
+    // Encounter Trigger Logic
+    const yokai = this.enemies[0];
+    if (yokai && !this.encounterActive && !this.isEncounterCompleted) {
+       const dist = this.player.root.position.distanceTo(yokai.root.position);
+       if (dist < 10) {
+         this.encounterActive = true;
+         EventBus.emit('encounterStarted');
+         EventBus.emit('enemyHealth', { current: yokai.health['currentHealth'], max: yokai.health['maxHealth'], delta: 0 });
+       }
+    }
+
     for (const enemy of this.enemies) {
-      enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx);
+      // Only update enemy AI if encounter is active or completed (dying)
+      if (this.encounterActive || this.isEncounterCompleted) {
+        enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx);
+      }
     }
 
     // 3. Resolve combat interactions
@@ -96,13 +125,33 @@ export class GameScene {
       const isPlayerHit = hit.hurtbox.id === 'PLAYER';
       
       if (isPlayerHit) {
+        const oldHp = this.player['health']['currentHealth'];
         this.player.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
-        this.vfx.spawnHurt(hit.hitbox.position);
-        this.cameraController.addShake(1.5);
+        const newHp = this.player['health']['currentHealth'];
+        
+        EventBus.emit('playerHealth', { current: newHp, max: this.player['health']['maxHealth'], delta: newHp - oldHp });
+        
+        if (newHp <= 0) {
+          EventBus.emit('playerDeath');
+        } else {
+          this.vfx.spawnHurt(hit.hitbox.position);
+          this.cameraController.addShake(1.5);
+        }
       } else {
         const targetEnemy = this.enemies.find(e => e.id === hit.hurtbox.id);
         if (targetEnemy) {
+          const oldHp = targetEnemy.health['currentHealth'];
           targetEnemy.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
+          const newHp = targetEnemy.health['currentHealth'];
+          
+          EventBus.emit('enemyHealth', { current: newHp, max: targetEnemy.health['maxHealth'], delta: newHp - oldHp });
+          
+          if (newHp <= 0 && !this.isEncounterCompleted) {
+             this.encounterActive = false;
+             this.isEncounterCompleted = true;
+             EventBus.emit('encounterComplete');
+          }
+
           // Assuming damage > 15 is heavy hit for now
           const isHeavy = hit.hitbox.damage > 15; 
           this.vfx.spawnHit(hit.hitbox.position, hit.hitbox.direction, isHeavy);
@@ -116,18 +165,27 @@ export class GameScene {
     this.hitboxSystem.update();
   }
 
-  private resetEncounter(): void {
-    // Reset player to spawn
+  public resetEncounter(): void {
+    // Reset player
     this.player.reset(new THREE.Vector3(0, 0, 0));
-    
-    // Reset Yokai to spawn
-    for (const enemy of this.enemies) {
-      enemy.reset(new THREE.Vector3(10, 0, 10));
+    // Reset enemy
+    if (this.enemies[0]) {
+      this.enemies[0].reset(new THREE.Vector3(12, 0, 12));
     }
-    
-    // Clear hitboxes
+    // Clean Hitboxes
     this.hitboxSystem.clearActiveHitboxes();
-    // Re-initialize any hit memory maps if needed by recreating or clearing
-    // hitboxSystem.activeHitboxes and hitMemory are already handled in update cycle.
+    this.hitStopTimer = 0;
+    
+    // Reset states
+    this.encounterActive = false;
+    this.isEncounterCompleted = false;
+
+    // Refresh UI
+    EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+    
+    if (this.enemies[0]) {
+      EventBus.emit('enemyHealth', { current: this.enemies[0].health['currentHealth'], max: this.enemies[0].health['maxHealth'], delta: 0 });
+    }
+    EventBus.emit('encounterComplete'); // Quick hack to hide enemy HP bar
   }
 }

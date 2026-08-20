@@ -149,7 +149,7 @@ export class BasicYokai implements Enemy {
 
       if (this.stateTimer >= recovery) {
         this.setState(EnemyState.IDLE);
-        this.attackCooldown = 1.5; // Cooldown before next attack
+        this.attackCooldown = 1.2 + Math.random() * 0.6; // Cooldown between 1.2 and 1.8s
       }
 
       this.applyVelocity(dt, collisionSystem);
