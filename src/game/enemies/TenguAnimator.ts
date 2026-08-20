@@ -31,14 +31,25 @@ export class TenguAnimator {
     this.time += dt;
     this.stateTime += dt;
 
+    // When dead, force all other weights to zero and only run death anim
+    if (this.state === EnemyState.DEAD) {
+      this.hoverWeight = 0;
+      this.strafeWeight = 0;
+      this.retreatWeight = 0;
+      this.attackWeight = 0;
+      this.hurtWeight = 0;
+      this.deadWeight = lerp(this.deadWeight, 1, dt * 8);
+      this.applyDead(this.deadWeight);
+      return;
+    }
+
     const tStrafe = this.state === EnemyState.STRAFE || this.state === EnemyState.WALK ? 1 : 0;
     const tRetreat = this.state === EnemyState.RETREAT ? 1 : 0;
     const tAttack = this.state === EnemyState.ATTACK ? 1 : 0;
     const tHurt = this.state === EnemyState.HURT ? 1 : 0;
-    const tDead = this.state === EnemyState.DEAD ? 1 : 0;
 
     // Hover is active whenever not dead/hurt
-    const tHover = (tHurt === 0 && tDead === 0) ? 1 : 0;
+    const tHover = (tHurt === 0) ? 1 : 0;
 
     const lerpSpeed = 10;
     this.hoverWeight = lerp(this.hoverWeight, tHover, dt * lerpSpeed);
@@ -47,13 +58,12 @@ export class TenguAnimator {
     
     this.attackWeight = lerp(this.attackWeight, tAttack, dt * 15);
     this.hurtWeight = lerp(this.hurtWeight, tHurt, dt * 20);
-    this.deadWeight = lerp(this.deadWeight, tDead, dt * 5);
+    this.deadWeight = 0;
 
     this.applyHover(this.hoverWeight);
     this.applyMovement(this.strafeWeight, this.retreatWeight);
     this.applyAttack(this.attackWeight);
     this.applyHurt(this.hurtWeight);
-    this.applyDead(this.deadWeight);
   }
 
   private applyHover(weight: number): void {

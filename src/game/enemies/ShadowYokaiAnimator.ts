@@ -32,13 +32,25 @@ export class ShadowYokaiAnimator {
     this.time += dt;
     this.stateTime += dt;
 
+    // When dead, force all other weights to zero and only run death anim
+    if (this.state === EnemyState.DEAD) {
+      this.idleWeight = 0;
+      this.walkWeight = 0;
+      this.strafeWeight = 0;
+      this.retreatWeight = 0;
+      this.attackWeight = 0;
+      this.hurtWeight = 0;
+      this.deadWeight = lerp(this.deadWeight, 1, dt * 8);
+      this.applyDead(this.deadWeight);
+      return;
+    }
+
     const tIdle = this.state === EnemyState.IDLE ? 1 : 0;
     const tWalk = this.state === EnemyState.WALK ? 1 : 0;
     const tStrafe = this.state === EnemyState.STRAFE ? 1 : 0;
     const tRetreat = this.state === EnemyState.RETREAT ? 1 : 0;
     const tAttack = this.state === EnemyState.ATTACK ? 1 : 0;
     const tHurt = this.state === EnemyState.HURT ? 1 : 0;
-    const tDead = this.state === EnemyState.DEAD ? 1 : 0;
 
     const lerpSpeed = 10;
     this.idleWeight = lerp(this.idleWeight, tIdle, dt * lerpSpeed);
@@ -46,10 +58,10 @@ export class ShadowYokaiAnimator {
     this.strafeWeight = lerp(this.strafeWeight, tStrafe, dt * lerpSpeed);
     this.retreatWeight = lerp(this.retreatWeight, tRetreat, dt * lerpSpeed);
     
-    // Fast snap for attacks/hurt/dead
+    // Fast snap for attacks/hurt
     this.attackWeight = lerp(this.attackWeight, tAttack, dt * 15);
     this.hurtWeight = lerp(this.hurtWeight, tHurt, dt * 20);
-    this.deadWeight = lerp(this.deadWeight, tDead, dt * 5); // slower collapse
+    this.deadWeight = 0;
 
     this.applyIdle(this.idleWeight);
     this.applyWalk(this.walkWeight);
@@ -57,7 +69,6 @@ export class ShadowYokaiAnimator {
     this.applyRetreat(this.retreatWeight);
     this.applyAttack(this.attackWeight);
     this.applyHurt(this.hurtWeight);
-    this.applyDead(this.deadWeight);
   }
 
   private applyIdle(weight: number): void {
