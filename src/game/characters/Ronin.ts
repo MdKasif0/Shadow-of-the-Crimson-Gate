@@ -115,6 +115,16 @@ export class Ronin {
       return;
     }
 
+    // Register hurtbox for this frame
+    if (hitboxSystem) {
+      hitboxSystem.registerHurtbox({
+        id: 'PLAYER',
+        position: this.root.position.clone(),
+        radius: 0.5,
+        height: 1.8
+      });
+    }
+
     // Process combat inputs
     if (inputManager.isAttackPressed() && this.state.movement !== MovementState.HURT) {
       this.combat.registerAttackInput();
