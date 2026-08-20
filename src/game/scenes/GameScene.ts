@@ -26,7 +26,6 @@ export class GameScene {
   private encounterActive: boolean = false;
   private isEncounterCompleted: boolean = false;
 
-  // Extracted systems
   private lighting: LightingSystem;
   private atmosphere: AtmosphereSystem;
 
@@ -34,37 +33,31 @@ export class GameScene {
     this.cameraController = cameraController;
     this.scene = new THREE.Scene();
     
-    // Atmosphere & Lighting (extracted)
     this.atmosphere = new AtmosphereSystem(this.scene);
     this.lighting = new LightingSystem(this.scene);
 
-    // Generate World and Collisions
     this.collisionSystem = new CollisionSystem();
     new WorldGenerator(this.scene, this.collisionSystem);
-
-    // Hitbox System
     this.hitboxSystem = new HitboxSystem(this.scene);
 
-    // Generate Player (Ronin)
     this.player = new Ronin();
     this.player.setPosition(0, 0, 0);
     this.scene.add(this.player.root);
 
-    // Generate Enemies
+    // TEST ARENA: Spawn both Basic Yokai and Shadow Yokai
     const spawner = new EnemySpawner();
-    // Spawn far enough away so encounter doesn't start instantly, and in open space
-    const yokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(0, 0, -8));
-    this.enemies.push(yokai);
+    const basicYokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(-4, 0, -8));
+    const shadowYokai = spawner.spawnShadowYokai(this.scene, new THREE.Vector3(4, 0, -8));
+    
+    this.enemies.push(basicYokai);
+    this.enemies.push(shadowYokai);
 
-    // Initialize VFX
     this.vfx = new VFXManager(this.scene, this.cameraController);
 
-    // Event Bus Bindings
     EventBus.on('restartEncounter', () => {
       this.resetEncounter();
     });
     
-    // Initial UI state
     setTimeout(() => {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     }, 100);
@@ -79,34 +72,38 @@ export class GameScene {
 
     if (this.hitStopTimer > 0) {
       this.hitStopTimer -= dt;
-      return; // Skip entity updates to create freeze-frame
+      return; 
     }
 
-    // 1. Clear hitboxes from last frame
     this.hitboxSystem.clearActiveHitboxes();
-
-    // 2. Update entities
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
     
     // Encounter Trigger Logic
-    const yokai = this.enemies[0];
-    if (yokai && !this.encounterActive && !this.isEncounterCompleted) {
-       const dist = this.player.root.position.distanceTo(yokai.root.position);
-       if (dist < 10) {
-         this.encounterActive = true;
-         EventBus.emit('encounterStarted');
-         EventBus.emit('enemyHealth', { current: yokai.health['currentHealth'], max: yokai.health['maxHealth'], delta: 0 });
-       }
+    if (!this.encounterActive && !this.isEncounterCompleted) {
+      for (const enemy of this.enemies) {
+        if (enemy.health.isDead) continue;
+        const dist = this.player.root.position.distanceTo(enemy.root.position);
+        if (dist < 12) {
+          this.encounterActive = true;
+          EventBus.emit('encounterStarted');
+          // For testing, just show the first alive enemy's health on trigger
+          EventBus.emit('enemyHealth', { 
+            current: enemy.health.currentHealth, 
+            max: enemy.health.maxHealth, 
+            delta: 0,
+            name: enemy.enemyType.replace('_', ' ')
+          });
+          break;
+        }
+      }
     }
 
     for (const enemy of this.enemies) {
-      // Only update enemy AI if encounter is active or completed (dying)
       if (this.encounterActive || this.isEncounterCompleted) {
         enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx);
       }
     }
 
-    // 3. Resolve combat interactions via DamageSystem
     const hits = this.hitboxSystem.checkHits();
     if (hits.length > 0) {
       const { hitStopTime, result } = DamageSystem.resolveHits(
@@ -114,38 +111,44 @@ export class GameScene {
       );
       this.hitStopTimer = hitStopTime;
 
-      if (result.enemyKilled && !this.isEncounterCompleted) {
+      // Update UI for the enemy that was hit (if any)
+      const hitEnemy = hits.find(h => h.hurtbox.id !== 'player');
+      if (hitEnemy) {
+        const enemy = this.enemies.find(e => e.id === hitEnemy.hurtbox.id);
+        if (enemy) {
+          EventBus.emit('enemyHealth', { 
+            current: enemy.health.currentHealth, 
+            max: enemy.health.maxHealth, 
+            delta: hitEnemy.hitbox.damage,
+            name: enemy.enemyType.replace('_', ' ')
+          });
+        }
+      }
+
+      // Check if ALL enemies are dead
+      if (!this.isEncounterCompleted && this.enemies.every(e => e.health.isDead)) {
         this.encounterActive = false;
         this.isEncounterCompleted = true;
         EventBus.emit('encounterComplete');
       }
     }
 
-    // 4. Update debug visuals
     this.hitboxSystem.update();
   }
 
   public resetEncounter(): void {
-    // Reset player
     this.player.reset(new THREE.Vector3(0, 0, 0));
-    // Reset enemy
-    if (this.enemies[0]) {
-      this.enemies[0].reset(new THREE.Vector3(0, 0, -8));
-    }
-    // Clean Hitboxes
+    
+    if (this.enemies[0]) this.enemies[0].reset(new THREE.Vector3(-4, 0, -8));
+    if (this.enemies[1]) this.enemies[1].reset(new THREE.Vector3(4, 0, -8));
+    
     this.hitboxSystem.clearActiveHitboxes();
     this.hitStopTimer = 0;
     
-    // Reset states
     this.encounterActive = false;
     this.isEncounterCompleted = false;
 
-    // Refresh UI
     EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
-    
-    if (this.enemies[0]) {
-      EventBus.emit('enemyHealth', { current: this.enemies[0].health['currentHealth'], max: this.enemies[0].health['maxHealth'], delta: 0 });
-    }
-    EventBus.emit('encounterComplete'); // Hide enemy HP bar on reset
+    EventBus.emit('encounterComplete'); 
   }
 }

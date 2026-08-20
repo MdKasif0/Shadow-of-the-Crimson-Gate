@@ -3,22 +3,22 @@ import { Enemy } from './Enemy';
 import { EnemyState } from './EnemyState';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
 import { CharacterRig } from '../characters/CharacterRig';
-import { EnemyAnimator } from './EnemyAnimator';
+import { ShadowYokaiAnimator } from './ShadowYokaiAnimator';
 import { EnemyFactory } from './EnemyFactory';
 import { HitboxSystem } from '../combat/HitboxSystem';
 import { EnemyAI } from './EnemyAI';
-import { BASIC_YOKAI_CONFIG, EnemyConfig } from './EnemyConfig';
+import { SHADOW_YOKAI_CONFIG, EnemyConfig } from './EnemyConfig';
 
-export class BasicYokai implements Enemy {
+export class ShadowYokai implements Enemy {
   public id: string;
-  public enemyType: string = 'BASIC_YOKAI';
+  public enemyType: string = 'SHADOW_YOKAI';
   public root: THREE.Group;
   public health: HealthComponent;
   public state: EnemyState = EnemyState.IDLE;
-  public config: EnemyConfig = BASIC_YOKAI_CONFIG;
+  public config: EnemyConfig = SHADOW_YOKAI_CONFIG;
 
   private rig: CharacterRig;
-  private animator: EnemyAnimator;
+  private animator: ShadowYokaiAnimator;
   private ai: EnemyAI;
   
   private velocity: THREE.Vector3 = new THREE.Vector3();
@@ -26,20 +26,45 @@ export class BasicYokai implements Enemy {
   private isDeathVfxPlayed: boolean = false;
   private attackCooldown: number = 0;
 
+  // Shadow Aura
+  private auraTime: number = 0;
+  private auraPlanes: THREE.Mesh[] = [];
+
   constructor(id: string) {
     this.id = id;
     this.root = new THREE.Group();
-    this.root.name = `BasicYokai_${id}`;
+    this.root.name = `ShadowYokai_${id}`;
 
-    this.rig = EnemyFactory.createBasicYokai();
+    this.rig = EnemyFactory.createShadowYokai();
     this.root.add(this.rig.root);
 
-    this.animator = new EnemyAnimator(this.rig);
+    this.animator = new ShadowYokaiAnimator(this.rig);
     this.ai = new EnemyAI(this.config);
 
     this.health = new HealthComponent(this.config.maxHealth);
     this.health.onDamage(this.onDamageTaken.bind(this));
     this.health.onDeath(this.onDeath.bind(this));
+
+    this.createAura();
+  }
+
+  private createAura() {
+    const auraGeo = new THREE.PlaneGeometry(1.5, 3.0);
+    const auraMat = new THREE.MeshBasicMaterial({
+      color: 0x0088aa,
+      transparent: true,
+      opacity: 0.15,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+
+    for (let i = 0; i < 2; i++) {
+      const plane = new THREE.Mesh(auraGeo, auraMat);
+      plane.position.y = 1.5;
+      this.root.add(plane);
+      this.auraPlanes.push(plane);
+    }
   }
 
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
@@ -72,6 +97,11 @@ export class BasicYokai implements Enemy {
     this.root.rotation.set(0, 0, 0);
     this.root.visible = true;
     this.ai.resetStrafe();
+    
+    // Reset aura
+    for (const plane of this.auraPlanes) {
+      plane.visible = true;
+    }
   }
 
   private setState(newState: EnemyState): void {
@@ -83,19 +113,34 @@ export class BasicYokai implements Enemy {
 
   public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any): void {
     this.stateTimer += dt;
+    this.auraTime += dt;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
+    
     this.animator.update(dt);
+    this.updateAura(playerPos);
 
     if (this.state === EnemyState.DEAD) {
       if (!this.isDeathVfxPlayed && vfx) {
+        // We'll map 'shadowEnemyDeath' to SpiritBurstVFX in the event bus later, 
+        // for now just trigger regular death VFX
         vfx.spawnDeath(this.root.position);
         this.isDeathVfxPlayed = true;
-        this.root.visible = false; 
+        
+        // Hide mesh but keep aura fading out
+        this.rig.root.visible = false; 
       }
+      
+      // Fade out aura
+      for (const plane of this.auraPlanes) {
+        const mat = plane.material as THREE.MeshBasicMaterial;
+        mat.opacity = Math.max(0, mat.opacity - dt * 0.2);
+      }
+
       this.applyVelocity(dt, collisionSystem);
       return; 
     }
 
+    // Register hurtbox
     hitboxSystem.registerHurtbox({
       id: this.id,
       position: this.root.position.clone(),
@@ -124,13 +169,19 @@ export class BasicYokai implements Enemy {
       this.setState(decision.state);
     }
 
+    // Handle movement based on AI decision
     if (this.state === EnemyState.WALK || this.state === EnemyState.STRAFE || this.state === EnemyState.RETREAT) {
       this.velocity.copy(decision.moveDirection).multiplyScalar(this.config.movementSpeed);
     } else {
+      // Idle / ATTACK (windup)
       this.velocity.set(0, 0, 0);
     }
 
+    // Handle rotation based on AI decision
+    // Smooth turn towards target angle
     let targetY = decision.facingAngle;
+    
+    // Normalize angles for lerping
     let currentY = this.root.rotation.y;
     while (currentY <= -Math.PI) currentY += Math.PI * 2;
     while (currentY > Math.PI) currentY -= Math.PI * 2;
@@ -139,8 +190,7 @@ export class BasicYokai implements Enemy {
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
     
-    // Slower rotation than Shadow Yokai (heavy/hunched)
-    this.root.rotation.y = currentY + diff * dt * 5.0;
+    this.root.rotation.y = currentY + diff * dt * 8.0;
 
     this.applyVelocity(dt, collisionSystem);
   }
@@ -152,6 +202,7 @@ export class BasicYokai implements Enemy {
     const totalTime = attackWindup + attackActive + attackRecovery;
 
     if (this.stateTimer >= activeStart && this.stateTimer <= activeEnd) {
+      // Only trigger once
       if (this.stateTimer - dt < activeStart) {
         hitboxSystem.resetAttackMemory(this.id);
       }
@@ -163,12 +214,12 @@ export class BasicYokai implements Enemy {
         position: this.root.position.clone(),
         direction: forward,
         range: this.config.attackRange,
-        hitAngle: Math.PI / 2, // Wide swing
+        hitAngle: Math.PI / 2.5, // slightly narrower slash than basic yokai
         knockback: knockback
       });
       
-      // Heavy forward lunge
-      this.velocity.copy(forward).multiplyScalar(5);
+      // Fast lunge
+      this.velocity.copy(forward).multiplyScalar(8);
     } else {
       this.velocity.set(0, 0, 0); 
     }
@@ -179,10 +230,30 @@ export class BasicYokai implements Enemy {
     }
   }
 
+  private updateAura(playerPos: THREE.Vector3) {
+    if (this.health.isDead) return;
+    
+    // Billboard auras towards player
+    const toPlayer = playerPos.clone().sub(this.root.position);
+    toPlayer.y = 0;
+    const angle = Math.atan2(toPlayer.x, toPlayer.z);
+    
+    this.auraPlanes[0].rotation.y = angle;
+    this.auraPlanes[1].rotation.y = angle + Math.PI / 2; // cross pattern
+
+    // Pulsing animation
+    const scale = 1.0 + Math.sin(this.auraTime * 2.0) * 0.1;
+    this.auraPlanes[0].scale.set(scale, scale, 1);
+    this.auraPlanes[1].scale.set(scale, scale, 1);
+  }
+
   private applyVelocity(dt: number, collisionSystem: any): void {
+    // Damping based on state
     let damping = 10.0;
     if (this.state === EnemyState.HURT || this.state === EnemyState.DEAD) {
-      damping = 5.0; 
+      damping = 5.0; // slide more when hurt
+    } else if (this.state === EnemyState.WALK || this.state === EnemyState.STRAFE || this.state === EnemyState.RETREAT) {
+      damping = 15.0; // tight control during movement
     }
 
     this.velocity.lerp(new THREE.Vector3(0, 0, 0), dt * damping);
@@ -195,6 +266,7 @@ export class BasicYokai implements Enemy {
       );
       this.root.position.add(resolvedMove);
       
+      // Bounds
       const bounds = { MIN_X: -28, MAX_X: 28, MIN_Z: -28, MAX_Z: 28 };
       this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, bounds.MIN_X, bounds.MAX_X);
       this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);

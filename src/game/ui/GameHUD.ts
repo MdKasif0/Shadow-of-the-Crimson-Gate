@@ -16,6 +16,7 @@ export class GameHUD {
   private playerHealthFill!: HTMLElement;
   private enemyHealthContainer!: HTMLElement;
   private enemyHealthFill!: HTMLElement;
+  private enemyNameElement!: HTMLElement;
   private vignette!: HTMLElement;
 
   constructor(containerId: string) {
@@ -91,13 +92,13 @@ export class GameHUD {
     this.enemyHealthContainer.style.opacity = '0';
     this.enemyHealthContainer.style.transition = 'opacity 0.5s ease-in';
 
-    const enemyName = document.createElement('div');
-    enemyName.innerText = 'BASIC YOKAI';
-    enemyName.style.fontSize = '1rem';
-    enemyName.style.letterSpacing = '0.1em';
-    enemyName.style.marginBottom = '6px';
-    enemyName.style.textShadow = '1px 1px 2px black';
-    this.enemyHealthContainer.appendChild(enemyName);
+    this.enemyNameElement = document.createElement('div');
+    this.enemyNameElement.innerText = 'ENEMY';
+    this.enemyNameElement.style.fontSize = '1rem';
+    this.enemyNameElement.style.letterSpacing = '0.1em';
+    this.enemyNameElement.style.marginBottom = '6px';
+    this.enemyNameElement.style.textShadow = '1px 1px 2px black';
+    this.enemyHealthContainer.appendChild(this.enemyNameElement);
 
     const enemyBarBg = document.createElement('div');
     enemyBarBg.style.width = '300px';
@@ -134,9 +135,12 @@ export class GameHUD {
       }
     });
 
-    EventBus.on('enemyHealth', (data) => {
+    EventBus.on('enemyHealth', (data: any) => {
       const pct = Math.max(0, (data.current / data.max) * 100);
       this.enemyHealthFill.style.width = `${pct}%`;
+      if (data.name) {
+        this.enemyNameElement.innerText = data.name;
+      }
     });
 
     EventBus.on('encounterStarted', () => {
