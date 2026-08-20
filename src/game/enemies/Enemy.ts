@@ -4,6 +4,7 @@ import { EnemyState } from './EnemyState';
 
 export interface Enemy {
   id: string;
+  enemyType: string;
   root: THREE.Group;
   health: HealthComponent;
   state: EnemyState;
