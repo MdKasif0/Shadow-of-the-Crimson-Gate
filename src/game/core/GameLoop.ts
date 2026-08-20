@@ -33,6 +33,8 @@ export class GameLoop {
     this.lastTime = now;
     
     // Cap max delta time to prevent huge spikes when tab is backgrounded
+    // Also prevent negative dt if requestAnimationFrame uses a different time origin
+    if (dt < 0) dt = 0;
     if (dt > 0.1) dt = 0.1;
 
     this.updateCallback(dt);

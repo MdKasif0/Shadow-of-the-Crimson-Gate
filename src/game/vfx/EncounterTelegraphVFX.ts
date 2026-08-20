@@ -5,9 +5,12 @@ import { EncounterManager } from '../encounters/EncounterManager';
 export class EncounterTelegraphVFX {
   private scene: THREE.Scene;
   private particleSystems: Map<string, THREE.Points> = new Map();
+  private activeRings: Map<string, THREE.Mesh> = new Map();
+  private encounterManager: EncounterManager;
 
   constructor(scene: THREE.Scene, encounterManager: EncounterManager) {
     this.scene = scene;
+    this.encounterManager = encounterManager;
 
     // Create a particle system for each registered encounter
     const encounters = encounterManager.getAllEncounters();
@@ -55,15 +58,35 @@ export class EncounterTelegraphVFX {
     EventBus.on('encounterStarted', (data: any) => {
       const ps = this.particleSystems.get(data.id);
       if (ps) ps.visible = false;
+      const ring = this.activeRings.get(data.id);
+      if (ring) ring.visible = false;
     });
 
     EventBus.on('encounterComplete', (data: any) => {
       const ps = this.particleSystems.get(data.id);
       if (ps) ps.visible = false;
+      const ring = this.activeRings.get(data.id);
+      if (ring) ring.visible = false;
     });
   }
 
   public update(dt: number, time: number): void {
+    const encounters = this.encounterManager.getAllEncounters();
+    for (const enc of encounters) {
+      // Changed from enc.isCleared() to checking the state property
+      if (enc.state === 3) continue; // EncounterState.COMPLETED
+
+      let mesh = this.activeRings.get(enc.config.id);
+      if (!mesh) {
+        mesh = this.createRing(enc.config.activationRadius);
+        mesh.position.copy(enc.config.center);
+        // Slightly above ground
+        mesh.position.y = 0.1;
+        this.scene.add(mesh);
+        this.activeRings.set(enc.config.id, mesh);
+      }
+    }
+
     for (const ps of this.particleSystems.values()) {
       if (!ps.visible) continue;
       
@@ -79,6 +102,14 @@ export class EncounterTelegraphVFX {
       }
       positions.needsUpdate = true;
     }
+  }
+
+  private createRing(radius: number): THREE.Mesh {
+    const geometry = new THREE.RingGeometry(radius - 0.1, radius, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(geometry, material);
+    ring.rotation.x = Math.PI / 2;
+    return ring;
   }
 
   private createCircleTexture(): THREE.CanvasTexture {

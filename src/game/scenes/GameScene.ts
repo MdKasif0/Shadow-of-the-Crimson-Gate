@@ -8,7 +8,7 @@ import { InputManager } from '../core/InputManager';
 import { Enemy } from '../enemies/Enemy';
 import { CameraController } from '../camera/CameraController';
 import { EncounterManager } from '../encounters/EncounterManager';
-import { EncounterConfig } from '../encounters/EncounterConfig';
+import { EncounterDatabase } from '../encounters/EncounterDatabase';
 import { AttackDirector } from '../combat/AttackDirector';
 import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
@@ -22,6 +22,12 @@ import { ShrineInteraction } from '../interaction/ShrineInteraction';
 import { ObjectiveManager } from '../progression/ObjectiveManager';
 import { ObjectiveUI } from '../ui/ObjectiveUI';
 import { EncounterTelegraphVFX } from '../vfx/EncounterTelegraphVFX';
+
+import { PlayerProgress } from '../progression/PlayerProgress';
+import { PlayerStats } from '../progression/PlayerStats';
+import { RewardSystem } from '../progression/RewardSystem';
+import { AudioManager } from '../audio/AudioManager';
+import { AudioZoneManager } from '../audio/AudioZoneManager';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -47,7 +53,14 @@ export class GameScene {
   private objectiveUI: ObjectiveUI;
   private telegraphVfx: EncounterTelegraphVFX;
 
+  private playerProgress: PlayerProgress;
+  private playerStats: PlayerStats;
+  private rewardSystem: RewardSystem;
+  private audioZoneManager: AudioZoneManager;
+
   constructor(cameraController: CameraController) {
+    AudioManager.init();
+    
     this.cameraController = cameraController;
     this.scene = new THREE.Scene();
     
@@ -60,63 +73,31 @@ export class GameScene {
     this.hitboxSystem = new HitboxSystem(this.scene);
     this.projectileSystem = new ProjectileSystem(this.scene);
 
+    this.playerProgress = new PlayerProgress();
+    this.playerStats = new PlayerStats(this.playerProgress.level);
+    this.rewardSystem = new RewardSystem(this.playerProgress);
+    this.audioZoneManager = new AudioZoneManager();
+
     this.player = new Ronin();
+    this.applyPlayerStats();
     this.player.setPosition(0, 0, 50); // Start at entrance
     this.scene.add(this.player.root);
 
     this.encounterManager = new EncounterManager();
     this.attackDirector = new AttackDirector();
 
-    // COURTYARD ENCOUNTER
-    this.encounterManager.registerEncounter({
-      id: 'enc_courtyard',
-      center: new THREE.Vector3(0, 0, 15),
-      activationRadius: 15,
-      leashRadius: 25,
-      waves: [
-        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'BASIC_YOKAI', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
-      ]
-    });
-
-    // SHRINE ENCOUNTER
-    this.encounterManager.registerEncounter({
-      id: 'enc_shrine',
-      center: new THREE.Vector3(0, 0, -10),
-      activationRadius: 12,
-      leashRadius: 20,
-      waves: [
-        { enemies: [{ type: 'SHADOW_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'TENGU', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
-      ]
-    });
-
-    // FOREST ENCOUNTER
-    this.encounterManager.registerEncounter({
-      id: 'enc_forest',
-      center: new THREE.Vector3(0, 0, -35),
-      activationRadius: 10,
-      leashRadius: 18,
-      waves: [
-        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(0, 0, -2) }, { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(0, 0, 2) }], delayAfterComplete: 0 }
-      ]
-    });
-    
-    // TEMPLE APPROACH ENCOUNTER
-    this.encounterManager.registerEncounter({
-      id: 'enc_temple',
-      center: new THREE.Vector3(0, 0, -60),
-      activationRadius: 14,
-      leashRadius: 22,
-      waves: [
-        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 1.5 },
-        { enemies: [{ type: 'SHADOW_YOKAI', offset: new THREE.Vector3(0, 0, -3) }, { type: 'TENGU', offset: new THREE.Vector3(0, 0, 3) }], delayAfterComplete: 0 }
-      ]
-    });
+    // Register encounters from database
+    const configs = EncounterDatabase.getAll();
+    for (const config of configs) {
+      if (!this.playerProgress.hasClearedEncounter(config.id)) {
+        this.encounterManager.registerEncounter(config);
+      }
+    }
 
     this.vfx = new VFXManager(this.scene, this.cameraController);
     this.telegraphVfx = new EncounterTelegraphVFX(this.scene, this.encounterManager);
 
     this.interactionSystem = new InteractionSystem();
-    // Register the main shrine
     this.interactionSystem.register(new ShrineInteraction(new THREE.Vector3(0, 0, -10)));
 
     this.objectiveManager = new ObjectiveManager();
@@ -131,9 +112,25 @@ export class GameScene {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     });
 
+    EventBus.on('levelUp', (data: any) => {
+      this.playerStats.applyLevel(data.level);
+      this.applyPlayerStats();
+      this.player['health'].heal(this.player['health'].maxHealth); // Full heal on level up
+      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+    });
+
     setTimeout(() => {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+      EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
+      EventBus.emit('levelUp', { level: this.playerProgress.level }); // Init UI
     }, 100);
+  }
+
+  private applyPlayerStats(): void {
+    this.player['health'].maxHealth = this.playerStats.maxHealth;
+    this.player['health'].currentHealth = this.playerStats.maxHealth;
+    this.player['dashSystem']['dashCooldown'] = this.playerStats.dashCooldown;
+    // movement speed etc can be applied here if exposed on player
   }
 
   private time: number = 0;
@@ -145,7 +142,7 @@ export class GameScene {
       this.resetEncounter();
     }
 
-    this.vfx.update(dt);
+    this.vfx.update(dt, this.time);
     this.telegraphVfx.update(dt, this.time);
 
     if (this.hitStopTimer > 0) {
@@ -205,13 +202,25 @@ export class GameScene {
   }
 
   public resetEncounter(): void {
+    this.playerProgress.wipe();
+    this.playerStats.applyLevel(1);
+    this.applyPlayerStats();
+
     this.player.reset(new THREE.Vector3(0, 0, 50));
+    
+    // Re-register all encounters
     this.encounterManager.resetAll(this.scene);
+    const configs = EncounterDatabase.getAll();
+    for (const config of configs) {
+      this.encounterManager.registerEncounter(config);
+    }
     
     this.hitboxSystem.clearActiveHitboxes();
     this.projectileSystem.clearAll();
     this.hitStopTimer = 0;
     
     EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+    EventBus.emit('essenceUpdate', { amount: 0, added: 0 });
+    EventBus.emit('levelUp', { level: 1 });
   }
 }
