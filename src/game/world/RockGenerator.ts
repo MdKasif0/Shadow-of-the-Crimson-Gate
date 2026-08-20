@@ -59,25 +59,25 @@ export class RockGenerator {
       
       // Carve out safe zones where rocks CANNOT spawn
       
-      // 1. Entrance Path
-      if (Math.abs(x) < 8 && z > 0) continue;
+      // 1. Main Central Path
+      if (Math.abs(x) < 10 && z > -70 && z < 40) continue;
       
-      // 2. Courtyard
+      // 2. Courtyard Arena
       const distToCourtyard = Math.sqrt(x*x + Math.pow(z + 5, 2));
       if (distToCourtyard < 20) continue;
       
-      // 3. Shrine area
+      // 3. Shrine Area & Path
       const distToShrine = Math.sqrt(Math.pow(x + 25, 2) + Math.pow(z + 20, 2));
-      if (distToShrine < 15) continue;
+      if (distToShrine < 16) continue;
+      if (x < 0 && x > -25 && Math.abs(z + 20) < 6) continue;
       
-      // 4. Forest Path
-      if (x > 5 && x < 35 && z > -35 && z < -10) {
-         const distToArena = Math.sqrt(Math.pow(x - 25, 2) + Math.pow(z + 25, 2));
-         if (distToArena < 15) continue;
-      }
+      // 4. Forest Arena & Path
+      const distToForest = Math.sqrt(Math.pow(x - 25, 2) + Math.pow(z + 25, 2));
+      if (distToForest < 16) continue;
+      if (x > 0 && x < 25 && Math.abs(z + 25) < 6) continue;
       
-      // 5. Temple approach
-      if (Math.abs(x) < 18 && z < -35) continue;
+      // 5. Temple Approach
+      if (Math.abs(x) < 20 && z < -40) continue;
 
       dummy.position.set(x, 0, z);
       

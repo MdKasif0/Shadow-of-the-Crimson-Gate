@@ -40,26 +40,25 @@ export class TreeGenerator {
       
       // Carve out safe zones where trees CANNOT spawn
       
-      // 1. Entrance Path (x: -6 to 6, z: 0 to 40)
-      if (Math.abs(x) < 8 && z > 0) continue;
+      // 1. Main Central Path & Entrance (x: -8 to 8, z: -70 to 40)
+      if (Math.abs(x) < 10 && z > -70 && z < 40) continue;
       
-      // 2. Courtyard (radius 20 around 0, 0, -5)
+      // 2. Courtyard Arena (radius 20 around 0, 0, -5)
       const distToCourtyard = Math.sqrt(x*x + Math.pow(z + 5, 2));
       if (distToCourtyard < 20) continue;
       
-      // 3. Shrine area (radius 15 around -25, 0, -20)
+      // 3. Shrine Area & Path (radius 15 around -25, 0, -20 + connection path)
       const distToShrine = Math.sqrt(Math.pow(x + 25, 2) + Math.pow(z + 20, 2));
-      if (distToShrine < 15) continue;
+      if (distToShrine < 16) continue;
+      if (x < 0 && x > -25 && Math.abs(z + 20) < 6) continue; // path to shrine
       
-      // 4. Forest Path (clear a path through x>0, z<0)
-      if (x > 5 && x < 35 && z > -35 && z < -10) {
-         // Distance to center of the forest arena
-         const distToArena = Math.sqrt(Math.pow(x - 25, 2) + Math.pow(z + 25, 2));
-         if (distToArena < 15) continue;
-      }
+      // 4. Forest Arena & Path (radius 15 around 25, 0, -25 + connection path)
+      const distToForest = Math.sqrt(Math.pow(x - 25, 2) + Math.pow(z + 25, 2));
+      if (distToForest < 16) continue;
+      if (x > 0 && x < 25 && Math.abs(z + 25) < 6) continue; // path to forest
       
-      // 5. Temple approach (x: -15 to 15, z: -70 to -35)
-      if (Math.abs(x) < 18 && z < -35) continue;
+      // 5. Temple Approach Arena (x: -18 to 18, z: -70 to -40)
+      if (Math.abs(x) < 20 && z < -40) continue;
 
       const tree = new THREE.Group();
       tree.position.set(x, 0, z);
