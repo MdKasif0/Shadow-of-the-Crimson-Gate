@@ -90,10 +90,16 @@ export class Encounter {
   }
 
   public getActiveEnemies(): Enemy[] {
-    if (this.state === EncounterState.ACTIVE) {
-      return this.waves[this.currentWaveIndex]?.getActiveEnemies() || [];
+    if (this.state === EncounterState.INACTIVE || this.state === EncounterState.COMPLETED) {
+      return [];
     }
-    return [];
+    const active: Enemy[] = [];
+    for (const wave of this.waves) {
+      if (wave.isSpawned) {
+        active.push(...wave.getActiveEnemies());
+      }
+    }
+    return active;
   }
 
   public cleanup(scene: THREE.Scene): void {

@@ -41,7 +41,8 @@ export class EncounterWave {
   }
 
   public getActiveEnemies(): Enemy[] {
-    return this.enemies.filter(e => !e.health.isDead);
+    // Return all enemies that are still visible (including dead ones that are playing death animations)
+    return this.enemies.filter(e => e.root.visible);
   }
 
   public cleanup(scene: THREE.Scene): void {
