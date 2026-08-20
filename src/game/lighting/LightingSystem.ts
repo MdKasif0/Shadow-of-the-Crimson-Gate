@@ -7,6 +7,7 @@ import * as THREE from 'three';
 export class LightingSystem {
   public ambient: THREE.AmbientLight;
   public directional: THREE.DirectionalLight;
+  public moonLight: THREE.DirectionalLight;
 
   private currentAmbientColor: THREE.Color = new THREE.Color(0xffffff);
   private currentAmbientIntensity: number = 2.0;
@@ -31,6 +32,20 @@ export class LightingSystem {
     this.directional.shadow.camera.bottom = -d;
     this.directional.shadow.bias = -0.001;
     scene.add(this.directional);
+
+    // Subtle moonlight
+    this.moonLight = new THREE.DirectionalLight(0x88bbff, 0.3);
+    this.moonLight.position.set(-50, 100, -50);
+    this.moonLight.castShadow = true;
+    this.moonLight.shadow.mapSize.width = 2048;
+    this.moonLight.shadow.mapSize.height = 2048;
+    this.moonLight.shadow.camera.near = 0.5;
+    this.moonLight.shadow.camera.far = 250;
+    this.moonLight.shadow.camera.left = -50;
+    this.moonLight.shadow.camera.right = 50;
+    this.moonLight.shadow.camera.top = 100;
+    this.moonLight.shadow.camera.bottom = -100;
+    scene.add(this.moonLight);
   }
 
   public update(dt: number, targetColor?: THREE.Color, targetIntensity?: number): void {

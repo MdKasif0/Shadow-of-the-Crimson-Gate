@@ -63,6 +63,7 @@ export class DamageSystem {
 
           if (newHp <= 0) {
             result.enemyKilled = targetEnemy.id;
+            EventBus.emit('enemyDeath', { enemyType: targetEnemy.enemyType, position: targetEnemy.root.position.clone() });
           }
 
           const isHeavy = hit.hitbox.damage > 15;

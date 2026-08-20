@@ -4,6 +4,8 @@ import { HitVFX } from './HitVFX';
 import { DashVFX } from './DashVFX';
 import { HurtVFX } from './HurtVFX';
 import { DeathVFX } from './DeathVFX';
+import { SakuraWindVFX } from './SakuraWindVFX';
+import { EnvironmentalEvents } from './EnvironmentalEvents';
 import { CameraController } from '../camera/CameraController';
 
 /**
@@ -15,6 +17,8 @@ export class VFXManager {
   private dash: DashVFX;
   private hurt: HurtVFX;
   private death: DeathVFX;
+  private sakuraWind: SakuraWindVFX;
+  public environment: EnvironmentalEvents;
 
   constructor(scene: THREE.Scene, _cameraController: CameraController) {
     this.slash = new SlashVFX(scene);
@@ -22,14 +26,18 @@ export class VFXManager {
     this.dash = new DashVFX(scene);
     this.hurt = new HurtVFX(scene);
     this.death = new DeathVFX(scene);
+    this.sakuraWind = new SakuraWindVFX(scene, _cameraController);
+    this.environment = new EnvironmentalEvents();
   }
 
-  public update(dt: number): void {
+  public update(dt: number, time: number): void {
     this.slash.update(dt);
     this.hit.update(dt);
     this.dash.update(dt);
     this.hurt.update(dt);
     this.death.update(dt);
+    this.sakuraWind.update(dt);
+    this.environment.update(dt, time);
   }
 
   // --- Public API (unchanged signatures) ---

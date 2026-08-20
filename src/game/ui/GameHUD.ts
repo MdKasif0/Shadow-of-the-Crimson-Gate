@@ -58,6 +58,15 @@ export class GameHUD {
     playerUI.style.bottom = '40px';
     playerUI.style.left = '40px';
 
+    const levelIndicator = document.createElement('div');
+    levelIndicator.id = 'hud-level';
+    levelIndicator.innerText = 'LV.1';
+    levelIndicator.style.fontSize = '1.0rem';
+    levelIndicator.style.color = '#ffcc00';
+    levelIndicator.style.marginBottom = '4px';
+    levelIndicator.style.textShadow = '1px 1px 2px black';
+    playerUI.appendChild(levelIndicator);
+
     const playerName = document.createElement('div');
     playerName.innerText = 'RONIN';
     playerName.style.fontSize = '1.2rem';
@@ -76,11 +85,36 @@ export class GameHUD {
     this.playerHealthFill.style.width = '100%';
     this.playerHealthFill.style.height = '100%';
     this.playerHealthFill.style.background = '#eeeeee';
-    this.playerHealthFill.style.transition = 'width 0.3s ease-out';
+    this.playerHealthFill.style.transition = 'width 0.3s ease-out, background 0.3s';
     playerBarBg.appendChild(this.playerHealthFill);
     playerUI.appendChild(playerBarBg);
 
+    const essenceIndicator = document.createElement('div');
+    essenceIndicator.id = 'hud-essence';
+    essenceIndicator.innerHTML = '✧ 0';
+    essenceIndicator.style.fontSize = '1.0rem';
+    essenceIndicator.style.color = '#88ffff';
+    essenceIndicator.style.marginTop = '8px';
+    essenceIndicator.style.textShadow = '1px 1px 2px black';
+    essenceIndicator.style.transition = 'transform 0.1s';
+    playerUI.appendChild(essenceIndicator);
+
     this.container.appendChild(playerUI);
+
+    // Level up flash
+    const levelUpFlash = document.createElement('div');
+    levelUpFlash.id = 'hud-levelup';
+    levelUpFlash.innerText = 'LEVEL UP';
+    levelUpFlash.style.position = 'absolute';
+    levelUpFlash.style.top = '30%';
+    levelUpFlash.style.left = '50%';
+    levelUpFlash.style.transform = 'translate(-50%, -50%)';
+    levelUpFlash.style.fontSize = '3rem';
+    levelUpFlash.style.color = '#ffcc00';
+    levelUpFlash.style.textShadow = '0 0 20px #ffcc00';
+    levelUpFlash.style.opacity = '0';
+    levelUpFlash.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+    this.container.appendChild(levelUpFlash);
 
     // 3. Enemy Health (Top Center, Hidden by default)
     this.enemyHealthContainer = document.createElement('div');
@@ -123,10 +157,20 @@ export class GameHUD {
     this.container.appendChild(this.pauseMenu.element);
   }
 
+  private enemyHealthTimeout: any;
+
   private bindEvents() {
     EventBus.on('playerHealth', (data) => {
       const pct = Math.max(0, (data.current / data.max) * 100);
       this.playerHealthFill.style.width = `${pct}%`;
+      
+      // Color change on low HP
+      if (pct < 30) {
+        this.playerHealthFill.style.background = '#ff4444';
+      } else {
+        this.playerHealthFill.style.background = '#eeeeee';
+      }
+
       if (data.current < data.max && data.delta < 0) {
         this.vignette.style.boxShadow = 'inset 0 0 100px rgba(255, 0, 0, 0.5)';
         setTimeout(() => {
@@ -140,6 +184,38 @@ export class GameHUD {
       this.enemyHealthFill.style.width = `${pct}%`;
       if (data.name) {
         this.enemyNameElement.innerText = data.name;
+      }
+      this.enemyHealthContainer.style.opacity = '1';
+      
+      clearTimeout(this.enemyHealthTimeout);
+      this.enemyHealthTimeout = setTimeout(() => {
+        this.enemyHealthContainer.style.opacity = '0';
+      }, 3000);
+    });
+
+    EventBus.on('essenceUpdate', (data: any) => {
+      const el = document.getElementById('hud-essence');
+      if (el) {
+        el.innerHTML = `✧ ${data.amount}`;
+        el.style.transform = 'scale(1.2)';
+        setTimeout(() => {
+          el.style.transform = 'scale(1)';
+        }, 150);
+      }
+    });
+
+    EventBus.on('levelUp', (data: any) => {
+      const el = document.getElementById('hud-level');
+      if (el) el.innerText = `LV.${data.level}`;
+      
+      const flash = document.getElementById('hud-levelup');
+      if (flash) {
+        flash.style.opacity = '1';
+        flash.style.transform = 'translate(-50%, -60%)';
+        setTimeout(() => {
+          flash.style.opacity = '0';
+          flash.style.transform = 'translate(-50%, -50%)';
+        }, 2000);
       }
     });
 

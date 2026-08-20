@@ -76,6 +76,7 @@ export class Encounter {
   }
 
   private activate(scene: THREE.Scene): void {
+    if (this.state === EncounterState.COMPLETED) return;
     this.state = EncounterState.ACTIVE;
     this.currentWaveIndex = 0;
     if (this.waves.length > 0) {
@@ -85,8 +86,12 @@ export class Encounter {
   }
 
   private complete(): void {
+    if (this.state === EncounterState.COMPLETED) return;
     this.state = EncounterState.COMPLETED;
-    EventBus.emit('encounterComplete', { id: this.config.id });
+    
+    setTimeout(() => {
+      EventBus.emit('encounterComplete', { id: this.config.id, reward: this.config.reward });
+    }, 500); // 0.5s polish delay
   }
 
   public getActiveEnemies(): Enemy[] {

@@ -15,5 +15,6 @@ export interface EncounterConfig {
   center: THREE.Vector3;
   activationRadius: number;
   leashRadius: number; // Max distance an enemy will chase
+  reward?: number; // Spirit Essence reward for completion
   waves: WaveConfig[];
 }

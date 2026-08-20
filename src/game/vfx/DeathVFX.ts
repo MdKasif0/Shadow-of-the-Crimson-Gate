@@ -32,15 +32,25 @@ export class DeathVFX {
       );
       this.spiritPool.emit(position.clone().add(new THREE.Vector3(0, 1, 0)), vel, 1.0 + Math.random() * 1.0);
     }
+    
+    // Essence orb rising
+    const orbVel = new THREE.Vector3(0, 1.5, 0);
+    this.spiritPool.emit(position.clone().add(new THREE.Vector3(0, 1, 0)), orbVel, 2.5); // long life orb
   }
 
   public update(dt: number): void {
     this.spiritPool.update(dt, (p) => {
       p.position.addScaledVector(p.velocity, dt);
-      p.velocity.y += dt * 0.5;
-      p.velocity.x += (Math.random() - 0.5) * dt;
-      p.velocity.z += (Math.random() - 0.5) * dt;
-      p.scale = p.life / p.maxLife;
+      if (p.maxLife > 2.0) {
+        // Essence orb logic
+        p.scale = Math.sin((p.life / p.maxLife) * Math.PI) * 2;
+      } else {
+        // Normal particle logic
+        p.velocity.y += dt * 0.5;
+        p.velocity.x += (Math.random() - 0.5) * dt;
+        p.velocity.z += (Math.random() - 0.5) * dt;
+        p.scale = p.life / p.maxLife;
+      }
     });
   }
 }
