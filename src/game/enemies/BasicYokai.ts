@@ -81,6 +81,7 @@ export class BasicYokai implements Enemy {
     this.isDeathVfxPlayed = false;
     this.setState(EnemyState.IDLE);
     this.root.rotation.set(0, 0, 0);
+    this.root.scale.setScalar(1);
     this.root.visible = true;
     this.ai.resetStrafe();
   }
@@ -101,8 +102,18 @@ export class BasicYokai implements Enemy {
       if (!this.isDeathVfxPlayed && vfx) {
         vfx.spawnDeath(this.root.position);
         this.isDeathVfxPlayed = true;
-        this.root.visible = false; 
       }
+      
+      // Sink into the ground / shrink slowly after laying dead for 1 second
+      if (this.stateTimer > 1.0) {
+        const shrinkFactor = 1.0 - (this.stateTimer - 1.0) * 2.0; // Shrink over 0.5s
+        if (shrinkFactor > 0) {
+          this.root.scale.setScalar(shrinkFactor);
+        } else {
+          this.root.visible = false;
+        }
+      }
+
       this.applyVelocity(dt, collisionSystem);
       return; 
     }

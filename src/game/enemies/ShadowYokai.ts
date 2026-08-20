@@ -106,6 +106,7 @@ export class ShadowYokai implements Enemy {
     this.isDeathVfxPlayed = false;
     this.setState(EnemyState.IDLE);
     this.root.rotation.set(0, 0, 0);
+    this.root.scale.setScalar(1);
     this.root.visible = true;
     this.ai.resetStrafe();
     
@@ -132,13 +133,18 @@ export class ShadowYokai implements Enemy {
 
     if (this.state === EnemyState.DEAD) {
       if (!this.isDeathVfxPlayed && vfx) {
-        // We'll map 'shadowEnemyDeath' to SpiritBurstVFX in the event bus later, 
-        // for now just trigger regular death VFX
         vfx.spawnDeath(this.root.position);
         this.isDeathVfxPlayed = true;
-        
-        // Hide mesh but keep aura fading out
-        this.rig.root.visible = false; 
+      }
+      
+      // Sink into the ground / shrink slowly after laying dead for 1 second
+      if (this.stateTimer > 1.0) {
+        const shrinkFactor = 1.0 - (this.stateTimer - 1.0) * 2.0;
+        if (shrinkFactor > 0) {
+          this.root.scale.setScalar(shrinkFactor);
+        } else {
+          this.root.visible = false;
+        }
       }
       
       // Fade out aura

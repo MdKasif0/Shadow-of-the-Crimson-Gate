@@ -81,6 +81,7 @@ export class Tengu implements Enemy {
     this.isDeathVfxPlayed = false;
     this.setState(EnemyState.IDLE);
     this.root.rotation.set(0, 0, 0);
+    this.root.scale.setScalar(1);
     this.root.visible = true;
     this.ai.resetStrafe();
   }
@@ -103,11 +104,17 @@ export class Tengu implements Enemy {
         vfx.spawnDeath(this.root.position);
         this.isDeathVfxPlayed = true;
       }
-      // Tengu falls faster when dead
-      this.velocity.y -= 20 * dt;
-      if (this.root.position.y < -1) {
-        this.root.visible = false;
+      
+      // Sink into the ground / shrink slowly after laying dead for 1 second
+      if (this.stateTimer > 1.0) {
+        const shrinkFactor = 1.0 - (this.stateTimer - 1.0) * 2.0;
+        if (shrinkFactor > 0) {
+          this.root.scale.setScalar(shrinkFactor);
+        } else {
+          this.root.visible = false;
+        }
       }
+
       this.applyVelocity(dt, collisionSystem);
       return; 
     }
