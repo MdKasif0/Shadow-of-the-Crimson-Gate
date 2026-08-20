@@ -20,6 +20,14 @@ const shadowClawMat = new THREE.MeshStandardMaterial({
   color: 0x112233, emissive: 0x003344, emissiveIntensity: 1.0, roughness: 0.1
 });
 
+// ─── Tengu Materials ────────────────────────────────────────────────────────
+const tenguSkinMat = new THREE.MeshStandardMaterial({ color: 0x552222, roughness: 0.8 });
+const tenguFeatherMat = new THREE.MeshStandardMaterial({ color: 0x111115, roughness: 0.9, flatShading: true });
+const tenguBeakMat = new THREE.MeshStandardMaterial({ color: 0xcc9933, roughness: 0.5, metalness: 0.1 });
+const tenguClothMat = new THREE.MeshStandardMaterial({ color: 0x2a1a1a, roughness: 1.0 }); // dark robes
+const tenguAccentMat = new THREE.MeshStandardMaterial({ color: 0xaa2222, roughness: 0.6 }); // red accents
+const tenguEyeMat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffaa00, emissiveIntensity: 2.0 });
+
 export class EnemyFactory {
   public static createBasicYokai(): CharacterRig {
     const rig = new CharacterRig();
@@ -315,6 +323,158 @@ export class EnemyFactory {
 
     // Raise pelvis for longer legs
     rig.pelvis.position.set(0, 1.2, 0);
+
+    return rig;
+  }
+
+  // ─── Tengu ────────────────────────────────────────────────────────────────
+  
+  public static createTengu(): CharacterRig {
+    const rig = new CharacterRig();
+
+    const addMesh = (parent: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material, yOffset = 0) => {
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.y = yOffset;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
+
+    // ── Torso ──
+    const pelvisGeo = new THREE.BoxGeometry(0.3, 0.2, 0.25);
+    const spineGeo = new THREE.BoxGeometry(0.25, 0.3, 0.2);
+    const chestGeo = new THREE.BoxGeometry(0.45, 0.4, 0.3);
+    
+    // ── Head & Beak ──
+    const headGeo = new THREE.BoxGeometry(0.2, 0.25, 0.2);
+    const beakGeo = new THREE.ConeGeometry(0.04, 0.25, 4);
+    beakGeo.translate(0, 0.125, 0);
+    beakGeo.rotateX(Math.PI / 2); // point forward
+    
+    const beak = new THREE.Mesh(beakGeo, tenguBeakMat);
+    beak.position.set(0, 0.05, 0.1);
+    
+    const eyeGeo = new THREE.BoxGeometry(0.04, 0.02, 0.02);
+    const lEye = new THREE.Mesh(eyeGeo, tenguEyeMat);
+    lEye.position.set(0.06, 0.08, 0.1);
+    lEye.rotation.z = 0.1;
+    const rEye = new THREE.Mesh(eyeGeo, tenguEyeMat);
+    rEye.position.set(-0.06, 0.08, 0.1);
+    rEye.rotation.z = -0.1;
+
+    // ── Limbs ──
+    const upperArmGeo = new THREE.BoxGeometry(0.12, 0.45, 0.12);
+    upperArmGeo.translate(0, -0.225, 0);
+    const lowerArmGeo = new THREE.BoxGeometry(0.1, 0.45, 0.1);
+    lowerArmGeo.translate(0, -0.225, 0);
+    const handGeo = new THREE.BoxGeometry(0.15, 0.2, 0.15);
+    handGeo.translate(0, -0.1, 0);
+
+    const upperLegGeo = new THREE.BoxGeometry(0.18, 0.4, 0.18);
+    upperLegGeo.translate(0, -0.2, 0);
+    const lowerLegGeo = new THREE.BoxGeometry(0.12, 0.4, 0.12);
+    lowerLegGeo.translate(0, -0.2, 0);
+    
+    // Claw-like feet (bird talons)
+    const footGeo = new THREE.BoxGeometry(0.1, 0.05, 0.15);
+    const talonGeo = new THREE.ConeGeometry(0.02, 0.1, 3);
+    talonGeo.translate(0, 0.05, 0);
+    talonGeo.rotateX(Math.PI / 2);
+    
+    const addTalons = (foot: THREE.Object3D) => {
+      for (let i = -1; i <= 1; i++) {
+        const talon = new THREE.Mesh(talonGeo, tenguBeakMat);
+        talon.position.set(i * 0.04, -0.02, 0.07);
+        foot.add(talon);
+      }
+    };
+
+    // ── Procedural Wings ──
+    rig.leftWing = new THREE.Group();
+    rig.rightWing = new THREE.Group();
+    rig.chest.add(rig.leftWing);
+    rig.chest.add(rig.rightWing);
+    
+    rig.leftWing.position.set(0.15, 0.1, -0.1);
+    rig.rightWing.position.set(-0.15, 0.1, -0.1);
+
+    const createWingGeometry = (isLeft: boolean) => {
+      const wingGroup = new THREE.Group();
+      // Layered feathers
+      const numFeathers = 6;
+      for (let i = 0; i < numFeathers; i++) {
+        const fw = 0.1 + (i * 0.05);
+        const fh = 0.6 + (i * 0.2);
+        const featherGeo = new THREE.PlaneGeometry(fw, fh);
+        // Taper plane
+        const pos = featherGeo.attributes.position;
+        for (let v = 0; v < pos.count; v++) {
+          if (pos.getY(v) < 0) {
+            pos.setX(v, pos.getX(v) * 0.2);
+          }
+        }
+        featherGeo.computeVertexNormals();
+        featherGeo.translate(0, -fh / 2, 0);
+
+        const feather = new THREE.Mesh(featherGeo, tenguFeatherMat);
+        feather.castShadow = true;
+        // Spread them out like a fan
+        const angle = (i / (numFeathers - 1)) * (Math.PI * 0.6); // 100 degrees spread
+        feather.rotation.z = isLeft ? -angle : angle;
+        feather.position.set(isLeft ? i * 0.1 : -i * 0.1, -i * 0.05, i * 0.02);
+        wingGroup.add(feather);
+      }
+      return wingGroup;
+    };
+
+    rig.leftWing.add(createWingGeometry(true));
+    rig.rightWing.add(createWingGeometry(false));
+
+    // ── Assembly ──
+    addMesh(rig.pelvis, pelvisGeo, tenguClothMat);
+    addMesh(rig.spine, spineGeo, tenguClothMat);
+    
+    // Chest with red accent
+    addMesh(rig.chest, chestGeo, tenguClothMat);
+    const sashGeo = new THREE.BoxGeometry(0.48, 0.1, 0.32);
+    addMesh(rig.chest, sashGeo, tenguAccentMat, -0.1);
+    
+    // Feathered Shoulders (collar)
+    const collarGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.2, 8);
+    const collar = addMesh(rig.chest, collarGeo, tenguFeatherMat, 0.15);
+    collar.rotation.x = 0.2;
+
+    const headMesh = addMesh(rig.head, headGeo, tenguSkinMat, 0.125);
+    headMesh.add(beak, lEye, rEye);
+
+    // Adjust rig proportions for flight
+    rig.leftUpperArm.position.set(0.3, 0.15, 0);
+    rig.rightUpperArm.position.set(-0.3, 0.15, 0);
+    
+    addMesh(rig.leftUpperArm, upperArmGeo, tenguClothMat);
+    addMesh(rig.rightUpperArm, upperArmGeo, tenguClothMat);
+    addMesh(rig.leftLowerArm, lowerArmGeo, tenguSkinMat);
+    addMesh(rig.rightLowerArm, lowerArmGeo, tenguSkinMat);
+    addMesh(rig.leftHand, handGeo, tenguSkinMat);
+    addMesh(rig.rightHand, handGeo, tenguSkinMat);
+
+    // Legs
+    rig.leftUpperLeg.position.set(0.12, -0.1, 0);
+    rig.rightUpperLeg.position.set(-0.12, -0.1, 0);
+
+    addMesh(rig.leftUpperLeg, upperLegGeo, tenguClothMat);
+    addMesh(rig.rightUpperLeg, upperLegGeo, tenguClothMat);
+    addMesh(rig.leftLowerLeg, lowerLegGeo, tenguSkinMat);
+    addMesh(rig.rightLowerLeg, lowerLegGeo, tenguSkinMat);
+    const lFoot = addMesh(rig.leftFoot, footGeo, tenguSkinMat, -0.025);
+    const rFoot = addMesh(rig.rightFoot, footGeo, tenguSkinMat, -0.025);
+    addTalons(lFoot);
+    addTalons(rFoot);
+
+    // Rescale slightly taller
+    rig.root.scale.set(1.1, 1.15, 1.1);
+    rig.pelvis.position.set(0, 1.1, 0);
 
     return rig;
   }

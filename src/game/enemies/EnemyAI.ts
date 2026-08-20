@@ -53,6 +53,11 @@ export class EnemyAI {
       return { state: EnemyState.WALK, moveDirection: dirToPlayer, facingAngle };
     }
 
+    // If it's a ranged enemy (has projectileSpeed) and outside preferred distance buffer
+    if (this.config.projectileSpeed && distToPlayer > this.config.preferredDistance * 1.5) {
+      return { state: EnemyState.MAINTAIN_DISTANCE, moveDirection: dirToPlayer, facingAngle };
+    }
+
     // In combat zone — decide based on aggression and cooldown
     const inAttackRange = distToPlayer <= this.config.attackRange;
     const canAttack = attackCooldown <= 0;
@@ -66,7 +71,7 @@ export class EnemyAI {
     }
 
     // Too close? Retreat to preferred distance
-    if (distToPlayer < this.config.preferredDistance * 0.6) {
+    if (distToPlayer < this.config.preferredDistance * 0.8) {
       const retreatDir = dirToPlayer.clone().negate();
       return { state: EnemyState.RETREAT, moveDirection: retreatDir, facingAngle };
     }

@@ -22,6 +22,9 @@ export interface EnemyConfig {
   collisionRadius: number;
   hurtboxRadius: number;
   hurtboxHeight: number;
+  // Ranged specific
+  projectileSpeed?: number;
+  projectileLifetime?: number;
 }
 
 // ─── Presets ─────────────────────────────────────────────────────────────────
@@ -68,4 +71,28 @@ export const SHADOW_YOKAI_CONFIG: EnemyConfig = {
   collisionRadius: 0.5,
   hurtboxRadius: 0.5,
   hurtboxHeight: 2.4,
+};
+
+export const TENGU_CONFIG: EnemyConfig = {
+  enemyType: 'TENGU',
+  maxHealth: 60,            // Fragile
+  movementSpeed: 4.5,       // Fast
+  detectionRange: 20,       // Sees far
+  attackRange: 15,          // Shoots from far
+  attackCooldownMin: 2.0,
+  attackCooldownMax: 3.5,
+  damage: 25,               // High damage
+  knockback: 20,
+  knockbackResistance: 0.1, // easily staggered
+  preferredDistance: 8,     // Prefers to stay away (6 to 10 units)
+  aggression: 0.7,
+  attackWindup: 0.6,        // Obvious telegraph
+  attackActive: 0.1,        // Instant fire
+  attackRecovery: 0.5,
+  hurtDuration: 0.4,
+  collisionRadius: 0.6,
+  hurtboxRadius: 0.6,
+  hurtboxHeight: 2.2,
+  projectileSpeed: 12,
+  projectileLifetime: 3.0,
 };

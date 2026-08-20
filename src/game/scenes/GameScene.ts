@@ -12,12 +12,14 @@ import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
 import { LightingSystem } from '../lighting/LightingSystem';
 import { AtmosphereSystem } from '../atmosphere/AtmosphereSystem';
+import { ProjectileSystem } from '../combat/ProjectileSystem';
 
 export class GameScene {
   public scene: THREE.Scene;
   public player: Ronin;
   public collisionSystem: CollisionSystem;
   public hitboxSystem: HitboxSystem;
+  public projectileSystem: ProjectileSystem;
   public enemies: Enemy[] = [];
   public vfx: VFXManager;
   public cameraController: CameraController;
@@ -39,18 +41,21 @@ export class GameScene {
     this.collisionSystem = new CollisionSystem();
     new WorldGenerator(this.scene, this.collisionSystem);
     this.hitboxSystem = new HitboxSystem(this.scene);
+    this.projectileSystem = new ProjectileSystem(this.scene);
 
     this.player = new Ronin();
     this.player.setPosition(0, 0, 0);
     this.scene.add(this.player.root);
 
-    // TEST ARENA: Spawn both Basic Yokai and Shadow Yokai
+    // TEST ARENA: Spawn all 3 enemies
     const spawner = new EnemySpawner();
     const basicYokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(-4, 0, -8));
-    const shadowYokai = spawner.spawnShadowYokai(this.scene, new THREE.Vector3(4, 0, -8));
+    const shadowYokai = spawner.spawnShadowYokai(this.scene, new THREE.Vector3(0, 0, -8));
+    const tengu = spawner.spawnTengu(this.scene, new THREE.Vector3(4, 0, -8));
     
     this.enemies.push(basicYokai);
     this.enemies.push(shadowYokai);
+    this.enemies.push(tengu);
 
     this.vfx = new VFXManager(this.scene, this.cameraController);
 
@@ -77,6 +82,7 @@ export class GameScene {
 
     this.hitboxSystem.clearActiveHitboxes();
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
+    this.projectileSystem.update(dt, this.player, this.vfx, this.cameraController);
     
     // Encounter Trigger Logic
     if (!this.encounterActive && !this.isEncounterCompleted) {
@@ -100,7 +106,7 @@ export class GameScene {
 
     for (const enemy of this.enemies) {
       if (this.encounterActive || this.isEncounterCompleted) {
-        enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx);
+        enemy.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem);
       }
     }
 
@@ -140,9 +146,11 @@ export class GameScene {
     this.player.reset(new THREE.Vector3(0, 0, 0));
     
     if (this.enemies[0]) this.enemies[0].reset(new THREE.Vector3(-4, 0, -8));
-    if (this.enemies[1]) this.enemies[1].reset(new THREE.Vector3(4, 0, -8));
+    if (this.enemies[1]) this.enemies[1].reset(new THREE.Vector3(0, 0, -8));
+    if (this.enemies[2]) this.enemies[2].reset(new THREE.Vector3(4, 0, -8));
     
     this.hitboxSystem.clearActiveHitboxes();
+    this.projectileSystem.clearAll();
     this.hitStopTimer = 0;
     
     this.encounterActive = false;

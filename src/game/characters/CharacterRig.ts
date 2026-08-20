@@ -28,6 +28,10 @@ export class CharacterRig {
   public rightLowerLeg: THREE.Group;
   public rightFoot: THREE.Group;
 
+  // Optional parts (e.g. for Tengu)
+  public leftWing?: THREE.Group;
+  public rightWing?: THREE.Group;
+
   // Prop attachment points
   public weaponSlot: THREE.Group;
   public sheathSlot: THREE.Group;
