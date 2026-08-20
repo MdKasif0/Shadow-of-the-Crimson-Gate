@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 import { WorldGenerator } from '../world/WorldGenerator';
 import { Ronin } from '../characters/Ronin';
-import { CollisionSystem } from '../physics/CollisionSystem';
-import { HitboxSystem } from '../physics/HitboxSystem';
+import { CollisionSystem } from '../collision/CollisionSystem';
+import { HitboxSystem } from '../combat/HitboxSystem';
+import { DamageSystem } from '../combat/DamageSystem';
 import { InputManager } from '../core/InputManager';
 import { EnemySpawner } from '../world/EnemySpawner';
 import { Enemy } from '../enemies/Enemy';
-import { CameraController } from '../core/CameraController';
+import { CameraController } from '../camera/CameraController';
 import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
-import { EnemyState } from '../enemies/EnemyState';
+import { LightingSystem } from '../lighting/LightingSystem';
+import { AtmosphereSystem } from '../atmosphere/AtmosphereSystem';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -24,32 +26,17 @@ export class GameScene {
   private encounterActive: boolean = false;
   private isEncounterCompleted: boolean = false;
 
+  // Extracted systems
+  private lighting: LightingSystem;
+  private atmosphere: AtmosphereSystem;
+
   constructor(cameraController: CameraController) {
     this.cameraController = cameraController;
     this.scene = new THREE.Scene();
     
-    // Atmosphere Placeholder
-    this.scene.background = new THREE.Color(0x060a10);
-    this.scene.fog = new THREE.FogExp2(0x060a10, 0.02);
-
-    // Lighting Placeholders
-    const ambient = new THREE.AmbientLight(0xffffff, 2.0);
-    this.scene.add(ambient);
-    
-    const dirLight = new THREE.DirectionalLight(0xffffff, 5.0);
-    dirLight.position.set(20, 40, 30);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 200;
-    const d = 50;
-    dirLight.shadow.camera.left = -d;
-    dirLight.shadow.camera.right = d;
-    dirLight.shadow.camera.top = d;
-    dirLight.shadow.camera.bottom = -d;
-    dirLight.shadow.bias = -0.001;
-    this.scene.add(dirLight);
+    // Atmosphere & Lighting (extracted)
+    this.atmosphere = new AtmosphereSystem(this.scene);
+    this.lighting = new LightingSystem(this.scene);
 
     // Generate World and Collisions
     this.collisionSystem = new CollisionSystem();
@@ -60,7 +47,7 @@ export class GameScene {
 
     // Generate Player (Ronin)
     this.player = new Ronin();
-    this.player.setPosition(0, 0, 0); // Spawn area
+    this.player.setPosition(0, 0, 0);
     this.scene.add(this.player.root);
 
     // Generate Enemies
@@ -119,45 +106,18 @@ export class GameScene {
       }
     }
 
-    // 3. Resolve combat interactions
+    // 3. Resolve combat interactions via DamageSystem
     const hits = this.hitboxSystem.checkHits();
-    for (const hit of hits) {
-      const isPlayerHit = hit.hurtbox.id === 'PLAYER';
-      
-      if (isPlayerHit) {
-        const oldHp = this.player['health']['currentHealth'];
-        this.player.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
-        const newHp = this.player['health']['currentHealth'];
-        
-        EventBus.emit('playerHealth', { current: newHp, max: this.player['health']['maxHealth'], delta: newHp - oldHp });
-        
-        if (newHp <= 0) {
-          EventBus.emit('playerDeath');
-        } else {
-          this.vfx.spawnHurt(hit.hitbox.position);
-          this.cameraController.addShake(1.5);
-        }
-      } else {
-        const targetEnemy = this.enemies.find(e => e.id === hit.hurtbox.id);
-        if (targetEnemy) {
-          const oldHp = targetEnemy.health['currentHealth'];
-          targetEnemy.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
-          const newHp = targetEnemy.health['currentHealth'];
-          
-          EventBus.emit('enemyHealth', { current: newHp, max: targetEnemy.health['maxHealth'], delta: newHp - oldHp });
-          
-          if (newHp <= 0 && !this.isEncounterCompleted) {
-             this.encounterActive = false;
-             this.isEncounterCompleted = true;
-             EventBus.emit('encounterComplete');
-          }
+    if (hits.length > 0) {
+      const { hitStopTime, result } = DamageSystem.resolveHits(
+        hits, this.player, this.enemies, this.vfx, this.cameraController
+      );
+      this.hitStopTimer = hitStopTime;
 
-          // Assuming damage > 15 is heavy hit for now
-          const isHeavy = hit.hitbox.damage > 15; 
-          this.vfx.spawnHit(hit.hitbox.position, hit.hitbox.direction, isHeavy);
-          this.cameraController.addShake(isHeavy ? 1.0 : 0.5);
-          this.hitStopTimer = isHeavy ? 0.07 : 0.04;
-        }
+      if (result.enemyKilled && !this.isEncounterCompleted) {
+        this.encounterActive = false;
+        this.isEncounterCompleted = true;
+        EventBus.emit('encounterComplete');
       }
     }
 
@@ -186,6 +146,6 @@ export class GameScene {
     if (this.enemies[0]) {
       EventBus.emit('enemyHealth', { current: this.enemies[0].health['currentHealth'], max: this.enemies[0].health['maxHealth'], delta: 0 });
     }
-    EventBus.emit('encounterComplete'); // Quick hack to hide enemy HP bar
+    EventBus.emit('encounterComplete'); // Hide enemy HP bar on reset
   }
 }

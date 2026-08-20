@@ -1,15 +1,21 @@
 import { EventBus } from '../core/EventBus';
+import { PauseMenu } from './PauseMenu';
+import { GameOver } from './GameOver';
 
+/**
+ * GameHUD — Cinematic HTML overlay composed from PauseMenu and GameOver submodules.
+ */
 export class GameHUD {
   private container: HTMLElement;
-  private isPaused: boolean = false;
-  
+
+  // Submodules
+  private pauseMenu: PauseMenu;
+  private gameOver: GameOver;
+
   // DOM Elements
   private playerHealthFill!: HTMLElement;
   private enemyHealthContainer!: HTMLElement;
   private enemyHealthFill!: HTMLElement;
-  private centerMessage!: HTMLElement;
-  private pauseMenu!: HTMLElement;
   private vignette!: HTMLElement;
 
   constructor(containerId: string) {
@@ -23,11 +29,14 @@ export class GameHUD {
     this.container.style.left = '0';
     this.container.style.width = '100%';
     this.container.style.height = '100%';
-    this.container.style.pointerEvents = 'none'; // Let clicks pass through to canvas
+    this.container.style.pointerEvents = 'none';
     this.container.style.zIndex = '10';
     this.container.style.fontFamily = "'Cinzel', serif";
     this.container.style.color = 'white';
     parent.appendChild(this.container);
+
+    this.pauseMenu = new PauseMenu();
+    this.gameOver = new GameOver();
 
     this.buildUI();
     this.bindEvents();
@@ -47,7 +56,7 @@ export class GameHUD {
     playerUI.style.position = 'absolute';
     playerUI.style.bottom = '40px';
     playerUI.style.left = '40px';
-    
+
     const playerName = document.createElement('div');
     playerName.innerText = 'RONIN';
     playerName.style.fontSize = '1.2rem';
@@ -61,7 +70,7 @@ export class GameHUD {
     playerBarBg.style.height = '6px';
     playerBarBg.style.background = 'rgba(255, 255, 255, 0.2)';
     playerBarBg.style.boxShadow = '0 0 4px rgba(0,0,0,0.5)';
-    
+
     this.playerHealthFill = document.createElement('div');
     this.playerHealthFill.style.width = '100%';
     this.playerHealthFill.style.height = '100%';
@@ -69,7 +78,7 @@ export class GameHUD {
     this.playerHealthFill.style.transition = 'width 0.3s ease-out';
     playerBarBg.appendChild(this.playerHealthFill);
     playerUI.appendChild(playerBarBg);
-    
+
     this.container.appendChild(playerUI);
 
     // 3. Enemy Health (Top Center, Hidden by default)
@@ -95,91 +104,28 @@ export class GameHUD {
     enemyBarBg.style.height = '4px';
     enemyBarBg.style.background = 'rgba(255, 255, 255, 0.2)';
     enemyBarBg.style.boxShadow = '0 0 4px rgba(0,0,0,0.5)';
-    
+
     this.enemyHealthFill = document.createElement('div');
     this.enemyHealthFill.style.width = '100%';
     this.enemyHealthFill.style.height = '100%';
     this.enemyHealthFill.style.background = '#ff4444';
     this.enemyHealthFill.style.transition = 'width 0.3s ease-out';
     enemyBarBg.appendChild(this.enemyHealthFill);
-    
+
     this.enemyHealthContainer.appendChild(enemyBarBg);
     this.container.appendChild(this.enemyHealthContainer);
 
-    // 4. Center Message (Defeated, Purified)
-    this.centerMessage = document.createElement('div');
-    this.centerMessage.style.position = 'absolute';
-    this.centerMessage.style.top = '45%';
-    this.centerMessage.style.left = '50%';
-    this.centerMessage.style.transform = 'translate(-50%, -50%)';
-    this.centerMessage.style.textAlign = 'center';
-    this.centerMessage.style.opacity = '0';
-    this.centerMessage.style.transition = 'opacity 1s ease-in';
-    this.centerMessage.style.pointerEvents = 'auto'; // allow clicking retry
-    this.container.appendChild(this.centerMessage);
+    // 4. Game Over overlay
+    this.container.appendChild(this.gameOver.element);
 
-    // 5. Pause Menu
-    this.pauseMenu = document.createElement('div');
-    this.pauseMenu.style.position = 'absolute';
-    this.pauseMenu.style.inset = '0';
-    this.pauseMenu.style.background = 'rgba(0, 0, 0, 0.8)';
-    this.pauseMenu.style.display = 'none';
-    this.pauseMenu.style.flexDirection = 'column';
-    this.pauseMenu.style.justifyContent = 'center';
-    this.pauseMenu.style.alignItems = 'center';
-    this.pauseMenu.style.pointerEvents = 'auto';
-    this.pauseMenu.style.zIndex = '20';
-
-    const pauseTitle = document.createElement('h2');
-    pauseTitle.innerText = 'PAUSED';
-    pauseTitle.style.fontSize = '3rem';
-    pauseTitle.style.letterSpacing = '0.3em';
-    pauseTitle.style.marginBottom = '2rem';
-    this.pauseMenu.appendChild(pauseTitle);
-
-    const btnResume = this.createMenuButton('RESUME');
-    btnResume.onclick = () => this.togglePause();
-    
-    const btnRestart = this.createMenuButton('RESTART ENCOUNTER');
-    btnRestart.onclick = () => {
-      this.togglePause();
-      EventBus.emit('restartEncounter');
-    };
-    
-    const btnMenu = this.createMenuButton('RETURN TO MENU');
-    btnMenu.onclick = () => {
-      // Typically we'd route back, for now just hardcode hash
-      window.location.hash = '#/';
-    };
-
-    this.pauseMenu.appendChild(btnResume);
-    this.pauseMenu.appendChild(btnRestart);
-    this.pauseMenu.appendChild(btnMenu);
-    this.container.appendChild(this.pauseMenu);
-  }
-
-  private createMenuButton(text: string): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.innerText = text;
-    btn.style.background = 'transparent';
-    btn.style.border = 'none';
-    btn.style.color = '#ccc';
-    btn.style.fontFamily = "'Cinzel', serif";
-    btn.style.fontSize = '1.2rem';
-    btn.style.letterSpacing = '0.1em';
-    btn.style.margin = '10px 0';
-    btn.style.cursor = 'pointer';
-    btn.style.transition = 'color 0.2s';
-    btn.onmouseover = () => btn.style.color = '#fff';
-    btn.onmouseout = () => btn.style.color = '#ccc';
-    return btn;
+    // 5. Pause Menu overlay
+    this.container.appendChild(this.pauseMenu.element);
   }
 
   private bindEvents() {
     EventBus.on('playerHealth', (data) => {
       const pct = Math.max(0, (data.current / data.max) * 100);
       this.playerHealthFill.style.width = `${pct}%`;
-      // Damage Vignette
       if (data.current < data.max && data.delta < 0) {
         this.vignette.style.boxShadow = 'inset 0 0 100px rgba(255, 0, 0, 0.5)';
         setTimeout(() => {
@@ -199,11 +145,11 @@ export class GameHUD {
 
     EventBus.on('encounterComplete', () => {
       this.enemyHealthContainer.style.opacity = '0';
-      this.showCenterMessage('PURIFIED', '#88ffff', true);
+      this.gameOver.showPurified();
     });
 
     EventBus.on('playerDeath', () => {
-      this.showCenterMessage('DEFEATED', '#ff4444', false, true);
+      this.gameOver.showDefeated();
     });
 
     window.addEventListener('keydown', this.handleKeyDown);
@@ -211,45 +157,9 @@ export class GameHUD {
 
   private handleKeyDown = (e: KeyboardEvent) => {
     if (e.code === 'Escape') {
-      this.togglePause();
+      this.pauseMenu.toggle();
     }
   };
-
-  private togglePause() {
-    this.isPaused = !this.isPaused;
-    this.pauseMenu.style.display = this.isPaused ? 'flex' : 'none';
-    EventBus.emit('gamePauseToggled', this.isPaused);
-  }
-
-  private showCenterMessage(text: string, color: string, autoHide: boolean, showRetry: boolean = false) {
-    this.centerMessage.innerHTML = '';
-    const title = document.createElement('h1');
-    title.innerText = text;
-    title.style.color = color;
-    title.style.fontSize = '4rem';
-    title.style.letterSpacing = '0.3em';
-    title.style.textShadow = '0 0 20px ' + color;
-    this.centerMessage.appendChild(title);
-
-    if (showRetry) {
-      const btn = this.createMenuButton('RETRY');
-      btn.style.marginTop = '20px';
-      btn.style.fontSize = '1.5rem';
-      btn.onclick = () => {
-        this.centerMessage.style.opacity = '0';
-        EventBus.emit('restartEncounter');
-      };
-      this.centerMessage.appendChild(btn);
-    }
-
-    this.centerMessage.style.opacity = '1';
-
-    if (autoHide) {
-      setTimeout(() => {
-        this.centerMessage.style.opacity = '0';
-      }, 3000);
-    }
-  }
 
   public destroy() {
     EventBus.clear();

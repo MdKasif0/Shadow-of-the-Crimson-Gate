@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { Renderer } from './core/Renderer';
 import { GameLoop } from './core/GameLoop';
 import { InputManager } from './core/InputManager';
-import { CameraController } from './core/CameraController';
+import { CameraController } from './camera/CameraController';
 import { GameScene } from './scenes/GameScene';
 import { GAME_CONFIG } from './GameConfig';
 import { GameHUD } from './ui/GameHUD';
+import { EventBus } from './core/EventBus';
 
 export class ThreeGame {
   private containerId: string;
@@ -34,10 +35,8 @@ export class ThreeGame {
     // 3. Initialize HUD
     this.hud = new GameHUD(containerId);
     
-    import('./core/EventBus').then(({ EventBus }) => {
-      EventBus.on('gamePauseToggled', (paused: boolean) => {
-        this.isPaused = paused;
-      });
+    EventBus.on('gamePauseToggled', (paused: boolean) => {
+      this.isPaused = paused;
     });
 
     // 4. Bind window events
@@ -95,6 +94,7 @@ export class ThreeGame {
     this.loop.stop();
     window.removeEventListener('resize', this.onResize);
     this.input.dispose();
+    this.hud.destroy();
     this.renderer.destroy();
   }
 }

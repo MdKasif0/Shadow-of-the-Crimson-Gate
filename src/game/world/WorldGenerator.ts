@@ -9,7 +9,7 @@ import { ToriiGenerator } from './ToriiGenerator';
 import { ShrineGenerator } from './ShrineGenerator';
 import { TempleGenerator } from './TempleGenerator';
 import { MountainGenerator } from './MountainGenerator';
-import { CollisionSystem } from '../physics/CollisionSystem';
+import { CollisionSystem } from '../collision/CollisionSystem';
 
 export class WorldGenerator {
   constructor(scene: THREE.Scene, collisionSystem: CollisionSystem) {

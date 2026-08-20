@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utils/MathUtils';
 import { GAME_CONFIG } from '../GameConfig';
-import { CollisionSystem } from '../physics/CollisionSystem';
+import { CollisionSystem } from '../collision/CollisionSystem';
 
 export class RockGenerator {
   public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {

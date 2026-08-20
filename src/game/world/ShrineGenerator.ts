@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utils/MathUtils';
-import { CollisionSystem } from '../physics/CollisionSystem';
+import { CollisionSystem } from '../collision/CollisionSystem';
 
 export class ShrineGenerator {
   public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {

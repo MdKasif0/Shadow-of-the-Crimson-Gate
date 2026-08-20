@@ -5,7 +5,7 @@ import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
 import { CharacterRig } from '../characters/CharacterRig';
 import { EnemyAnimator } from './EnemyAnimator';
 import { EnemyFactory } from './EnemyFactory';
-import { HitboxSystem } from '../physics/HitboxSystem';
+import { HitboxSystem } from '../combat/HitboxSystem';
 
 export class BasicYokai implements Enemy {
   public id: string;

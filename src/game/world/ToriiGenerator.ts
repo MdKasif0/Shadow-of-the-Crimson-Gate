@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CollisionSystem } from '../physics/CollisionSystem';
+import { CollisionSystem } from '../collision/CollisionSystem';
 
 export class ToriiGenerator {
   public static generate(collisionSystem: CollisionSystem): THREE.Group {

@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../GameConfig';
-import { lerp } from '../utils/MathUtils';
+import { CameraShake } from './CameraShake';
 
+/**
+ * CameraController — Orthographic isometric camera with smooth tracking and shake.
+ */
 export class CameraController {
   public camera: THREE.OrthographicCamera;
   
@@ -9,9 +12,8 @@ export class CameraController {
   private offset: THREE.Vector3;
   private currentPos: THREE.Vector3;
   
-  // Shake mechanics
-  private shakeIntensity: number = 0;
-  private shakeOffset: THREE.Vector3 = new THREE.Vector3();
+  // Shake module
+  private shake: CameraShake = new CameraShake();
 
   // The world boundary to clamp the camera against
   private minX: number;
@@ -32,14 +34,9 @@ export class CameraController {
       GAME_CONFIG.CAMERA.FAR
     );
 
-    // Position camera at an isometric angle (e.g. looking down 45 degrees, rotated 45 degrees)
-    // The prompt requested above, behind, angled downward. 
     this.offset = new THREE.Vector3(0, 30, 30);
     this.currentPos = new THREE.Vector3().copy(this.offset);
     this.camera.position.copy(this.currentPos);
-    
-    // We want the player in the lower-middle of the screen, so we look slightly ahead of the camera's true target.
-    // We'll achieve this by shifting the target point in update()
     
     this.camera.lookAt(0, 0, 0);
 
@@ -61,31 +58,26 @@ export class CameraController {
   }
 
   public addShake(intensity: number): void {
-    this.shakeIntensity = Math.min(this.shakeIntensity + intensity, 2.0); // Cap max shake
+    this.shake.addShake(intensity);
   }
 
   public update(target: THREE.Vector3, dt: number): void {
     // 1. Determine desired camera position (tracking the player)
-    // To place player in lower-middle, we shift the camera's focus point *forward* along the Z axis (or adjust offset).
-    // Let's just shift the target point.
-    const screenOffset = new THREE.Vector3(0, 0, -8); // Look ahead of player
+    const screenOffset = new THREE.Vector3(0, 0, -8);
     
     const desiredTarget = target.clone().add(screenOffset);
     const desiredPos = desiredTarget.clone().add(this.offset);
 
     // 2. Smoothly interpolate current camera position
-    // We use dt to make interpolation frame-rate independent
     const blend = 1.0 - Math.pow(0.001, dt);
     
     this.currentPos.lerp(desiredPos, blend);
 
     // 3. Clamp camera to prevent revealing the void
-    // The view covers roughly `zoom * aspect` in X, and `zoom` in Z.
     const aspect = this.camera.right / GAME_CONFIG.CAMERA.ZOOM;
     const viewWidth = GAME_CONFIG.CAMERA.ZOOM * aspect;
-    const viewDepth = GAME_CONFIG.CAMERA.ZOOM; // Actually the true depth depends on the camera angle, but orthographic mapping is flat
+    const viewDepth = GAME_CONFIG.CAMERA.ZOOM;
 
-    // We only clamp the focus target, then re-apply offset
     const clampedTarget = this.currentPos.clone().sub(this.offset);
     
     const clampMinX = this.minX + viewWidth;
@@ -96,10 +88,9 @@ export class CameraController {
       clampedTarget.x = (this.minX + this.maxX) / 2;
     }
     
-    // Because camera is angled at 45 degrees, the visible Z depth on the ground plane is roughly viewDepth / sin(45)
     const zVisibleDepth = viewDepth * 1.414;
     const clampMinZ = this.minZ + zVisibleDepth;
-    const clampMaxZ = this.maxZ - zVisibleDepth*0.2;
+    const clampMaxZ = this.maxZ - zVisibleDepth * 0.2;
     
     if (clampMinZ < clampMaxZ) {
       clampedTarget.z = THREE.MathUtils.clamp(clampedTarget.z, clampMinZ, clampMaxZ);
@@ -110,22 +101,10 @@ export class CameraController {
     this.currentPos.copy(clampedTarget).add(this.offset);
 
     // Apply procedural shake
-    if (this.shakeIntensity > 0.01) {
-      this.shakeOffset.set(
-        (Math.random() - 0.5) * this.shakeIntensity,
-        (Math.random() - 0.5) * this.shakeIntensity,
-        0 // mostly XY shake for orthographic
-      );
-      this.currentPos.add(this.shakeOffset);
-      
-      // Decay shake
-      this.shakeIntensity = THREE.MathUtils.lerp(this.shakeIntensity, 0, dt * 10);
-    } else {
-      this.shakeIntensity = 0;
-    }
+    this.shake.apply(this.currentPos, dt);
 
     // 4. Apply position and rotation
     this.camera.position.copy(this.currentPos);
-    this.camera.lookAt(clampedTarget); // look at un-shaken target for stability, or shake target too? Unshaken is usually better
+    this.camera.lookAt(clampedTarget);
   }
 }
