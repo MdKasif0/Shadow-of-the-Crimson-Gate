@@ -8,7 +8,7 @@ export class RockGenerator {
     const group = new THREE.Group();
     group.name = 'Rocks';
 
-    const rockCount = 45;
+    const rockCount = 150;
     const geometries: THREE.BufferGeometry[] = [];
 
     // Create 3 variant rock geometries
@@ -49,20 +49,35 @@ export class RockGenerator {
     });
 
     const dummy = new THREE.Object3D();
-    const bounds = GAME_CONFIG.WORLD.BOUNDS;
     
-    // Distribute rocks mostly around perimeter
     let rockIndex = 0;
-    while (rockIndex < rockCount) {
-      const x = random.range(bounds.MIN_X - 5, bounds.MAX_X + 5);
-      const z = random.range(bounds.MIN_Z - 5, bounds.MAX_Z + 5);
+    let attempts = 0;
+    while (rockIndex < rockCount && attempts < 2000) {
+      attempts++;
+      const x = random.range(-45, 45);
+      const z = random.range(-75, 35);
       
-      const distFromCenter = Math.sqrt(x*x + z*z);
-      // Avoid spawn area and center
-      if (distFromCenter < 12) continue;
+      // Carve out safe zones where rocks CANNOT spawn
       
-      // Avoid temple area
-      if (z < -10 && Math.abs(x) < 15) continue;
+      // 1. Entrance Path
+      if (Math.abs(x) < 8 && z > 0) continue;
+      
+      // 2. Courtyard
+      const distToCourtyard = Math.sqrt(x*x + Math.pow(z + 5, 2));
+      if (distToCourtyard < 20) continue;
+      
+      // 3. Shrine area
+      const distToShrine = Math.sqrt(Math.pow(x + 25, 2) + Math.pow(z + 20, 2));
+      if (distToShrine < 15) continue;
+      
+      // 4. Forest Path
+      if (x > 5 && x < 35 && z > -35 && z < -10) {
+         const distToArena = Math.sqrt(Math.pow(x - 25, 2) + Math.pow(z + 25, 2));
+         if (distToArena < 15) continue;
+      }
+      
+      // 5. Temple approach
+      if (Math.abs(x) < 18 && z < -35) continue;
 
       dummy.position.set(x, 0, z);
       

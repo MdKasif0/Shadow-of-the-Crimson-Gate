@@ -18,6 +18,8 @@ export class GameHUD {
   private enemyHealthFill!: HTMLElement;
   private enemyNameElement!: HTMLElement;
   private vignette!: HTMLElement;
+  private objectiveElement!: HTMLElement;
+  private interactionPromptElement!: HTMLElement;
 
   constructor(containerId: string) {
     const parent = document.getElementById(containerId);
@@ -121,6 +123,31 @@ export class GameHUD {
 
     // 5. Pause Menu overlay
     this.container.appendChild(this.pauseMenu.element);
+
+    // 6. Objective UI (Top Left)
+    this.objectiveElement = document.createElement('div');
+    this.objectiveElement.style.position = 'absolute';
+    this.objectiveElement.style.top = '40px';
+    this.objectiveElement.style.left = '40px';
+    this.objectiveElement.style.fontSize = '1.1rem';
+    this.objectiveElement.style.letterSpacing = '0.15em';
+    this.objectiveElement.style.textShadow = '1px 1px 2px black';
+    this.objectiveElement.style.opacity = '0';
+    this.objectiveElement.style.transition = 'opacity 0.5s ease';
+    this.container.appendChild(this.objectiveElement);
+
+    // 7. Interaction Prompt (Center Bottom)
+    this.interactionPromptElement = document.createElement('div');
+    this.interactionPromptElement.style.position = 'absolute';
+    this.interactionPromptElement.style.bottom = '120px';
+    this.interactionPromptElement.style.left = '50%';
+    this.interactionPromptElement.style.transform = 'translateX(-50%)';
+    this.interactionPromptElement.style.fontSize = '1.1rem';
+    this.interactionPromptElement.style.letterSpacing = '0.1em';
+    this.interactionPromptElement.style.textShadow = '1px 1px 2px black';
+    this.interactionPromptElement.style.opacity = '0';
+    this.interactionPromptElement.style.transition = 'opacity 0.2s ease';
+    this.container.appendChild(this.interactionPromptElement);
   }
 
   private bindEvents() {
@@ -154,6 +181,20 @@ export class GameHUD {
 
     EventBus.on('playerDeath', () => {
       this.gameOver.showDefeated();
+    });
+
+    EventBus.on('showInteraction', (data: any) => {
+      this.interactionPromptElement.innerText = `[E] ${data.prompt}`;
+      this.interactionPromptElement.style.opacity = '1';
+    });
+
+    EventBus.on('hideInteraction', () => {
+      this.interactionPromptElement.style.opacity = '0';
+    });
+
+    EventBus.on('setObjective', (data: any) => {
+      this.objectiveElement.innerText = data.text;
+      this.objectiveElement.style.opacity = '1';
     });
 
     window.addEventListener('keydown', this.handleKeyDown);

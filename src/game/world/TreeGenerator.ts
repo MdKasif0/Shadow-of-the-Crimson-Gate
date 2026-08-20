@@ -8,7 +8,7 @@ export class TreeGenerator {
     const group = new THREE.Group();
     group.name = 'Trees';
 
-    const treeCount = 20;
+    const treeCount = 150;
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1a1a, roughness: 0.9 });
     
     // Foliage instancing setup
@@ -31,18 +31,35 @@ export class TreeGenerator {
     let foliageIndex = 0;
     const dummy = new THREE.Object3D();
 
-    const bounds = GAME_CONFIG.WORLD.BOUNDS;
-
     let placed = 0;
-    while (placed < treeCount) {
-      const x = random.range(bounds.MIN_X - 10, bounds.MAX_X + 10);
-      const z = random.range(bounds.MIN_Z - 10, bounds.MAX_Z + 10);
+    let attempts = 0;
+    while (placed < treeCount && attempts < 2000) {
+      attempts++;
+      const x = random.range(-45, 45);
+      const z = random.range(-75, 35);
       
-      const distFromCenter = Math.sqrt(x*x + z*z);
-      // Keep clear of spawn and central path
-      if (Math.abs(x) < 8 || distFromCenter < 12) continue;
-      // Keep clear of temple
-      if (z < -8 && Math.abs(x) < 16) continue;
+      // Carve out safe zones where trees CANNOT spawn
+      
+      // 1. Entrance Path (x: -6 to 6, z: 0 to 40)
+      if (Math.abs(x) < 8 && z > 0) continue;
+      
+      // 2. Courtyard (radius 20 around 0, 0, -5)
+      const distToCourtyard = Math.sqrt(x*x + Math.pow(z + 5, 2));
+      if (distToCourtyard < 20) continue;
+      
+      // 3. Shrine area (radius 15 around -25, 0, -20)
+      const distToShrine = Math.sqrt(Math.pow(x + 25, 2) + Math.pow(z + 20, 2));
+      if (distToShrine < 15) continue;
+      
+      // 4. Forest Path (clear a path through x>0, z<0)
+      if (x > 5 && x < 35 && z > -35 && z < -10) {
+         // Distance to center of the forest arena
+         const distToArena = Math.sqrt(Math.pow(x - 25, 2) + Math.pow(z + 25, 2));
+         if (distToArena < 15) continue;
+      }
+      
+      // 5. Temple approach (x: -15 to 15, z: -70 to -35)
+      if (Math.abs(x) < 18 && z < -35) continue;
 
       const tree = new THREE.Group();
       tree.position.set(x, 0, z);

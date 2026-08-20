@@ -17,7 +17,14 @@ export class InputManager {
     this._onBlur = this._onBlur.bind(this);
     this._onContextMenu = this._onContextMenu.bind(this);
 
-    window.addEventListener('keydown', this._onKeyDown);
+    window.addEventListener('keydown', (e) => {
+      this.keys[e.code] = true;
+      if (e.code === 'KeyE') {
+        // We'll emit from InteractionSystem based on this state, or directly here if needed
+        // but it's cleaner to just let systems read isPressed('KeyE').
+      }
+      this._onKeyDown(e);
+    });
     window.addEventListener('keyup', this._onKeyUp);
     window.addEventListener('mousedown', this._onMouseDown);
     window.addEventListener('mouseup', this._onMouseUp);

@@ -15,6 +15,8 @@ import { EventBus } from '../core/EventBus';
 import { LightingSystem } from '../lighting/LightingSystem';
 import { AtmosphereSystem } from '../atmosphere/AtmosphereSystem';
 import { ProjectileSystem } from '../combat/ProjectileSystem';
+import { InteractionSystem } from '../core/InteractionSystem';
+import { ZoneManager } from '../world/ZoneManager';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -33,6 +35,9 @@ export class GameScene {
 
   private lighting: LightingSystem;
   private atmosphere: AtmosphereSystem;
+  
+  private interactionSystem: InteractionSystem;
+  private zoneManager: ZoneManager;
 
   constructor(cameraController: CameraController) {
     this.cameraController = cameraController;
@@ -42,32 +47,47 @@ export class GameScene {
     this.lighting = new LightingSystem(this.scene);
 
     this.collisionSystem = new CollisionSystem();
-    new WorldGenerator(this.scene, this.collisionSystem);
     this.hitboxSystem = new HitboxSystem(this.scene);
     this.projectileSystem = new ProjectileSystem(this.scene);
 
     this.player = new Ronin();
-    this.player.setPosition(0, 0, 0);
+    this.player.setPosition(0, 0, 30); // Start in ENTRANCE
     this.scene.add(this.player.root);
+
+    this.interactionSystem = new InteractionSystem();
+
+    new WorldGenerator(this.scene, this.collisionSystem, this.interactionSystem, this.player);
 
     this.encounterManager = new EncounterManager();
     this.attackDirector = new AttackDirector();
+    this.zoneManager = new ZoneManager(this.atmosphere, this.encounterManager);
 
-    // TEST ENCOUNTER A: 2 Basic Yokai
+    // COURTYARD_BATTLE: 2 Basic Yokai
     this.encounterManager.registerEncounter({
-      id: 'encA',
-      center: new THREE.Vector3(-15, 0, -15),
+      id: 'COURTYARD_BATTLE',
+      center: new THREE.Vector3(0, 0, -10),
       activationRadius: 15,
       leashRadius: 25,
       waves: [
-        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'BASIC_YOKAI', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
+        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-3, 0, -2) }, { type: 'BASIC_YOKAI', offset: new THREE.Vector3(3, 0, -2) }], delayAfterComplete: 0 }
       ]
     });
 
-    // TEST ENCOUNTER B: 1 Basic, 1 Shadow
+    // SHRINE_BATTLE: 1 Shadow, 1 Tengu
     this.encounterManager.registerEncounter({
-      id: 'encB',
-      center: new THREE.Vector3(15, 0, -15),
+      id: 'SHRINE_BATTLE',
+      center: new THREE.Vector3(-25, 0, -20),
+      activationRadius: 15,
+      leashRadius: 25,
+      waves: [
+        { enemies: [{ type: 'SHADOW_YOKAI', offset: new THREE.Vector3(0, 0, 4) }, { type: 'TENGU', offset: new THREE.Vector3(0, 0, -4) }], delayAfterComplete: 0 }
+      ]
+    });
+
+    // FOREST_BATTLE: Basic + Shadow
+    this.encounterManager.registerEncounter({
+      id: 'FOREST_BATTLE',
+      center: new THREE.Vector3(25, 0, -25),
       activationRadius: 15,
       leashRadius: 25,
       waves: [
@@ -75,15 +95,15 @@ export class GameScene {
       ]
     });
 
-    // TEST ENCOUNTER C: 1 Basic, 1 Shadow, 1 Tengu (Waves)
+    // TEMPLE_BATTLE: Mixed Wave
     this.encounterManager.registerEncounter({
-      id: 'encC',
-      center: new THREE.Vector3(0, 0, -25),
-      activationRadius: 15,
-      leashRadius: 25,
+      id: 'TEMPLE_BATTLE',
+      center: new THREE.Vector3(0, 0, -50),
+      activationRadius: 20,
+      leashRadius: 35,
       waves: [
-        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(0, 0, 0) }], delayAfterComplete: 2.0 },
-        { enemies: [{ type: 'SHADOW_YOKAI', offset: new THREE.Vector3(-2, 0, 0) }, { type: 'TENGU', offset: new THREE.Vector3(2, 0, 0) }], delayAfterComplete: 0 }
+        { enemies: [{ type: 'BASIC_YOKAI', offset: new THREE.Vector3(-4, 0, 0) }, { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(4, 0, 0) }], delayAfterComplete: 2.0 },
+        { enemies: [{ type: 'TENGU', offset: new THREE.Vector3(0, 0, 0) }], delayAfterComplete: 0 }
       ]
     });
 
@@ -112,6 +132,8 @@ export class GameScene {
 
     this.hitboxSystem.clearActiveHitboxes();
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
+    this.interactionSystem.update(this.player.root.position, inputManager);
+    this.zoneManager.update(dt, this.player.root.position);
     this.projectileSystem.update(dt, this.player, this.vfx, this.cameraController);
     // Encounter Update
     this.encounterManager.update(dt, this.player.root.position, this.scene);

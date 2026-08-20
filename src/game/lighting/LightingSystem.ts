@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { EventBus } from '../core/EventBus';
 
 /**
  * LightingSystem — Manages all scene lights.
@@ -28,5 +29,10 @@ export class LightingSystem {
     this.directional.shadow.camera.bottom = -d;
     this.directional.shadow.bias = -0.001;
     scene.add(this.directional);
+
+    EventBus.on('atmosphereChanged', (data: any) => {
+      this.ambient.color.copy(data.ambientColor);
+      this.directional.intensity = data.directionalIntensity;
+    });
   }
 }
