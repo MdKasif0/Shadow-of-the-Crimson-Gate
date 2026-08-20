@@ -65,8 +65,8 @@ export class GameScene {
 
     // Generate Enemies
     const spawner = new EnemySpawner();
-    // Spawn far enough away so encounter doesn't start instantly
-    const yokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(12, 0, 12));
+    // Spawn far enough away so encounter doesn't start instantly, and in open space
+    const yokai = spawner.spawnBasicYokai(this.scene, new THREE.Vector3(0, 0, -8));
     this.enemies.push(yokai);
 
     // Initialize VFX
@@ -170,7 +170,7 @@ export class GameScene {
     this.player.reset(new THREE.Vector3(0, 0, 0));
     // Reset enemy
     if (this.enemies[0]) {
-      this.enemies[0].reset(new THREE.Vector3(12, 0, 12));
+      this.enemies[0].reset(new THREE.Vector3(0, 0, -8));
     }
     // Clean Hitboxes
     this.hitboxSystem.clearActiveHitboxes();
