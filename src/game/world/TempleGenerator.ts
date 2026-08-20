@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CollisionSystem } from '../collision/CollisionSystem';
 
 export class TempleGenerator {
-  public static generate(collisionSystem: CollisionSystem, position: THREE.Vector3): THREE.Group {
+  public static generate(collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Temple';
 
@@ -141,13 +141,13 @@ export class TempleGenerator {
       group.add(finial);
     }
 
-    // Position temple
-    group.position.copy(position);
+    // Position temple at back of courtyard
+    group.position.set(0, 0, -18);
 
     // Register collision
     const templeBox = new THREE.Box3(
-      new THREE.Vector3(position.x - width / 2, 0, position.z - depth / 2),
-      new THREE.Vector3(position.x + width / 2, 10, position.z + depth / 2)
+      new THREE.Vector3(-width / 2, 0, -18 - depth / 2),
+      new THREE.Vector3(width / 2, 10, -18 + depth / 2)
     );
     collisionSystem.addBox(templeBox);
 

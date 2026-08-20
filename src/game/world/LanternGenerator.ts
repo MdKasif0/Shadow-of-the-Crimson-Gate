@@ -57,34 +57,23 @@ export class LanternGenerator {
     pointLight.position.set(0, 2.5, 0);
     prefab.add(pointLight);
 
-    // Explicitly place lanterns to guide the player
-    const positions = [
-      // Entrance
-      new THREE.Vector3(-4, 0, 10),
-      new THREE.Vector3(4, 0, 10),
-      new THREE.Vector3(-5, 0, 0),
-      new THREE.Vector3(5, 0, 0),
-      // Courtyard edges
-      new THREE.Vector3(-10, 0, -10),
-      new THREE.Vector3(10, 0, -10),
-      // Path to Shrine
-      new THREE.Vector3(-15, 0, -15),
-      new THREE.Vector3(-25, 0, -15),
-      // Path to Forest
-      new THREE.Vector3(15, 0, -15),
-      new THREE.Vector3(25, 0, -15),
-      // Path to Temple
-      new THREE.Vector3(-6, 0, -35),
-      new THREE.Vector3(6, 0, -35),
-      new THREE.Vector3(-8, 0, -45),
-      new THREE.Vector3(8, 0, -45),
-      new THREE.Vector3(-10, 0, -55),
-      new THREE.Vector3(10, 0, -55),
-    ];
+    const lanternCount = 8;
+    const bounds = GAME_CONFIG.WORLD.BOUNDS;
 
-    positions.forEach(pos => {
+    let placed = 0;
+    while (placed < lanternCount) {
+      const x = random.range(bounds.MIN_X + 5, bounds.MAX_X - 5);
+      const z = random.range(bounds.MIN_Z + 5, bounds.MAX_Z - 5);
+      
+      // Prefer placing near the path (x near 0)
+      if (Math.abs(x) > 8 && random.next() > 0.3) continue;
+      
+      const distFromCenter = Math.sqrt(x*x + z*z);
+      if (distFromCenter < 5) continue; // Keep spawn clear
+      if (z < -5 && Math.abs(x) < 8) continue; // Keep temple entrance clear
+
       const lantern = prefab.clone();
-      lantern.position.copy(pos);
+      lantern.position.set(x, 0, z);
       
       // Slight scale variation
       const s = random.range(0.8, 1.1);
@@ -94,13 +83,8 @@ export class LanternGenerator {
       lantern.rotation.y = random.next() * Math.PI / 2;
 
       group.add(lantern);
-      
-      // Add collision for lanterns
-      collisionSystem.addBox(new THREE.Box3(
-        new THREE.Vector3(pos.x - 1, 0, pos.z - 1),
-        new THREE.Vector3(pos.x + 1, 4, pos.z + 1)
-      ));
-    });
+      placed++;
+    }
 
     return group;
   }

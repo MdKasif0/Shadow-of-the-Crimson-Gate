@@ -8,7 +8,7 @@ export class TreeGenerator {
     const group = new THREE.Group();
     group.name = 'Trees';
 
-    const treeCount = 150;
+    const treeCount = 20;
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1a1a, roughness: 0.9 });
     
     // Foliage instancing setup
@@ -31,34 +31,18 @@ export class TreeGenerator {
     let foliageIndex = 0;
     const dummy = new THREE.Object3D();
 
+    const bounds = GAME_CONFIG.WORLD.BOUNDS;
+
     let placed = 0;
-    let attempts = 0;
-    while (placed < treeCount && attempts < 2000) {
-      attempts++;
-      const x = random.range(-45, 45);
-      const z = random.range(-75, 35);
+    while (placed < treeCount) {
+      const x = random.range(bounds.MIN_X - 10, bounds.MAX_X + 10);
+      const z = random.range(bounds.MIN_Z - 10, bounds.MAX_Z + 10);
       
-      // Carve out safe zones where trees CANNOT spawn
-      
-      // 1. Main Central Path & Entrance (x: -8 to 8, z: -70 to 40)
-      if (Math.abs(x) < 10 && z > -70 && z < 40) continue;
-      
-      // 2. Courtyard Arena (radius 20 around 0, 0, -5)
-      const distToCourtyard = Math.sqrt(x*x + Math.pow(z + 5, 2));
-      if (distToCourtyard < 20) continue;
-      
-      // 3. Shrine Area & Path (radius 15 around -25, 0, -20 + connection path)
-      const distToShrine = Math.sqrt(Math.pow(x + 25, 2) + Math.pow(z + 20, 2));
-      if (distToShrine < 16) continue;
-      if (x < 0 && x > -25 && Math.abs(z + 20) < 6) continue; // path to shrine
-      
-      // 4. Forest Arena & Path (radius 15 around 25, 0, -25 + connection path)
-      const distToForest = Math.sqrt(Math.pow(x - 25, 2) + Math.pow(z + 25, 2));
-      if (distToForest < 16) continue;
-      if (x > 0 && x < 25 && Math.abs(z + 25) < 6) continue; // path to forest
-      
-      // 5. Temple Approach Arena (x: -18 to 18, z: -70 to -40)
-      if (Math.abs(x) < 20 && z < -40) continue;
+      const distFromCenter = Math.sqrt(x*x + z*z);
+      // Keep clear of spawn and central path
+      if (Math.abs(x) < 8 || distFromCenter < 12) continue;
+      // Keep clear of temple
+      if (z < -8 && Math.abs(x) < 16) continue;
 
       const tree = new THREE.Group();
       tree.position.set(x, 0, z);
