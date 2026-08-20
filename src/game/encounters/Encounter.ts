@@ -90,9 +90,10 @@ export class Encounter {
   }
 
   public getActiveEnemies(): Enemy[] {
-    if (this.state === EncounterState.INACTIVE || this.state === EncounterState.COMPLETED) {
+    if (this.state === EncounterState.INACTIVE) {
       return [];
     }
+    // Return all still-visible enemies (including dead ones mid-death-animation)
     const active: Enemy[] = [];
     for (const wave of this.waves) {
       if (wave.isSpawned) {
