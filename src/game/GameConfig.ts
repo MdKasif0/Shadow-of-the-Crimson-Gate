@@ -21,7 +21,7 @@ export const GAME_CONFIG = {
 
   WORLD: {
     WIDTH: 60,
-    DEPTH: 160,
+    DEPTH: 200,
     BOUNDS: {
       MIN_X: -28,
       MAX_X: 28,
