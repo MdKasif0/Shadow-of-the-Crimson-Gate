@@ -47,6 +47,23 @@ export class AudioManager {
     EventBus.on('enemyDeath', () => this.playEnemyDeath());
   }
 
+  // ─── Boss Audio Hooks ──────────────────────────────────────────────────
+
+  public static playBossIntro(): void {
+    // Stub: Play dramatic taiko drum hit / riser
+    console.log('[Audio] Playing Boss Intro Music/Stinger');
+  }
+
+  public static playBossPhase(phase: number): void {
+    // Stub: Crossfade to phase-specific combat track
+    console.log(`[Audio] Playing Boss Phase ${phase} Music`);
+  }
+
+  public static playBossDefeat(): void {
+    // Stub: Stop combat music, play victory/collapse stinger
+    console.log('[Audio] Playing Boss Defeat Audio');
+  }
+
   // --- Core Synthesis ---
   
   private static createNoiseBuffer(): AudioBuffer | null {
