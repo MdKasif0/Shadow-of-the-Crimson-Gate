@@ -18,6 +18,10 @@ export class BossAnimator {
   private walkWeight: number = 0;
   private hurtWeight: number = 0;
   private attackWeight: number = 0;
+  private introWeight: number = 0;
+
+  // Intro specific
+  private introTimer: number = 0;
 
   // Attack animation state
   private currentAttackId: string | null = null;
@@ -47,16 +51,19 @@ export class BossAnimator {
     const targetWalk = (!isAttacking && (this.state === BossState.APPROACH || this.state === BossState.ENRAGED)) ? 1 : 0;
     const targetHurt = (this.state === BossState.HURT) ? 1 : 0;
     const targetAttack = isAttacking ? 1 : 0;
+    const targetIntro = (this.state === BossState.INTRO) ? 1 : 0;
 
     this.idleWeight = lerp(this.idleWeight, targetIdle, dt * 6);
     this.walkWeight = lerp(this.walkWeight, targetWalk, dt * 6);
     this.hurtWeight = lerp(this.hurtWeight, targetHurt, dt * 10);
     this.attackWeight = lerp(this.attackWeight, targetAttack, dt * 10);
+    this.introWeight = lerp(this.introWeight, targetIntro, dt * 4);
 
     this.applyIdle(this.idleWeight);
     this.applyWalk(this.walkWeight);
     this.applyHurt(this.hurtWeight);
     this.applyAttack(this.attackWeight);
+    this.applyIntro(this.introWeight, dt);
 
     // Phase transition: boss glows and trembles
     if (this.state === BossState.PHASE_TRANSITION) {
@@ -99,9 +106,52 @@ export class BossAnimator {
 
     // Stable wide stance
     this.rig.leftUpperLeg.rotation.set(0, 0, 0.08 * weight);
-    this.rig.rightUpperLeg.rotation.set(0, 0, -0.08 * weight);
+    this.rightUpperLeg.rotation.set(0, 0, -0.08 * weight);
     this.rig.leftLowerLeg.rotation.set(0, 0, 0);
     this.rig.rightLowerLeg.rotation.set(0, 0, 0);
+  }
+
+  // ─── INTRO ──────────────────────────────────────────────────────────────
+  private applyIntro(weight: number, dt: number): void {
+    if (weight <= 0.01) {
+      this.introTimer = 0;
+      return;
+    }
+    
+    if (this.state === BossState.INTRO) {
+      this.introTimer += dt;
+    }
+
+    // Sequence: 
+    // 0-1.5s: Look down, weapon resting.
+    // 1.5s-3s: Slowly raise head.
+    // 3s-4.5s: Raise weapon slightly, tense up.
+
+    let headX = 0.5; // looking down
+    let rightArmX = -0.2;
+    let rightArmZ = 0.2;
+
+    if (this.introTimer > 1.5) {
+      // Raise head
+      const t = Math.min((this.introTimer - 1.5) / 1.5, 1.0);
+      headX = lerp(0.5, -0.1, t); // Look slightly up/forward
+    }
+    
+    if (this.introTimer > 3.0) {
+      // Grip weapon
+      const t = Math.min((this.introTimer - 3.0) / 1.5, 1.0);
+      rightArmX = lerp(-0.2, -0.4, t);
+      rightArmZ = lerp(0.2, 0.0, t);
+    }
+
+    this.rig.head.rotation.x = lerp(this.rig.head.rotation.x, headX, weight);
+    this.rig.rightUpperArm.rotation.x = lerp(this.rig.rightUpperArm.rotation.x, rightArmX, weight);
+    this.rig.rightUpperArm.rotation.z = lerp(this.rig.rightUpperArm.rotation.z, rightArmZ, weight);
+    
+    // Add heavy breathing
+    const breath = Math.sin(this.time * 1.5) * 0.04 * weight;
+    this.rig.chest.position.y = 0.25 + breath;
+    this.rig.spine.rotation.x = 0.1 * weight; // slightly hunched
   }
 
   // ─── WALK ────────────────────────────────────────────────────────────────
