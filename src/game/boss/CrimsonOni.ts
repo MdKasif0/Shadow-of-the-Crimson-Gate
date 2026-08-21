@@ -199,7 +199,7 @@ export class CrimsonOni implements Boss {
     }
 
     // Start attack if AI decided to attack
-    if (this.state === BossState.ATTACK && decision.attackId) {
+    if (decision.state === BossState.ATTACK && decision.attackId) {
       this.attackSystem.startAttack(decision.attackId);
     }
 
