@@ -61,12 +61,24 @@ export class CameraController {
     this.shake.addShake(intensity);
   }
 
+  public overrideTarget: THREE.Vector3 | null = null;
+  public overrideZoom: number | null = null;
+
   public update(target: THREE.Vector3, dt: number): void {
-    // 1. Determine desired camera position (tracking the player)
+    // 1. Determine desired camera position
+    const activeTarget = this.overrideTarget || target;
     const screenOffset = new THREE.Vector3(0, 0, -8);
     
-    const desiredTarget = target.clone().add(screenOffset);
+    const desiredTarget = activeTarget.clone().add(screenOffset);
     const desiredPos = desiredTarget.clone().add(this.offset);
+
+    // Apply zoom override if present
+    const targetZoom = this.overrideZoom !== null ? this.overrideZoom : GAME_CONFIG.CAMERA.ZOOM;
+    const currentZoom = this.camera.zoom;
+    if (Math.abs(currentZoom - targetZoom) > 0.01) {
+      this.camera.zoom = THREE.MathUtils.lerp(currentZoom, targetZoom, dt * 2.0);
+      this.camera.updateProjectionMatrix();
+    }
 
     // 2. Smoothly interpolate current camera position
     const blend = 1.0 - Math.pow(0.001, dt);
