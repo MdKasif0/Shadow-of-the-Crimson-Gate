@@ -21,8 +21,8 @@ export class Renderer {
     this.webgl.setPixelRatio(pixelRatio);
     
     // Shadow maps
-    this.webgl.shadowMap.enabled = true;
-    this.webgl.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.webgl.shadowMap.enabled = false; // Temporarily disabled to prevent GPU stall
+    // this.webgl.shadowMap.type = THREE.PCFShadowMap; 
 
     this.container.appendChild(this.webgl.domElement);
     this.resize();
