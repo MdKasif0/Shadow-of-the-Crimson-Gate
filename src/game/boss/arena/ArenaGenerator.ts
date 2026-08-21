@@ -70,7 +70,7 @@ export class ArenaGenerator {
       const lx = center.x + Math.cos(angle) * lanternR;
       const lz = center.z + Math.sin(angle) * lanternR;
       
-      const lantern = LanternGenerator.generate(random, collisionSystem);
+      const lantern = LanternGenerator.generateSingle();
       lantern.position.set(lx, 0, lz);
       lantern.rotation.y = angle + Math.PI; // Face center
       arenaGroup.add(lantern);
