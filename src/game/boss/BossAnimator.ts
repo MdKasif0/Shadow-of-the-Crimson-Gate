@@ -106,7 +106,7 @@ export class BossAnimator {
 
     // Stable wide stance
     this.rig.leftUpperLeg.rotation.set(0, 0, 0.08 * weight);
-    this.rightUpperLeg.rotation.set(0, 0, -0.08 * weight);
+    this.rig.rightUpperLeg.rotation.set(0, 0, -0.08 * weight);
     this.rig.leftLowerLeg.rotation.set(0, 0, 0);
     this.rig.rightLowerLeg.rotation.set(0, 0, 0);
   }
