@@ -16,6 +16,7 @@ export class TerrainGenerator {
 
     const geometry = new THREE.PlaneGeometry(width, depth, segX, segZ);
     geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, 0, -40); // Align with bounds: -140 to 60
 
     const positions = geometry.attributes.position;
     const colors: number[] = [];
