@@ -70,7 +70,7 @@ export class ArenaGenerator {
       const lx = center.x + Math.cos(angle) * lanternR;
       const lz = center.z + Math.sin(angle) * lanternR;
       
-      const lantern = LanternGenerator.generate(collisionSystem);
+      const lantern = LanternGenerator.generate(random, collisionSystem);
       lantern.position.set(lx, 0, lz);
       lantern.rotation.y = angle + Math.PI; // Face center
       arenaGroup.add(lantern);
@@ -83,13 +83,27 @@ export class ArenaGenerator {
       rock.position.set(rx, 0, rz);
       arenaGroup.add(rock);
 
-      // Cherry blossom trees
+      // Cherry blossom trees (placeholder logic, simple tree for boss arena)
       if (random.next() > 0.4) {
         const tx = center.x + Math.cos(angle - 0.2) * (debrisR + 2);
         const tz = center.z + Math.sin(angle - 0.2) * (debrisR + 2);
-        const tree = TreeGenerator.generateTree(random);
-        tree.position.set(tx, 0, tz);
-        arenaGroup.add(tree);
+        
+        const treeGroup = new THREE.Group();
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1a1a, roughness: 0.9 });
+        const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 4, 5);
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 2;
+        treeGroup.add(trunk);
+        
+        const foliageMat = new THREE.MeshStandardMaterial({ color: 0xffb7c5, roughness: 0.8, flatShading: true });
+        const foliageGeo = new THREE.DodecahedronGeometry(2, 0);
+        foliageGeo.scale(1, 0.7, 1);
+        const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+        foliage.position.y = 4.5;
+        treeGroup.add(foliage);
+        
+        treeGroup.position.set(tx, 0, tz);
+        arenaGroup.add(treeGroup);
       }
     }
 
@@ -99,7 +113,16 @@ export class ArenaGenerator {
     const tz = center.z + Math.sin(backAngle) * (floorRadius - 1);
     
     // Create a ruined shrine backdrop
-    const shrineGrp = ShrineGenerator.generateSingle(random, collisionSystem);
+    const shrineGrp = new THREE.Group();
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x1a110a, roughness: 0.9 });
+    const pillar1 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4, 8), woodMat);
+    pillar1.position.set(-2, 2, 0);
+    const pillar2 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3, 8), woodMat);
+    pillar2.position.set(2, 1.5, 0);
+    pillar2.rotation.z = 0.2;
+    shrineGrp.add(pillar1);
+    shrineGrp.add(pillar2);
+    
     shrineGrp.position.set(tx, 0, tz);
     arenaGroup.add(shrineGrp);
 
