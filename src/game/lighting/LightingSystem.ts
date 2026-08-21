@@ -21,8 +21,8 @@ export class LightingSystem {
     this.directional = new THREE.DirectionalLight(0xffffff, 5.0);
     this.directional.position.set(20, 40, 30);
     this.directional.castShadow = true;
-    this.directional.shadow.mapSize.width = 2048;
-    this.directional.shadow.mapSize.height = 2048;
+    this.directional.shadow.mapSize.width = 1024; // Reduced from 2048
+    this.directional.shadow.mapSize.height = 1024;
     this.directional.shadow.camera.near = 0.5;
     this.directional.shadow.camera.far = 200;
     const d = 80; // Extended for larger level
@@ -36,9 +36,9 @@ export class LightingSystem {
     // Subtle moonlight
     this.moonLight = new THREE.DirectionalLight(0x88bbff, 0.3);
     this.moonLight.position.set(-50, 100, -50);
-    this.moonLight.castShadow = true;
-    this.moonLight.shadow.mapSize.width = 2048;
-    this.moonLight.shadow.mapSize.height = 2048;
+    this.moonLight.castShadow = false; // Disabled to save rendering a full scene depth pass
+    // this.moonLight.shadow.mapSize.width = 2048;
+    // this.moonLight.shadow.mapSize.height = 2048;
     this.moonLight.shadow.camera.near = 0.5;
     this.moonLight.shadow.camera.far = 250;
     this.moonLight.shadow.camera.left = -50;
