@@ -10,7 +10,7 @@ export class LanternGenerator {
 
     const prefab = this.generateSingle();
 
-    const lanternCount = 2; // Reduced drastically to avoid shader light limits
+    const lanternCount = 20; // Increased for expanded world
     const bounds = GAME_CONFIG.WORLD.BOUNDS;
 
     let placed = 0;
