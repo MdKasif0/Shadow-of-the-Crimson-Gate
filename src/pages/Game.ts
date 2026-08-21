@@ -25,7 +25,7 @@ export function createGamePage(): PageComponent {
   return {
     render(container: HTMLElement): void {
       const page = document.createElement('main');
-      page.className = 'page-enter';
+      page.className = '';
       page.id = 'game-page';
 
       // Full screen container for the game + an absolute positioned back button overlay
