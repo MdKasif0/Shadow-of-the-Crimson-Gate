@@ -56,7 +56,7 @@ export class ArenaGenerator {
 
     // 3. Populate Outer Ring
     // We will place environmental objects just outside the boundary circle
-    const numLanterns = 8;
+    const numLanterns = 0; // Disabled to avoid max point light shader limits
     for (let i = 0; i < numLanterns; i++) {
       const angle = (i / numLanterns) * Math.PI * 2 + (Math.PI / numLanterns);
       
