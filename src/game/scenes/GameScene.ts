@@ -28,6 +28,8 @@ import { PlayerStats } from '../progression/PlayerStats';
 import { RewardSystem } from '../progression/RewardSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { AudioZoneManager } from '../audio/AudioZoneManager';
+import { CrimsonOni } from '../boss/CrimsonOni';
+import { Boss } from '../boss/Boss';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -56,6 +58,9 @@ export class GameScene {
   private playerProgress: PlayerProgress;
   private playerStats: PlayerStats;
   private rewardSystem: RewardSystem;
+
+  // ─── Boss (Phase 4) ───────────────────────────────────────────────
+  private boss: CrimsonOni | null = null;
   private audioZoneManager: AudioZoneManager;
 
   constructor(cameraController: CameraController) {
@@ -102,6 +107,11 @@ export class GameScene {
 
     this.objectiveManager = new ObjectiveManager();
     this.objectiveUI = new ObjectiveUI();
+
+    // ─── TEMPORARY: Boss test spawn in courtyard ────────────────────
+    this.boss = new CrimsonOni();
+    this.boss.reset(new THREE.Vector3(0, 0, 10)); // Courtyard center
+    this.scene.add(this.boss.root);
 
     EventBus.on('restartEncounter', () => {
       this.resetEncounter();
@@ -176,6 +186,12 @@ export class GameScene {
       enemy.update(dt, playerPos, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem, this.enemies);
     }
 
+    // ─── Boss Update ────────────────────────────────────────────────
+    if (this.boss && !this.boss.health.isDead) {
+      this.boss.update(dt, playerPos, this.hitboxSystem, this.collisionSystem, this.vfx);
+    }
+
+    // ─── Hit Resolution ─────────────────────────────────────────────
     const hits = this.hitboxSystem.checkHits();
     if (hits.length > 0) {
       const { hitStopTime, result } = DamageSystem.resolveHits(
@@ -183,8 +199,24 @@ export class GameScene {
       );
       this.hitStopTimer = hitStopTime;
 
-      // Update UI for the enemy that was hit
-      const hitEnemy = hits.find(h => h.hurtbox.id !== 'player');
+      // Check if boss was hit
+      for (const hit of hits) {
+        if (hit.hurtbox.id === 'CRIMSON_ONI' && this.boss) {
+          this.boss.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
+          EventBus.emit('enemyHealth', {
+            current: this.boss.health.currentHealth,
+            max: this.boss.health.maxHealth,
+            delta: -hit.hitbox.damage,
+            name: 'CRIMSON ONI'
+          });
+          this.vfx.spawnHit(hit.hitbox.position, hit.hitbox.direction, true);
+          this.cameraController.addShake(1.0);
+          this.hitStopTimer = Math.max(this.hitStopTimer, 0.07);
+        }
+      }
+
+      // Update UI for regular enemies that were hit
+      const hitEnemy = hits.find(h => h.hurtbox.id !== 'player' && h.hurtbox.id !== 'CRIMSON_ONI');
       if (hitEnemy) {
         const enemy = this.enemies.find(e => e.id === hitEnemy.hurtbox.id);
         if (enemy) {
@@ -213,6 +245,11 @@ export class GameScene {
     const configs = EncounterDatabase.getAll();
     for (const config of configs) {
       this.encounterManager.registerEncounter(config);
+    }
+
+    // Reset boss
+    if (this.boss) {
+      this.boss.reset(new THREE.Vector3(0, 0, 10));
     }
     
     this.hitboxSystem.clearActiveHitboxes();
