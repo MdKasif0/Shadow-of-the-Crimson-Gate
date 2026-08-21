@@ -92,6 +92,45 @@ export class RockGenerator {
     }
 
     instancedMeshes.forEach(mesh => group.add(mesh));
+
     return group;
+  }
+
+  public static generateSingle(random: SeededRandom, scale: number = 1.0): THREE.Mesh {
+    const geo = new THREE.IcosahedronGeometry(scale, 1);
+    const pos = geo.attributes.position;
+    
+    // Deform vertices
+    for (let j = 0; j < pos.count; j++) {
+      const v = new THREE.Vector3().fromBufferAttribute(pos, j);
+      v.x += (random.next() - 0.5) * scale * 0.4;
+      v.y += (random.next() - 0.5) * scale * 0.4;
+      v.z += (random.next() - 0.5) * scale * 0.4;
+      // Flatten bottom
+      if (v.y < 0) v.y *= 0.2;
+      pos.setXYZ(j, v.x, v.y, v.z);
+    }
+    
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x3a404a,
+      roughness: 0.9,
+      metalness: 0.1,
+      flatShading: true
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    
+    // Random rotation
+    mesh.rotation.set(
+      random.next() * Math.PI * 0.1,
+      random.next() * Math.PI * 2,
+      random.next() * Math.PI * 0.1
+    );
+
+    return mesh;
   }
 }
