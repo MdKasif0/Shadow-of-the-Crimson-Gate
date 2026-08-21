@@ -73,7 +73,7 @@ export class CameraController {
     const desiredPos = desiredTarget.clone().add(this.offset);
 
     // Apply zoom override if present
-    const targetZoom = this.overrideZoom !== null ? this.overrideZoom : GAME_CONFIG.CAMERA.ZOOM;
+    const targetZoom = this.overrideZoom !== null ? this.overrideZoom : 1.0;
     const currentZoom = this.camera.zoom;
     if (Math.abs(currentZoom - targetZoom) > 0.01) {
       this.camera.zoom = THREE.MathUtils.lerp(currentZoom, targetZoom, dt * 2.0);

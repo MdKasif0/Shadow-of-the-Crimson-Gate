@@ -66,8 +66,8 @@ export class BossIntroCamera {
       this.currentTarget.lerpVectors(this.playerPos, targetPos, ease);
       this.cameraController.overrideTarget = this.currentTarget;
       
-      // Zoom in slightly
-      this.cameraController.overrideZoom = GAME_CONFIG.CAMERA.ZOOM * 0.8;
+      // Zoom in slightly (scale > 1 means zoomed in)
+      this.cameraController.overrideZoom = 1.3;
 
       if (t >= 1.0) {
         this.state = IntroState.ZOOM_AND_HOLD;
@@ -77,7 +77,7 @@ export class BossIntroCamera {
     else if (this.state === IntroState.ZOOM_AND_HOLD) {
       // Hold on boss, very slow zoom
       const t = Math.min(this.timer / this.HOLD_DURATION, 1.0);
-      this.cameraController.overrideZoom = GAME_CONFIG.CAMERA.ZOOM * (0.8 - t * 0.1);
+      this.cameraController.overrideZoom = 1.3 + (t * 0.2);
       
       const targetPos = this.bossPos.clone().add(new THREE.Vector3(0, 0, 4));
       this.cameraController.overrideTarget = targetPos;
@@ -97,8 +97,8 @@ export class BossIntroCamera {
       this.cameraController.overrideTarget = this.currentTarget;
       
       // Restore zoom
-      const startZoom = GAME_CONFIG.CAMERA.ZOOM * 0.7;
-      this.cameraController.overrideZoom = startZoom + (GAME_CONFIG.CAMERA.ZOOM - startZoom) * ease;
+      const startZoom = 1.5;
+      this.cameraController.overrideZoom = startZoom + (1.0 - startZoom) * ease;
 
       if (t >= 1.0) {
         this.state = IntroState.COMPLETE;
