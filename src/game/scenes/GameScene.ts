@@ -88,13 +88,16 @@ export class GameScene {
     this.playerProgress = new PlayerProgress();
     this.playerStats = new PlayerStats(this.playerProgress.level);
     this.rewardSystem = new RewardSystem(this.playerProgress);
-    this.audioZoneManager = new AudioZoneManager(this.zoneManager, this.player);
 
     this.bossIntroCamera = new BossIntroCamera(this.cameraController);
     this.bossUI = new BossUI();
 
     this.player = new Ronin();
     this.applyPlayerStats();
+    
+    // Ensure player is instantiated before AudioZoneManager
+    this.audioZoneManager = new AudioZoneManager(this.zoneManager, this.player);
+
     this.player.setPosition(0, 0, 50); // Start at entrance
     this.scene.add(this.player.root);
 
@@ -205,7 +208,7 @@ export class GameScene {
       this.hasShownTitle = false;
       this.player.isControlsEnabled = false;
       
-      AudioManager.getInstance().playBossIntro();
+      AudioManager.playBossIntro();
       this.boss.startIntro();
       this.bossIntroCamera.start(this.boss.root.position, this.player.root.position);
     }
@@ -223,7 +226,7 @@ export class GameScene {
         this.player.isControlsEnabled = true;
         this.boss.endIntro();
         this.bossUI.showHealthBar('Crimson Oni');
-        AudioManager.getInstance().playBossPhase(1);
+        AudioManager.playBossPhase(1);
       }
     }
 
@@ -291,7 +294,7 @@ export class GameScene {
     this.enemies.forEach(e => this.scene.remove(e.root));
     this.enemies = [];
     
-    this.projectileSystem.reset();
+    this.projectileSystem.clearAll();
     this.encounterManager.resetAll(this.scene);
     
     this.hasBossIntroPlayed = false;
