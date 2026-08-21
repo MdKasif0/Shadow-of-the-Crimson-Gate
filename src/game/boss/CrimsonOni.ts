@@ -21,7 +21,7 @@ export class CrimsonOni implements Boss {
   public id: string = 'CRIMSON_ONI';
   public root: THREE.Group;
   public health: HealthComponent;
-  public state: BossState = BossState.IDLE;
+  public state: BossState = BossState.INTRO;
   public phase: BossPhaseId = BossPhaseId.PHASE_1;
 
   private rig: CharacterRig;
@@ -84,16 +84,20 @@ export class CrimsonOni implements Boss {
     this.health.isDead = false;
     this.velocity.set(0, 0, 0);
     this.isDeathVfxPlayed = false;
-    this.state = BossState.IDLE;
+    this.state = BossState.INTRO;
     this.phase = BossPhaseId.PHASE_1;
     this.previousPhase = BossPhaseId.PHASE_1;
     this.phaseConfig = CRIMSON_ONI_PHASES[0];
     this.stateTimer = 0;
     this.attackSystem.reset();
-    this.animator.setState(BossState.IDLE);
-    this.root.rotation.set(0, 0, 0);
+    this.animator.setState(BossState.INTRO);
+    this.root.rotation.set(0, Math.PI, 0); // Face away
     this.root.scale.setScalar(1);
     this.root.visible = true;
+  }
+
+  public startIntro(): void {
+    this.setState(BossState.INTRO);
   }
 
   // ─── Update Loop ─────────────────────────────────────────────────────
@@ -132,6 +136,15 @@ export class CrimsonOni implements Boss {
         // Transition complete
         this.attackSystem.isInvulnerable = false;
         this.setState(this.phase === BossPhaseId.PHASE_3 ? BossState.ENRAGED : BossState.IDLE);
+      }
+      return;
+    }
+
+    // ─── INTRO ────────────────────────────────────────────────────
+    if (this.state === BossState.INTRO) {
+      // Very slow turn if intro timer > 1.5s
+      if (this.stateTimer > 1.5 && this.stateTimer < 4.5) {
+        this.smoothRotateToward(Math.PI * 0.1, dt, 1.0); 
       }
       return;
     }
