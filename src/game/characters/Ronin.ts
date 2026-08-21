@@ -24,6 +24,8 @@ export class Ronin {
   public dashSystem: DashSystem;
   private katana: Katana;
   
+  public isControlsEnabled: boolean = true;
+  
   private velocity: THREE.Vector3 = new THREE.Vector3();
   private hurtTimer: number = 0;
 
@@ -126,21 +128,23 @@ export class Ronin {
     }
 
     // Process combat inputs
-    if (inputManager.isAttackPressed() && this.state.movement !== MovementState.HURT) {
-      this.combat.registerAttackInput();
-    }
+    if (this.isControlsEnabled) {
+      if (inputManager.isAttackPressed() && this.state.movement !== MovementState.HURT) {
+        this.combat.registerAttackInput();
+      }
 
-    // Process Dash
-    if (inputManager.isPressed('Space')) {
-      const inputMoveDir = inputManager.getMovementDirection();
-      this.dashSystem.tryDash(inputMoveDir, this.currentRotation);
+      // Process Dash
+      if (inputManager.isPressed('Space')) {
+        const inputMoveDir = inputManager.getMovementDirection();
+        this.dashSystem.tryDash(inputMoveDir, this.currentRotation);
+      }
     }
 
     // Update combat state machine
     this.combat.update(dt);
 
     // Fetch movement dir
-    const inputMoveDir = inputManager.getMovementDirection();
+    const inputMoveDir = this.isControlsEnabled ? inputManager.getMovementDirection() : new THREE.Vector3();
     const isAttacking = this.state.isAttacking();
     
     let intendedMove = new THREE.Vector3();
