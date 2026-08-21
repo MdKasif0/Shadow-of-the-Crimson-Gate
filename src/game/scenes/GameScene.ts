@@ -95,8 +95,8 @@ export class GameScene {
     this.player = new Ronin();
     this.applyPlayerStats();
     
-    // Ensure player is instantiated before AudioZoneManager
-    this.audioZoneManager = new AudioZoneManager(this.zoneManager, this.player);
+    // Ensure player is instantiated before AudioZoneManager (though AudioZoneManager doesn't take args currently)
+    this.audioZoneManager = new AudioZoneManager();
 
     this.player.setPosition(0, 0, 50); // Start at entrance
     this.scene.add(this.player.root);
