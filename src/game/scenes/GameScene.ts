@@ -30,6 +30,8 @@ import { AudioManager } from '../audio/AudioManager';
 import { AudioZoneManager } from '../audio/AudioZoneManager';
 import { CrimsonOni } from '../boss/CrimsonOni';
 import { Boss } from '../boss/Boss';
+import { BossIntroCamera } from '../boss/arena/BossIntroCamera';
+import { BossUI } from '../ui/BossUI';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -62,6 +64,11 @@ export class GameScene {
   // ─── Boss (Phase 4) ───────────────────────────────────────────────
   private boss: CrimsonOni | null = null;
   private audioZoneManager: AudioZoneManager;
+  private bossIntroCamera: BossIntroCamera;
+  private bossUI: BossUI;
+  private hasBossIntroPlayed: boolean = false;
+  private isCinematicActive: boolean = false;
+  private hasShownTitle: boolean = false;
 
   constructor(cameraController: CameraController) {
     AudioManager.init();
@@ -81,7 +88,10 @@ export class GameScene {
     this.playerProgress = new PlayerProgress();
     this.playerStats = new PlayerStats(this.playerProgress.level);
     this.rewardSystem = new RewardSystem(this.playerProgress);
-    this.audioZoneManager = new AudioZoneManager();
+    this.audioZoneManager = new AudioZoneManager(this.zoneManager, this.player);
+
+    this.bossIntroCamera = new BossIntroCamera(this.cameraController);
+    this.bossUI = new BossUI();
 
     this.player = new Ronin();
     this.applyPlayerStats();
@@ -186,9 +196,45 @@ export class GameScene {
       enemy.update(dt, playerPos, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem, this.enemies);
     }
 
-    // ─── Boss Update ────────────────────────────────────────────────
-    if (this.boss && !this.boss.health.isDead) {
-      this.boss.update(dt, playerPos, this.hitboxSystem, this.collisionSystem, this.vfx);
+    // ─── Boss Update ──────────────────────────────────────────────
+    
+    // Trigger Cinematic Intro
+    if (this.boss && this.player.root.position.z < -90 && !this.hasBossIntroPlayed) {
+      this.hasBossIntroPlayed = true;
+      this.isCinematicActive = true;
+      this.hasShownTitle = false;
+      this.player.isControlsEnabled = false;
+      
+      AudioManager.getInstance().playBossIntro();
+      this.boss.startIntro();
+      this.bossIntroCamera.start(this.boss.root.position, this.player.root.position);
+    }
+
+    if (this.isCinematicActive && this.boss) {
+      this.bossIntroCamera.update(dt, this.player.root.position, this.boss.root.position);
+      
+      if (this.bossIntroCamera.isHolding && !this.hasShownTitle) {
+        this.bossUI.showCinematicTitle('Crimson Oni', 2500);
+        this.hasShownTitle = true;
+      }
+      
+      if (!this.bossIntroCamera.isActive) {
+        this.isCinematicActive = false;
+        this.player.isControlsEnabled = true;
+        this.boss.endIntro();
+        this.bossUI.showHealthBar('Crimson Oni');
+        AudioManager.getInstance().playBossPhase(1);
+      }
+    }
+
+    if (this.boss) {
+      // Don't update boss combat AI if cinematic is active
+      if (!this.isCinematicActive) {
+        this.boss.update(dt, this.player.root.position, this.hitboxSystem, this.collisionSystem, this.vfx);
+      } else {
+        // Still update animation during cinematic
+        this.boss.update(dt, this.boss.root.position.clone(), this.hitboxSystem, this.collisionSystem, this.vfx);
+      }
     }
 
     // ─── Hit Resolution ─────────────────────────────────────────────
@@ -238,19 +284,28 @@ export class GameScene {
     this.playerStats.applyLevel(1);
     this.applyPlayerStats();
 
-    this.player.reset(new THREE.Vector3(0, 0, 50));
+    // Place player at entrance
+    this.player.root.position.set(0, 0, 50);
     
-    // Re-register all encounters
+    // Clear existing entities
+    this.enemies.forEach(e => this.scene.remove(e.root));
+    this.enemies = [];
+    
+    this.projectileSystem.reset();
     this.encounterManager.resetAll(this.scene);
-    const configs = EncounterDatabase.getAll();
-    for (const config of configs) {
-      this.encounterManager.registerEncounter(config);
-    }
+    
+    this.hasBossIntroPlayed = false;
+    this.isCinematicActive = false;
+    this.hasShownTitle = false;
+    this.player.isControlsEnabled = true;
+    this.bossUI.reset();
 
-    // Reset boss
-    if (this.boss) {
-      this.boss.reset(new THREE.Vector3(0, 0, 10));
+    // Spawn Boss in arena
+    if (!this.boss) {
+      this.boss = new CrimsonOni();
+      this.scene.add(this.boss.root);
     }
+    this.boss.reset(new THREE.Vector3(0, 0, -115)); // Back of arena
     
     this.hitboxSystem.clearActiveHitboxes();
     this.projectileSystem.clearAll();
