@@ -48,6 +48,8 @@ export class TempleGenerator {
     const doorWidth = 1.8;
     const doorHeight = 3.5;
     for (let i = -2; i <= 2; i++) {
+      if (i === 0) continue; // Leave center open for passage
+      
       const door = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, doorHeight, 0.1), paperMat);
       door.position.set(i * (doorWidth + 0.2), baseHeight + 0.2 + doorHeight / 2, depth / 2 - 0.95);
       
