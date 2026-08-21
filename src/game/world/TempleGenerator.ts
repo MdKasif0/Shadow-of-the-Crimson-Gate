@@ -144,12 +144,22 @@ export class TempleGenerator {
     // Position temple at back of level (Temple Approach zone)
     group.position.set(0, 0, -65);
 
-    // Register collision
-    const templeBox = new THREE.Box3(
+    // Register collision - Split into left and right to allow passage
+    const pathWidth = 2.0; // Half width of the open path
+    
+    // Left side collision
+    const templeBoxLeft = new THREE.Box3(
       new THREE.Vector3(-width / 2, 0, -65 - depth / 2),
+      new THREE.Vector3(-pathWidth, 10, -65 + depth / 2)
+    );
+    collisionSystem.addBox(templeBoxLeft);
+
+    // Right side collision
+    const templeBoxRight = new THREE.Box3(
+      new THREE.Vector3(pathWidth, 0, -65 - depth / 2),
       new THREE.Vector3(width / 2, 10, -65 + depth / 2)
     );
-    collisionSystem.addBox(templeBox);
+    collisionSystem.addBox(templeBoxRight);
 
     return group;
   }

@@ -10,6 +10,7 @@ import { ShrineGenerator } from './ShrineGenerator';
 import { TempleGenerator } from './TempleGenerator';
 import { MountainGenerator } from './MountainGenerator';
 import { CollisionSystem } from '../collision/CollisionSystem';
+import { ArenaGenerator } from '../boss/arena/ArenaGenerator';
 
 export class WorldGenerator {
   constructor(scene: THREE.Scene, collisionSystem: CollisionSystem) {
@@ -27,6 +28,9 @@ export class WorldGenerator {
 
     // 3. Temple (focal point - now at Temple Approach zone)
     worldGroup.add(TempleGenerator.generate(collisionSystem));
+
+    // 3b. Boss Arena (Phase 4)
+    worldGroup.add(ArenaGenerator.generate(random, collisionSystem));
 
     // 4. Entrance Torii Gate (at entrance zone z=55)
     const entranceTorii = ToriiGenerator.generate(collisionSystem);
