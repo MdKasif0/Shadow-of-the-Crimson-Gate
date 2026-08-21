@@ -100,6 +100,12 @@ export class CrimsonOni implements Boss {
     this.setState(BossState.INTRO);
   }
 
+  public endIntro(): void {
+    if (this.state === BossState.INTRO) {
+      this.setState(BossState.OBSERVE);
+    }
+  }
+
   // ─── Update Loop ─────────────────────────────────────────────────────
 
   public update(
