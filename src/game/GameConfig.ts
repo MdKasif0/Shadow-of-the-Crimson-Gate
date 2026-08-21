@@ -25,7 +25,7 @@ export const GAME_CONFIG = {
     BOUNDS: {
       MIN_X: -28,
       MAX_X: 28,
-      MIN_Z: -80,
+      MIN_Z: -140,
       MAX_Z: 60,
     },
     SPAWN_AREA_SIZE: 10,
