@@ -8,13 +8,13 @@ export class BossUI {
   private container: HTMLElement;
   
   // Cinematic Title
-  private titleContainer: HTMLElement;
-  private titleText: HTMLElement;
+  private titleContainer!: HTMLElement;
+  private titleText!: HTMLElement;
   
   // Health Bar
-  private healthContainer: HTMLElement;
-  private healthFill: HTMLElement;
-  private healthLabel: HTMLElement;
+  private healthContainer!: HTMLElement;
+  private healthFill!: HTMLElement;
+  private healthLabel!: HTMLElement;
 
   private isVisible: boolean = false;
 
