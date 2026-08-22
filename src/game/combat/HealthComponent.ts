@@ -47,6 +47,10 @@ export class HealthComponent {
     this.currentHealth = Math.min(this.maxHealth, this.currentHealth + amount);
   }
 
+  public getHealthPercent(): number {
+    return this.maxHealth > 0 ? this.currentHealth / this.maxHealth : 0;
+  }
+
   public onDamage(listener: HealthListener): void {
     this.onDamageListeners.push(listener);
   }

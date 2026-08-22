@@ -12,5 +12,6 @@ export enum BossState {
   HURT,
   PHASE_TRANSITION,
   ENRAGED,
+  STAGGER,
   DEFEATED
 }
