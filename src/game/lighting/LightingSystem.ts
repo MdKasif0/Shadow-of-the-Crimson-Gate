@@ -24,8 +24,8 @@ export class LightingSystem {
     this.directional.shadow.mapSize.width = 2048;
     this.directional.shadow.mapSize.height = 2048;
     this.directional.shadow.camera.near = 0.5;
-    this.directional.shadow.camera.far = 200;
-    const d = 80; // Extended for larger level
+    this.directional.shadow.camera.far = 250;
+    const d = 160; // Extended to cover Boss Arena at Z=-140
     this.directional.shadow.camera.left = -d;
     this.directional.shadow.camera.right = d;
     this.directional.shadow.camera.top = d;
