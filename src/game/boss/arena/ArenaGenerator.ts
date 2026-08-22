@@ -14,6 +14,7 @@ import { ArenaBounds } from './ArenaBounds';
 export class ArenaGenerator {
   public static readonly CENTER_Z = -115;
   public static readonly ARENA_RADIUS = 18;
+  public static corruptionMat: THREE.Material;
 
   public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
     const arenaGroup = new THREE.Group();
