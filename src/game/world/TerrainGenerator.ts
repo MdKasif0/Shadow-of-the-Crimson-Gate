@@ -119,7 +119,7 @@ export class TerrainGenerator {
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
     group.add(mesh);
 
     return group;
