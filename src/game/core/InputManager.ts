@@ -40,6 +40,9 @@ export class InputManager {
   public isAttackPressed(): boolean {
     return this.mouseJustPressed || this.isPressed('KeyJ');
   }
+  public isRunPressed(): boolean {
+    return this.isPressed('ShiftLeft') || this.isPressed('ShiftRight');
+  }
 
   public getMovementDirection(): THREE.Vector3 {
     const dir = new THREE.Vector3(0, 0, 0);
