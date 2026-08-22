@@ -60,9 +60,6 @@ export class BossAnimator {
     this.attackWeight = lerp(this.attackWeight, targetAttack, dt * 10);
     this.introWeight = lerp(this.introWeight, Math.max(targetIntro, targetTransition), dt * 4);
 
-    // Reset pose
-    this.rig.resetPose();
-
     // Apply layers
     this.applyIdle(this.idleWeight);
     this.applyWalk(this.walkWeight);
