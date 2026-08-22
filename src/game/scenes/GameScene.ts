@@ -178,8 +178,8 @@ export class GameScene {
       
       // Look at boss
       if (this.boss) {
-        this.cameraController.setTarget(this.boss.root);
-        this.cameraController.setOffset(new THREE.Vector3(0, 2, 8)); // Low cinematic angle
+        this.cameraController.overrideTarget = this.boss.root.position.clone();
+        this.cameraController.overrideZoom = 1.8;
       }
 
       // Energy VFX
@@ -193,8 +193,8 @@ export class GameScene {
         this.playerProgress.save();
         
         // Restore camera and controls
-        this.cameraController.setTarget(this.player.root);
-        this.cameraController.setOffset(new THREE.Vector3(0, 4, 6)); // Default
+        this.cameraController.overrideTarget = null;
+        this.cameraController.overrideZoom = null;
         this.player.isControlsEnabled = true;
       }, 7000);
     });
@@ -284,7 +284,7 @@ export class GameScene {
 
     if (this.bossIsDefeatedSequence || this.playerProgress.crimsonOniDefeated) {
       // Force purified atmosphere in boss arena
-      if (this.zoneManager.getCurrentZone() === 'BOSS_ARENA') {
+      if (this.zoneManager.getCurrentZoneId() === 'BOSS_ARENA') {
         fogColor = new THREE.Color(0x111116);
         fogDensity = 0.015;
         ambientColor = new THREE.Color(0xffffff);
