@@ -312,12 +312,41 @@ export class BossAnimator {
 
   // ─── DEFEATED ────────────────────────────────────────────────────────────
   private applyDefeated(): void {
-    // Slow collapse forward
-    const t = Math.min(this.time * 0.5, 1.0); // 2 seconds to fall
-    this.rig.pelvis.position.y = lerp(1.0, 0.2, t);
-    this.rig.spine.rotation.x = lerp(0, 0.8, t);
-    this.rig.head.rotation.x = lerp(0, 0.5, t);
-    this.rig.leftUpperArm.rotation.z = lerp(0.15, 0.8, t);
-    this.rig.rightUpperArm.rotation.z = lerp(-0.15, -0.8, t);
+    // Sequence: 0-1s stagger, 1-2s knees weaken & weapon drops, 2-3s body falls
+    const t = this.time;
+    
+    // Stagger phase (0-1s)
+    let pelvisY = 1.0;
+    let spineX = 0;
+    let headX = 0;
+    let rightArmZ = -0.15;
+    let leftArmZ = 0.15;
+    
+    if (t < 1.0) {
+      const p = t;
+      spineX = lerp(0, -0.3, p); // Reel back
+      headX = lerp(0, -0.2, p);
+    } else if (t < 2.0) {
+      // Drop weapon, knees weaken
+      const p = t - 1.0;
+      spineX = lerp(-0.3, 0.4, p); // Slump forward
+      headX = lerp(-0.2, 0.3, p);
+      pelvisY = lerp(1.0, 0.6, p);
+      rightArmZ = lerp(-0.15, -0.6, p);
+    } else {
+      // Full collapse
+      const p = Math.min((t - 2.0) * 0.5, 1.0); // Fall over 2 seconds
+      spineX = lerp(0.4, 1.2, p);
+      headX = lerp(0.3, 0.6, p);
+      pelvisY = lerp(0.6, 0.15, p);
+      rightArmZ = lerp(-0.6, -1.0, p);
+      leftArmZ = lerp(0.15, 0.8, p);
+    }
+
+    this.rig.pelvis.position.y = lerp(this.rig.pelvis.position.y, pelvisY, 0.1);
+    this.rig.spine.rotation.x = lerp(this.rig.spine.rotation.x, spineX, 0.1);
+    this.rig.head.rotation.x = lerp(this.rig.head.rotation.x, headX, 0.1);
+    this.rig.leftUpperArm.rotation.z = lerp(this.rig.leftUpperArm.rotation.z, leftArmZ, 0.1);
+    this.rig.rightUpperArm.rotation.z = lerp(this.rig.rightUpperArm.rotation.z, rightArmZ, 0.1);
   }
 }
