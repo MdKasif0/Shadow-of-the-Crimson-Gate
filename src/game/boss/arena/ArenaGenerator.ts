@@ -51,6 +51,20 @@ export class ArenaGenerator {
     floor.receiveShadow = true;
     arenaGroup.add(floor);
 
+    // Corruption Decal Mesh (Phase 2/3)
+    const corruptGeo = new THREE.CylinderGeometry(floorRadius, floorRadius, 0.45, 16);
+    this.corruptionMat = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      transparent: true,
+      opacity: 0,
+      wireframe: true,
+      blending: THREE.AdditiveBlending
+    });
+    const corruptMesh = new THREE.Mesh(corruptGeo, this.corruptionMat);
+    corruptMesh.position.copy(center);
+    corruptMesh.position.y = -0.2;
+    arenaGroup.add(corruptMesh);
+
     // 2. Register Physical Boundaries
     ArenaBounds.registerCircularBounds(collisionSystem, center, this.ARENA_RADIUS, 24);
 
