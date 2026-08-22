@@ -26,9 +26,10 @@ export class ProjectileSystem {
     speed: number,
     damage: number,
     knockback: number,
-    maxLifetime: number = 3.0
+    maxLifetime: number = 3.0,
+    type: ProjectileType = 'DEFAULT'
   ): void {
-    const proj = this.projectiles.find(p => !p.active);
+    const proj = this.projectiles.find(p => !p.active && p.type === type);
     if (proj) {
       proj.fire(ownerId, startPos, direction, speed, damage, knockback, maxLifetime);
     }
