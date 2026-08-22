@@ -52,13 +52,18 @@ export class BossAnimator {
     const targetHurt = (this.state === BossState.HURT) ? 1 : 0;
     const targetAttack = isAttacking ? 1 : 0;
     const targetIntro = (this.state === BossState.INTRO) ? 1 : 0;
+    const targetTransition = (this.state === BossState.PHASE_TRANSITION) ? 1 : 0;
 
     this.idleWeight = lerp(this.idleWeight, targetIdle, dt * 6);
     this.walkWeight = lerp(this.walkWeight, targetWalk, dt * 6);
     this.hurtWeight = lerp(this.hurtWeight, targetHurt, dt * 10);
     this.attackWeight = lerp(this.attackWeight, targetAttack, dt * 10);
-    this.introWeight = lerp(this.introWeight, targetIntro, dt * 4);
+    this.introWeight = lerp(this.introWeight, Math.max(targetIntro, targetTransition), dt * 4);
 
+    // Reset pose
+    this.rig.resetPose();
+
+    // Apply layers
     this.applyIdle(this.idleWeight);
     this.applyWalk(this.walkWeight);
     this.applyHurt(this.hurtWeight);
