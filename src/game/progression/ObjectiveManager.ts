@@ -29,6 +29,10 @@ export class ObjectiveManager {
         this.setState(ObjectiveState.COMPLETED);
       }
     });
+
+    EventBus.on('bossDeath', () => {
+      this.setState(ObjectiveState.COMPLETED);
+    });
   }
 
   public onZoneEntered(zoneId: string): void {

@@ -147,9 +147,20 @@ export class BossUI {
 
   private onBossDeath(): void {
     // Fade out health bar on death
+    this.hideHealthBar();
+    
+    // Show cinematic victory text
     setTimeout(() => {
-      this.hideHealthBar();
+      this.titleText.style.color = '#ffffff';
+      this.titleText.style.textShadow = '0 0 20px #aaaaaa, 2px 2px 4px #000';
+      this.showCinematicTitle('CRIMSON ONI DEFEATED', 4000);
     }, 2000);
+
+    setTimeout(() => {
+      this.titleText.style.color = '#ffaa33'; // Golden hue for purified/reward
+      this.titleText.style.textShadow = '0 0 20px #ff8800, 2px 2px 4px #000';
+      this.showCinematicTitle('PURIFIED', 3000);
+    }, 7000);
   }
 
   public reset(): void {
