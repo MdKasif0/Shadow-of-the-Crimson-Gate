@@ -244,7 +244,7 @@ export class GameScene {
     const hits = this.hitboxSystem.checkHits();
     if (hits.length > 0) {
       const { hitStopTime, result } = DamageSystem.resolveHits(
-        hits, this.player, this.enemies, this.vfx, this.cameraController
+        hits, this.player, this.enemies, this.vfx, this.cameraController, this.boss
       );
       this.hitStopTimer = hitStopTime;
 

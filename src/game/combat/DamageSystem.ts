@@ -5,6 +5,7 @@ import { Enemy } from '../enemies/Enemy';
 import { EventBus } from '../core/EventBus';
 import { VFXManager } from '../vfx/VFXManager';
 import { CameraController } from '../camera/CameraController';
+import { Boss } from '../boss/Boss';
 
 export interface DamageResult {
   playerDied: boolean;
@@ -22,7 +23,8 @@ export class DamageSystem {
     player: Ronin,
     enemies: Enemy[],
     vfx: VFXManager,
-    cameraController: CameraController
+    cameraController: CameraController,
+    boss?: Boss | null
   ): { hitStopTime: number; result: DamageResult } {
     let hitStopTime = 0;
     const result: DamageResult = { playerDied: false, enemyKilled: null };
@@ -70,6 +72,13 @@ export class DamageSystem {
           vfx.spawnHit(hit.hitbox.position, hit.hitbox.direction, isHeavy);
           cameraController.addShake(isHeavy ? 1.0 : 0.5);
           hitStopTime = Math.max(hitStopTime, isHeavy ? 0.07 : 0.04);
+        } else if (boss && hit.hurtbox.id === boss.id) {
+          boss.takeDamage(hit.hitbox.damage, hit.hitbox.direction, hit.hitbox.knockback);
+
+          const isHeavy = hit.hitbox.damage > 15;
+          vfx.spawnHit(hit.hitbox.position, hit.hitbox.direction, isHeavy);
+          cameraController.addShake(isHeavy ? 1.5 : 0.8);
+          hitStopTime = Math.max(hitStopTime, isHeavy ? 0.08 : 0.05);
         }
       }
     }

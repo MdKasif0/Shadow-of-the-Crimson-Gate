@@ -209,12 +209,15 @@ export class BossAnimator {
     const p = this.attackProgress;
     const phase = this.attackPhase;
 
-    if (this.currentAttackId === 'KANABO_SLAM') {
+    if (this.currentAttackId === 'HEAVY_SWING') {
       this.applyKanaboSlam(weight, p, phase);
-    } else if (this.currentAttackId === 'KANABO_SWEEP') {
+    } else if (this.currentAttackId === 'DOUBLE_SWING') {
       this.applyKanaboSweep(weight, p, phase);
-    } else if (this.currentAttackId === 'STOMP') {
+    } else if (this.currentAttackId === 'GROUND_SMASH') {
       this.applyStomp(weight, p, phase);
+    } else if (this.currentAttackId === 'CHARGE_ATTACK') {
+      // Use stomp or sweep as placeholder for charge animation
+      this.applyKanaboSweep(weight, p, phase);
     }
   }
 

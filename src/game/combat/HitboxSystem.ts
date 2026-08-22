@@ -16,6 +16,7 @@ export interface Hitbox {
   range: number;
   hitAngle: number; // e.g. Math.PI / 2 for a 90 degree front cone
   knockback: number;
+  hitboxType?: 'ARC' | 'RADIAL' | 'CONTINUOUS';
 }
 
 export interface HitEvent {
@@ -107,16 +108,23 @@ export class HitboxSystem {
         const combinedRadius = hitbox.range + hurtbox.radius;
 
         if (distSq <= combinedRadius * combinedRadius) {
-          // 2. Check angle (Cone check)
-          const toTarget = new THREE.Vector3(dx, 0, dz).normalize();
-          const forward = hitbox.direction.clone().setY(0).normalize();
-          
-          const angle = forward.angleTo(toTarget);
-          
-          if (angle <= hitbox.hitAngle / 2) {
-            // Hit confirmed
+          // 2. Check angle based on type
+          if (hitbox.hitboxType === 'RADIAL') {
+            // Hit confirmed (360 degrees)
             hits.push({ hitbox, hurtbox });
             hitSet.add(id);
+          } else {
+            // ARC or CONTINUOUS (cone check)
+            const toTarget = new THREE.Vector3(dx, 0, dz).normalize();
+            const forward = hitbox.direction.clone().setY(0).normalize();
+            
+            const angle = forward.angleTo(toTarget);
+            
+            if (angle <= hitbox.hitAngle / 2) {
+              // Hit confirmed
+              hits.push({ hitbox, hurtbox });
+              hitSet.add(id);
+            }
           }
         }
       }
