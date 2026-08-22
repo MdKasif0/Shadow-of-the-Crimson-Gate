@@ -246,19 +246,18 @@ export class GameScene {
 
     if (this.boss && this.boss.phase === 1) { // PHASE_2
       fogColor = new THREE.Color(0x330000);
-      fogDensity = 0.04;
+      fogDensity = 0.03;
       ambientColor = new THREE.Color(0xff4444);
-      ambientIntensity = 0.3;
+      ambientIntensity = 1.6;
     } else if (this.boss && this.boss.phase === 2) { // PHASE_3
-      fogColor = new THREE.Color(0x1a0000);
-      fogDensity = 0.06;
+      fogColor = new THREE.Color(0x220000);
+      fogDensity = 0.04;
       ambientColor = new THREE.Color(0xff0000);
-      ambientIntensity = 0.5;
+      ambientIntensity = 1.8;
     }
 
     this.atmosphere.update(dt, fogDensity, fogColor);
     this.lighting.update(dt, ambientColor, ambientIntensity);
-    
     const zoneId = this.zoneManager.getCurrentZoneId();
     this.objectiveManager.onZoneEntered(zoneId);
 
