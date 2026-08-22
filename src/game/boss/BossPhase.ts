@@ -31,7 +31,7 @@ export const CRIMSON_ONI_PHASES: BossPhaseConfig[] = [
     healthThreshold: 1.0,    // Active from 100% to 70%
     movementSpeed: 2.0,
     attackCooldown: 2.5,
-    attackSet: ['KANABO_SLAM', 'KANABO_SWEEP'],
+    attackSet: ['HEAVY_SWING', 'DOUBLE_SWING', 'GROUND_SMASH', 'CHARGE_ATTACK'],
     aggression: 0.5,
     damageMultiplier: 1.0,
     defenseMultiplier: 1.0,
@@ -41,7 +41,7 @@ export const CRIMSON_ONI_PHASES: BossPhaseConfig[] = [
     healthThreshold: 0.7,    // Active from 70% to 35%
     movementSpeed: 2.5,
     attackCooldown: 2.0,
-    attackSet: ['KANABO_SLAM', 'KANABO_SWEEP', 'STOMP'],
+    attackSet: ['HEAVY_SWING', 'DOUBLE_SWING', 'GROUND_SMASH', 'CHARGE_ATTACK'], // Update later for Phase 2
     aggression: 0.65,
     damageMultiplier: 1.2,
     defenseMultiplier: 0.9,
@@ -51,7 +51,7 @@ export const CRIMSON_ONI_PHASES: BossPhaseConfig[] = [
     healthThreshold: 0.35,   // Active from 35% to 0%
     movementSpeed: 3.0,
     attackCooldown: 1.5,
-    attackSet: ['KANABO_SLAM', 'KANABO_SWEEP', 'STOMP'],
+    attackSet: ['HEAVY_SWING', 'DOUBLE_SWING', 'GROUND_SMASH', 'CHARGE_ATTACK'], // Update later for Phase 3
     aggression: 0.85,
     damageMultiplier: 1.5,
     defenseMultiplier: 0.8,
