@@ -149,6 +149,10 @@ export class GameScene {
       // Lock player controls during transformation
       this.player.isControlsEnabled = false;
       this.cameraController.addShake(3.0); // Heavy sustained shake
+      
+      if (ArenaGenerator.corruptionMat) {
+        (ArenaGenerator.corruptionMat as THREE.MeshBasicMaterial).opacity = data.phase === BossPhaseId.PHASE_2 ? 0.4 : 0.8;
+      }
 
       setTimeout(() => {
         this.player.isControlsEnabled = true;
