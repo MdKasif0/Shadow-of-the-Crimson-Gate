@@ -66,7 +66,7 @@ export class BossUI {
   private createHealthBar(): void {
     this.healthContainer = document.createElement('div');
     this.healthContainer.style.position = 'absolute';
-    this.healthContainer.style.top = '40px';
+    this.healthContainer.style.top = '100px';
     this.healthContainer.style.width = '50%';
     this.healthContainer.style.maxWidth = '600px';
     this.healthContainer.style.opacity = '0';

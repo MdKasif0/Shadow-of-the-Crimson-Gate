@@ -285,10 +285,10 @@ export class GameScene {
     if (this.bossIsDefeatedSequence || this.playerProgress.crimsonOniDefeated) {
       // Force purified atmosphere in boss arena
       if (this.zoneManager.getCurrentZoneId() === 'BOSS_ARENA') {
-        fogColor = new THREE.Color(0x111116);
+        fogColor = new THREE.Color(0x111520);
         fogDensity = 0.015;
-        ambientColor = new THREE.Color(0xffffff);
-        ambientIntensity = 0.3;
+        ambientColor = new THREE.Color(0xffcccc);
+        ambientIntensity = 3.0;
       }
 
       if (this.bossIsDefeatedSequence) {
@@ -306,12 +306,12 @@ export class GameScene {
       fogColor = new THREE.Color(0x330000);
       fogDensity = 0.03;
       ambientColor = new THREE.Color(0xff4444);
-      ambientIntensity = 0.6;
+      ambientIntensity = 2.0;
     } else if (this.boss && this.boss.phase === BossPhaseId.PHASE_3) {
       fogColor = new THREE.Color(0x440000);
       fogDensity = 0.04;
       ambientColor = new THREE.Color(0xff2222);
-      ambientIntensity = 0.8;
+      ambientIntensity = 2.5;
     }
 
     this.atmosphere.update(dt, fogDensity, fogColor);
