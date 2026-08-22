@@ -274,6 +274,18 @@ export class CrimsonOni implements Boss {
     this.animator.setState(newState);
   }
 
+  private triggerPhaseTransition(newPhaseId: BossPhaseId): void {
+    const hpPercent = this.health.getHealthPercent();
+    this.previousPhase = this.phase;
+    this.phase = newPhaseId;
+    this.phaseConfig = CRIMSON_ONI_PHASES.find(p => p.id === newPhaseId) || CRIMSON_ONI_PHASES[0];
+    this.attackSystem.reset();
+    this.setState(BossState.PHASE_TRANSITION);
+    this.attackSystem.isInvulnerable = true;
+
+    EventBus.emit('bossPhaseTransition', { phase: this.phase, hpPercent });
+  }
+
   private onDamageTaken(_event: HealthEventPayload): void {
     if (this.health.isDead) return;
 
