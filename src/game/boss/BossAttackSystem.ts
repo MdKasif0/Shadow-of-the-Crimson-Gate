@@ -20,6 +20,7 @@ export class BossAttackSystem {
   private attackTimer: number = 0;
   private attackPhase: BossAttackPhase = BossAttackPhase.NONE;
   private cooldownTimer: number = 0;
+  public attackHistory: string[] = [];
 
   /** True during PHASE_TRANSITION or INTRO — boss cannot take damage */
   public isInvulnerable: boolean = false;
@@ -66,6 +67,8 @@ export class BossAttackSystem {
     this.currentAttack = config;
     this.attackTimer = 0;
     this.attackPhase = BossAttackPhase.WINDUP;
+    this.attackHistory.push(attackId);
+    if (this.attackHistory.length > 5) this.attackHistory.shift();
     return true;
   }
 
@@ -103,6 +106,17 @@ export class BossAttackSystem {
         hitboxSystem.resetAttackMemory(bossId);
       }
 
+      // Handle Multi-Hit resets
+      if (atk.multiHit) {
+        const activeTime = this.attackTimer - windupEnd;
+        const prevActiveTime = (this.attackTimer - dt) - windupEnd;
+        for (const hitTime of atk.multiHit) {
+          if (prevActiveTime < hitTime && activeTime >= hitTime) {
+            hitboxSystem.resetAttackMemory(bossId);
+          }
+        }
+      }
+
       // Register hitbox every frame during active
       hitboxSystem.addActiveHitbox({
         ownerId: bossId,
@@ -112,12 +126,13 @@ export class BossAttackSystem {
         range: atk.range,
         hitAngle: atk.hitAngle,
         knockback: atk.knockback,
-      });
+        hitboxType: atk.hitboxType // Pass through hitbox type to hitbox system
+      } as any);
     } else if (this.attackTimer < totalDuration) {
       this.attackPhase = BossAttackPhase.RECOVERY;
     } else {
       // Attack finished
-      this.cooldownTimer = phaseConfig.attackCooldown;
+      this.cooldownTimer = atk.cooldown; // use attack-specific cooldown
       this.currentAttack = null;
       this.attackPhase = BossAttackPhase.NONE;
     }
@@ -130,7 +145,13 @@ export class BossAttackSystem {
     if (!this.currentAttack || this.attackPhase !== BossAttackPhase.ACTIVE) {
       return new THREE.Vector3();
     }
-    return bossForward.clone().multiplyScalar(this.currentAttack.lungeDistance * 3);
+    if (this.currentAttack.movement === 'STATIONARY') {
+      return new THREE.Vector3();
+    }
+    
+    // Spread the lunge distance over the active duration
+    const speed = this.currentAttack.lungeDistance / this.currentAttack.active;
+    return bossForward.clone().multiplyScalar(speed);
   }
 
   public reset(): void {
