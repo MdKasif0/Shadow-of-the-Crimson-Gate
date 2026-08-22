@@ -17,7 +17,7 @@ const ZONES: ZoneConfig[] = [
   { id: 'SHRINE',           label: 'Shrine Area',       minZ: -20, maxZ: 0,   fogDensity: 0.020, fogColor: 0x080c12, ambientColor: 0xaaddcc, ambientIntensity: 1.8 },
   { id: 'FOREST',           label: 'Forest Path',       minZ: -50, maxZ: -20, fogDensity: 0.035, fogColor: 0x040810, ambientColor: 0x889999, ambientIntensity: 1.2 },
   { id: 'TEMPLE_APPROACH',  label: 'Temple Approach',   minZ: -85, maxZ: -50, fogDensity: 0.025, fogColor: 0x060a14, ambientColor: 0xccaaee, ambientIntensity: 1.5 },
-  { id: 'BOSS_ARENA',       label: 'Boss Arena',        minZ: -140, maxZ: -85, fogDensity: 0.035, fogColor: 0x040608, ambientColor: 0xffaaaa, ambientIntensity: 1.2 },
+  { id: 'BOSS_ARENA',       label: 'Boss Arena',        minZ: -140, maxZ: -85, fogDensity: 0.035, fogColor: 0x080c10, ambientColor: 0xffaaaa, ambientIntensity: 2.0 },
 ];
 
 export class ZoneManager {
