@@ -131,7 +131,7 @@ export class GameScene {
     // Boss is in the Boss Arena
     if (!this.playerProgress.crimsonOniDefeated) {
       this.boss = new CrimsonOni();
-      this.boss.reset(new THREE.Vector3(0, 0, -135)); // Boss Arena center
+      this.boss.reset(new THREE.Vector3(0, 0, -115)); // Boss Arena center
       this.scene.add(this.boss.root);
     } else {
       this.boss = null;
