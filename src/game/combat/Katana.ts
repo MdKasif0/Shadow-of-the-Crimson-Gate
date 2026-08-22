@@ -13,10 +13,11 @@ export class Katana implements Weapon {
     this.mesh = new THREE.Group();
     this.mesh.name = 'KatanaWeapon';
 
-    const armorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.7, metalness: 0.2 }); 
-    const accentMat = new THREE.MeshStandardMaterial({ color: 0x8b1a1a, roughness: 0.8 }); 
-    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9, roughness: 0.1 });
-    const wrapMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0 });
+    const scabbardMat = new THREE.MeshStandardMaterial({ color: 0x101010, roughness: 0.8, metalness: 0.3 }); 
+    const accentMat = new THREE.MeshStandardMaterial({ color: 0x8a1515, roughness: 0.9 }); // Red
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xb5954a, roughness: 0.3, metalness: 0.9 });
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.95, roughness: 0.1 });
+    const wrapMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 1.0 });
 
     // ─── WEAPON MESH (Katana) ────────────────────────────────────────────────
     
@@ -24,10 +25,15 @@ export class Katana implements Weapon {
     const handleGeo = new THREE.BoxGeometry(0.04, 0.05, 0.25);
     handleGeo.translate(0, 0, 0.125);
     const handle = new THREE.Mesh(handleGeo, wrapMat);
+    // Gold pommel (Kashira)
+    const pommel = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.055, 0.03), goldMat);
+    pommel.position.z = 0.0;
+    handle.add(pommel);
+    
     this.mesh.add(handle);
 
-    // Guard (Tsuba)
-    const guardMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 8), accentMat);
+    // Guard (Tsuba) - Round and ornate (gold)
+    const guardMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.015, 16), goldMat);
     guardMesh.rotation.x = Math.PI / 2;
     guardMesh.position.z = 0.26;
     this.mesh.add(guardMesh);
@@ -63,9 +69,30 @@ export class Katana implements Weapon {
     this.sheathMesh = new THREE.Group();
     this.sheathMesh.name = 'KatanaSheath';
     
-    const sheathGeo = new THREE.BoxGeometry(0.05, 0.08, 1.0);
-    sheathGeo.translate(0, 0, -0.4);
-    const sheath = new THREE.Mesh(sheathGeo, armorMat);
+    const sheathGeo = new THREE.BoxGeometry(0.05, 0.07, 0.85);
+    sheathGeo.translate(0, 0, -0.425);
+    
+    // Curve the sheath to match blade
+    const sPos = sheathGeo.attributes.position;
+    for(let i = 0; i < sPos.count; i++) {
+      const z = sPos.getZ(i);
+      // Absolute Z distance from opening (Z=0 is opening, down to -0.85)
+      const absZ = Math.abs(z);
+      sPos.setY(i, sPos.getY(i) + Math.pow(absZ * 0.8, 2) * 0.05);
+    }
+    sheathGeo.computeVertexNormals();
+
+    const sheath = new THREE.Mesh(sheathGeo, scabbardMat);
+    
+    // Gold trim at the sheath opening (Koiguchi)
+    const koiguchi = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.075, 0.03), goldMat);
+    sheath.add(koiguchi);
+    
+    // Red Sageo (cord) wrapped around sheath
+    const sageo = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.072, 0.1), accentMat);
+    sageo.position.z = -0.15;
+    sheath.add(sageo);
+
     this.sheathMesh.add(sheath);
   }
 
