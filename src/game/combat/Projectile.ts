@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 
+export type ProjectileType = 'DEFAULT' | 'CRIMSON_ARC';
+
 export class Projectile {
   public id: string;
   public root: THREE.Group;
+  public type: ProjectileType;
   
   public active: boolean = false;
   
@@ -20,27 +23,41 @@ export class Projectile {
   private coreMesh: THREE.Mesh;
   private time: number = 0;
 
-  constructor(id: string) {
+  constructor(id: string, type: ProjectileType = 'DEFAULT') {
     this.id = id;
+    this.type = type;
     this.root = new THREE.Group();
     this.root.visible = false;
 
-    // Procedural look: cyan core, dark teal aura
-    const coreGeo = new THREE.SphereGeometry(0.15, 8, 8);
-    const coreMat = new THREE.MeshBasicMaterial({ 
-      color: 0x00ffff, 
-    });
-    this.coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    if (type === 'CRIMSON_ARC') {
+      const coreGeo = new THREE.BoxGeometry(3.0, 0.2, 0.5); // Wide arc shape
+      const coreMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      this.coreMesh = new THREE.Mesh(coreGeo, coreMat);
 
-    const auraGeo = new THREE.SphereGeometry(0.3, 16, 16);
-    const auraMat = new THREE.MeshBasicMaterial({
-      color: 0x004455,
-      transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    this.mesh = new THREE.Mesh(auraGeo, auraMat);
+      const auraGeo = new THREE.BoxGeometry(3.5, 0.6, 1.0);
+      const auraMat = new THREE.MeshBasicMaterial({
+        color: 0x660000,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      this.mesh = new THREE.Mesh(auraGeo, auraMat);
+    } else {
+      const coreGeo = new THREE.SphereGeometry(0.15, 8, 8);
+      const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+      this.coreMesh = new THREE.Mesh(coreGeo, coreMat);
+
+      const auraGeo = new THREE.SphereGeometry(0.3, 16, 16);
+      const auraMat = new THREE.MeshBasicMaterial({
+        color: 0x004455,
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      this.mesh = new THREE.Mesh(auraGeo, auraMat);
+    }
 
     this.root.add(this.coreMesh);
     this.root.add(this.mesh);
