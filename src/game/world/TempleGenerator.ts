@@ -21,7 +21,7 @@ export class TempleGenerator {
     const foundation = new THREE.Mesh(new THREE.BoxGeometry(width + 2, baseHeight, depth + 2), foundationMat);
     foundation.position.y = baseHeight / 2;
     foundation.receiveShadow = true;
-    foundation.castShadow = true;
+    foundation.castShadow = false;
     group.add(foundation);
 
     // Front stairs
@@ -41,7 +41,7 @@ export class TempleGenerator {
     const hallHeight = 5;
     const hall = new THREE.Mesh(new THREE.BoxGeometry(width - 2, hallHeight, depth - 2), woodMat);
     hall.position.y = baseHeight + 0.2 + hallHeight / 2;
-    hall.castShadow = true;
+    hall.castShadow = false;
     group.add(hall);
 
     // Shoji doors (front)
@@ -84,7 +84,7 @@ export class TempleGenerator {
         
         const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, hallHeight, 8), crimsonMat);
         pillar.position.set(px, baseHeight + 0.2 + hallHeight / 2, pz);
-        pillar.castShadow = true;
+        pillar.castShadow = false;
         group.add(pillar);
       }
     }
@@ -96,14 +96,14 @@ export class TempleGenerator {
     lowerRoofGeo.scale(width / Math.max(width, depth), 1, depth / Math.max(width, depth));
     const lowerRoof = new THREE.Mesh(lowerRoofGeo, roofMat);
     lowerRoof.position.y = baseHeight + hallHeight + 1.0;
-    lowerRoof.castShadow = true;
+    lowerRoof.castShadow = false;
     group.add(lowerRoof);
 
     // Upper level (Irimoya style top)
     const upperHeight = 3;
     const upperHall = new THREE.Mesh(new THREE.BoxGeometry(width - 6, upperHeight, depth - 6), woodMat);
     upperHall.position.y = baseHeight + hallHeight + 1.5 + upperHeight / 2;
-    upperHall.castShadow = true;
+    upperHall.castShadow = false;
     group.add(upperHall);
 
     // Upper Roof
@@ -127,7 +127,7 @@ export class TempleGenerator {
 
     const upperRoof = new THREE.Mesh(upperRoofGeo, roofMat);
     upperRoof.position.y = baseHeight + hallHeight + 1.5 + upperHeight + 1.5;
-    upperRoof.castShadow = true;
+    upperRoof.castShadow = false;
     group.add(upperRoof);
 
     // Gold ornaments on roof ridge
