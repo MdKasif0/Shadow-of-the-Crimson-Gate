@@ -32,6 +32,7 @@ import { CrimsonOni } from '../boss/CrimsonOni';
 import { Boss } from '../boss/Boss';
 import { BossIntroCamera } from '../boss/arena/BossIntroCamera';
 import { BossUI } from '../ui/BossUI';
+import { ArenaHazardSystem } from '../boss/arena/ArenaHazardSystem';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -39,6 +40,7 @@ export class GameScene {
   public collisionSystem: CollisionSystem;
   public hitboxSystem: HitboxSystem;
   public projectileSystem: ProjectileSystem;
+  public arenaHazardSystem: ArenaHazardSystem;
   public enemies: Enemy[] = [];
   public vfx: VFXManager;
   public cameraController: CameraController;

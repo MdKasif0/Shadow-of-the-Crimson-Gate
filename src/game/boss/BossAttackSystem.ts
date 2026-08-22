@@ -104,6 +104,23 @@ export class BossAttackSystem {
       if (this.attackPhase === BossAttackPhase.WINDUP) {
         this.attackPhase = BossAttackPhase.ACTIVE;
         hitboxSystem.resetAttackMemory(bossId);
+        
+        // One-time spawns at start of active phase
+        if (atk.id === 'CRIMSON_ARC') {
+          EventBus.emit('spawnBossProjectile', {
+            ownerId: bossId,
+            startPos: bossPos.clone().add(new THREE.Vector3(0, 1.5, 0).add(bossForward.clone().multiplyScalar(2))),
+            direction: bossForward.clone(),
+            damage: atk.baseDamage * phaseConfig.damageMultiplier,
+            knockback: atk.knockback,
+            speed: 25.0
+          });
+        } else if (atk.id === 'CRIMSON_RAIN') {
+          // Spawn several hazards around the player (handled in GameScene)
+          EventBus.emit('spawnBossHazard', { type: 'RAIN', damage: atk.baseDamage * phaseConfig.damageMultiplier });
+        } else if (atk.id === 'GROUND_ERUPTION') {
+          EventBus.emit('spawnBossHazard', { type: 'ERUPTION', damage: atk.baseDamage * phaseConfig.damageMultiplier });
+        }
       }
 
       // Handle Multi-Hit resets
@@ -117,17 +134,19 @@ export class BossAttackSystem {
         }
       }
 
-      // Register hitbox every frame during active
-      hitboxSystem.addActiveHitbox({
-        ownerId: bossId,
-        damage: atk.baseDamage * phaseConfig.damageMultiplier,
-        position: bossPos.clone(),
-        direction: bossForward.clone(),
-        range: atk.range,
-        hitAngle: atk.hitAngle,
-        knockback: atk.knockback,
-        hitboxType: atk.hitboxType // Pass through hitbox type to hitbox system
-      } as any);
+      // Register melee hitbox every frame during active
+      if (atk.id !== 'CRIMSON_ARC' && atk.id !== 'CRIMSON_RAIN' && atk.id !== 'GROUND_ERUPTION') {
+        hitboxSystem.addActiveHitbox({
+          ownerId: bossId,
+          damage: atk.baseDamage * phaseConfig.damageMultiplier,
+          position: bossPos.clone(),
+          direction: bossForward.clone(),
+          range: atk.range,
+          hitAngle: atk.hitAngle,
+          knockback: atk.knockback,
+          hitboxType: atk.hitboxType
+        } as any);
+      }
     } else if (this.attackTimer < totalDuration) {
       this.attackPhase = BossAttackPhase.RECOVERY;
     } else {
