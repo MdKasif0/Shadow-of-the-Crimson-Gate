@@ -139,8 +139,16 @@ export class ArenaGenerator {
     shrineGrp.add(pillar2);
     
     shrineGrp.position.set(tx, 0, tz);
+    shrineGrp.rotation.y = backAngle - Math.PI / 2;
     arenaGroup.add(shrineGrp);
 
     return arenaGroup;
+  }
+
+  public static purifyArena(dt: number): void {
+    if (this.corruptionMat) {
+      const mat = this.corruptionMat as THREE.MeshBasicMaterial;
+      mat.opacity = THREE.MathUtils.lerp(mat.opacity, 0, dt * 1.5);
+    }
   }
 }

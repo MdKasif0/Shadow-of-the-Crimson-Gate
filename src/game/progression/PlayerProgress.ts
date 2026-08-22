@@ -4,6 +4,7 @@ export class PlayerProgress {
   public spiritEssence: number = 0;
   public level: number = 1;
   public clearedEncounters: Set<string> = new Set();
+  public crimsonOniDefeated: boolean = false;
   
   private levelThresholds = [0, 50, 120];
 
@@ -44,7 +45,8 @@ export class PlayerProgress {
     const data = {
       spiritEssence: this.spiritEssence,
       level: this.level,
-      clearedEncounters: Array.from(this.clearedEncounters)
+      clearedEncounters: Array.from(this.clearedEncounters),
+      crimsonOniDefeated: this.crimsonOniDefeated
     };
     try {
       localStorage.setItem('sotcg_progress', JSON.stringify(data));
@@ -58,9 +60,10 @@ export class PlayerProgress {
       const dataStr = localStorage.getItem('sotcg_progress');
       if (dataStr) {
         const data = JSON.parse(dataStr);
-        this.spiritEssence = data.spiritEssence || 0;
-        this.level = data.level || 1;
-        this.clearedEncounters = new Set(data.clearedEncounters || []);
+        if (data.spiritEssence) this.spiritEssence = data.spiritEssence;
+        if (data.level) this.level = data.level;
+        if (data.clearedEncounters) this.clearedEncounters = new Set(data.clearedEncounters);
+        if (data.crimsonOniDefeated) this.crimsonOniDefeated = data.crimsonOniDefeated;
       }
     } catch (e) {
       console.warn("Could not load from localStorage", e);
