@@ -4,6 +4,7 @@ import { HitVFX } from './HitVFX';
 import { DashVFX } from './DashVFX';
 import { HurtVFX } from './HurtVFX';
 import { DeathVFX } from './DeathVFX';
+import { BossDeathVFX } from './BossDeathVFX';
 import { SakuraWindVFX } from './SakuraWindVFX';
 import { EnvironmentalEvents } from './EnvironmentalEvents';
 import { CameraController } from '../camera/CameraController';
@@ -17,6 +18,7 @@ export class VFXManager {
   private dash: DashVFX;
   private hurt: HurtVFX;
   private death: DeathVFX;
+  private bossDeath: BossDeathVFX;
   private sakuraWind: SakuraWindVFX;
   public environment: EnvironmentalEvents;
 
@@ -26,6 +28,7 @@ export class VFXManager {
     this.dash = new DashVFX(scene);
     this.hurt = new HurtVFX(scene);
     this.death = new DeathVFX(scene);
+    this.bossDeath = new BossDeathVFX(scene);
     this.sakuraWind = new SakuraWindVFX(scene, _cameraController);
     this.environment = new EnvironmentalEvents();
   }
@@ -36,6 +39,7 @@ export class VFXManager {
     this.dash.update(dt);
     this.hurt.update(dt);
     this.death.update(dt);
+    this.bossDeath.update(dt);
     this.sakuraWind.update(dt);
     this.environment.update(dt, time);
   }
@@ -56,6 +60,10 @@ export class VFXManager {
 
   public spawnDeath(position: THREE.Vector3): void {
     this.death.spawn(position);
+  }
+
+  public spawnBossDeathEnergy(position: THREE.Vector3): void {
+    this.bossDeath.spawn(position);
   }
 
   public spawnDash(position: THREE.Vector3, rotationY: number): void {
