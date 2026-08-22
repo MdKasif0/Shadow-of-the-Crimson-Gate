@@ -121,9 +121,9 @@ export class GameScene {
     this.objectiveManager = new ObjectiveManager();
     this.objectiveUI = new ObjectiveUI();
 
-    // ─── TEMPORARY: Boss test spawn in courtyard ────────────────────
+    // Boss is in the Boss Arena
     this.boss = new CrimsonOni();
-    this.boss.reset(new THREE.Vector3(0, 0, 10)); // Courtyard center
+    this.boss.reset(new THREE.Vector3(0, 0, -135)); // Boss Arena center
     this.scene.add(this.boss.root);
 
     EventBus.on('restartEncounter', () => {
