@@ -229,7 +229,7 @@ export class Ronin {
       this.root.position.add(resolvedMove);
 
       // Clamp to world bounds
-      const bounds = { MIN_X: -28, MAX_X: 28, MIN_Z: -28, MAX_Z: 28 };
+      const bounds = GAME_CONFIG.WORLD.BOUNDS;
       this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, bounds.MIN_X, bounds.MAX_X);
       this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);
     }
