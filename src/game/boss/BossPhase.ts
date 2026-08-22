@@ -41,7 +41,7 @@ export const CRIMSON_ONI_PHASES: BossPhaseConfig[] = [
     healthThreshold: 0.7,    // Active from 70% to 35%
     movementSpeed: 2.5,
     attackCooldown: 2.0,
-    attackSet: ['HEAVY_SWING', 'DOUBLE_SWING', 'GROUND_SMASH', 'CHARGE_ATTACK'], // Update later for Phase 2
+    attackSet: ['HEAVY_SWING', 'DOUBLE_SWING', 'TRIPLE_SWING', 'SHOCKWAVE', 'LEAP_SMASH', 'CRIMSON_ARC'],
     aggression: 0.65,
     damageMultiplier: 1.2,
     defenseMultiplier: 0.9,
@@ -51,7 +51,7 @@ export const CRIMSON_ONI_PHASES: BossPhaseConfig[] = [
     healthThreshold: 0.35,   // Active from 35% to 0%
     movementSpeed: 3.0,
     attackCooldown: 1.5,
-    attackSet: ['HEAVY_SWING', 'DOUBLE_SWING', 'GROUND_SMASH', 'CHARGE_ATTACK'], // Update later for Phase 3
+    attackSet: ['TRIPLE_SWING', 'SHOCKWAVE', 'LEAP_SMASH', 'CRIMSON_ARC', 'BERSERKER_COMBO', 'CRIMSON_RAIN', 'GROUND_ERUPTION', 'FINAL_CHARGE'],
     aggression: 0.85,
     damageMultiplier: 1.5,
     defenseMultiplier: 0.8,

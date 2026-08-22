@@ -283,6 +283,13 @@ export class CrimsonOni implements Boss {
     this.setState(BossState.PHASE_TRANSITION);
     this.attackSystem.isInvulnerable = true;
 
+    // Apply visual material corruption
+    BossFactory.setPhaseMaterials(newPhaseId);
+
+    // Audio transition
+    if (newPhaseId === BossPhaseId.PHASE_2) AudioManager.playBossPhase(2);
+    if (newPhaseId === BossPhaseId.PHASE_3) AudioManager.playBossPhase(3);
+
     EventBus.emit('bossPhaseTransition', { phase: this.phase, hpPercent });
   }
 

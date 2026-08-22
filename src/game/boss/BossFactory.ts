@@ -45,6 +45,27 @@ const oniCoreMat = new THREE.MeshStandardMaterial({
  * BossFactory — Constructs fully procedural boss characters.
  */
 export class BossFactory {
+
+  public static setPhaseMaterials(phaseId: number): void {
+    if (phaseId === 1) { // PHASE_2
+      oniEyeMat.emissiveIntensity = 8.0;
+      oniCoreMat.emissiveIntensity = 4.0;
+      oniCoreMat.color.setHex(0xff0000);
+      oniCoreMat.emissive.setHex(0xff0000);
+    } else if (phaseId === 2) { // PHASE_3
+      oniEyeMat.emissiveIntensity = 15.0;
+      oniCoreMat.emissiveIntensity = 8.0;
+      oniCoreMat.color.setHex(0xff3300);
+      oniCoreMat.emissive.setHex(0xff3300);
+      oniSkinMat.color.setHex(0x660000);
+    } else { // PHASE_1
+      oniEyeMat.emissiveIntensity = 3.0;
+      oniCoreMat.emissiveIntensity = 1.5;
+      oniCoreMat.color.setHex(0xff1100);
+      oniCoreMat.emissive.setHex(0xff1100);
+      oniSkinMat.color.setHex(0x881111);
+    }
+  }
   /**
    * Create the Crimson Oni procedural character.
    * Returns a CharacterRig with all geometry attached, scaled to ~3.5–4.0 units.

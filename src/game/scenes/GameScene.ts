@@ -142,6 +142,16 @@ export class GameScene {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     });
 
+    EventBus.on('bossPhaseTransition', (data: any) => {
+      // Lock player controls during transformation
+      this.player.isControlsEnabled = false;
+      this.cameraController.addShake(3.0); // Heavy sustained shake
+
+      setTimeout(() => {
+        this.player.isControlsEnabled = true;
+      }, 2500);
+    });
+
     setTimeout(() => {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
       EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
@@ -175,7 +185,20 @@ export class GameScene {
 
     // Zone & Atmosphere updates
     const playerPos = this.player.root.position;
-    const { fogDensity, fogColor, ambientColor, ambientIntensity } = this.zoneManager.getBlendedAtmosphere(playerPos);
+    let { fogDensity, fogColor, ambientColor, ambientIntensity } = this.zoneManager.getBlendedAtmosphere(playerPos);
+
+    if (this.boss && this.boss.phase === 1) { // PHASE_2
+      fogColor = new THREE.Color(0x330000);
+      fogDensity = 0.04;
+      ambientColor = new THREE.Color(0xff4444);
+      ambientIntensity = 0.3;
+    } else if (this.boss && this.boss.phase === 2) { // PHASE_3
+      fogColor = new THREE.Color(0x1a0000);
+      fogDensity = 0.06;
+      ambientColor = new THREE.Color(0xff0000);
+      ambientIntensity = 0.5;
+    }
+
     this.atmosphere.update(dt, fogDensity, fogColor);
     this.lighting.update(dt, ambientColor, ambientIntensity);
     
