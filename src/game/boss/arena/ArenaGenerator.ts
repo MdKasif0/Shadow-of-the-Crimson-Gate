@@ -49,7 +49,7 @@ export class ArenaGenerator {
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.position.copy(center);
     floor.position.y = -0.2; // Flush with ground
-    floor.receiveShadow = true;
+    floor.receiveShadow = false;
     arenaGroup.add(floor);
 
     // Corruption Decal Mesh (Phase 2/3)
