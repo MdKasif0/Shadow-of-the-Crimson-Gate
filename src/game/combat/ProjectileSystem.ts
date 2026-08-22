@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Projectile } from './Projectile';
+import { Projectile, ProjectileType } from './Projectile';
 import { Ronin } from '../characters/Ronin';
 import { VFXManager } from '../vfx/VFXManager';
 import { CameraController } from '../camera/CameraController';
