@@ -66,6 +66,17 @@ export class BossFactory {
       oniSkinMat.color.setHex(0x881111);
     }
   }
+
+  public static fadeDefeatedMaterials(dt: number): void {
+    const lerpSpeed = dt * 1.5;
+    oniEyeMat.emissiveIntensity = THREE.MathUtils.lerp(oniEyeMat.emissiveIntensity, 0, lerpSpeed);
+    oniCoreMat.emissiveIntensity = THREE.MathUtils.lerp(oniCoreMat.emissiveIntensity, 0, lerpSpeed);
+    
+    // Fade skin back to neutral dark red if it was glowing/bright
+    const targetSkinColor = new THREE.Color(0x330808);
+    oniSkinMat.color.lerp(targetSkinColor, lerpSpeed);
+  }
+
   /**
    * Create the Crimson Oni procedural character.
    * Returns a CharacterRig with all geometry attached, scaled to ~3.5–4.0 units.

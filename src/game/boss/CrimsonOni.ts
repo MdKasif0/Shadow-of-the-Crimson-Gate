@@ -12,6 +12,7 @@ import { CharacterRig } from '../characters/CharacterRig';
 import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
 import { AudioManager } from '../audio/AudioManager';
+import { GAME_CONFIG } from '../GameConfig';
 
 /**
  * CrimsonOni — The game's first major boss.
@@ -148,10 +149,7 @@ export class CrimsonOni implements Boss {
 
     // ─── DEFEATED ─────────────────────────────────────────────────
     if (this.state === BossState.DEFEATED) {
-      if (!this.isDeathVfxPlayed && vfx) {
-        vfx.spawnDeath(this.root.position);
-        this.isDeathVfxPlayed = true;
-      }
+      BossFactory.fadeDefeatedMaterials(dt);
       this.applyVelocity(dt, collisionSystem);
       return;
     }
@@ -317,8 +315,11 @@ export class CrimsonOni implements Boss {
   }
 
   private onDeath(_event: HealthEventPayload): void {
+    if (this.state === BossState.DEFEATED) return;
+    this.health.isDead = true;
+    this.attackSystem.reset();
     this.setState(BossState.DEFEATED);
-    EventBus.emit('bossDeath', { id: this.id });
+    EventBus.emit('bossDeath', { id: this.id, position: this.root.position.clone() });
   }
 
   private smoothRotateToward(targetAngle: number, dt: number, speed: number): void {
@@ -351,7 +352,7 @@ export class CrimsonOni implements Boss {
       this.root.position.add(resolvedMove);
 
       // Clamp to world bounds
-      const bounds = { MIN_X: -28, MAX_X: 28, MIN_Z: -80, MAX_Z: 60 };
+      const bounds = GAME_CONFIG.WORLD.BOUNDS;
       this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, bounds.MIN_X, bounds.MAX_X);
       this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);
     }
