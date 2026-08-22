@@ -9,6 +9,7 @@ import { InputManager } from '../core/InputManager';
 import { ATTACK_DATA } from '../combat/AttackData';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
 import { DashSystem } from '../combat/DashSystem';
+import { GAME_CONFIG } from '../GameConfig';
 
 export class Ronin {
   public root: THREE.Group;
