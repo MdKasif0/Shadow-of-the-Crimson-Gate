@@ -16,6 +16,9 @@ export interface BossAIDecision {
   attackId: string | null;
 }
 
+import { BossAttackSystem } from './BossAttackSystem';
+import { BOSS_ATTACKS, BossAttackConfig } from './BossAttackData';
+
 export class BossAI {
   private observeTimer: number = 0;
   private observeDuration: number = 1.0;
@@ -27,7 +30,7 @@ export class BossAI {
     bossPos: THREE.Vector3,
     playerPos: THREE.Vector3,
     currentState: BossState,
-    attackCooldown: number,
+    attackSystem: BossAttackSystem,
     phaseConfig: BossPhaseConfig,
     dt: number
   ): BossAIDecision {
@@ -54,10 +57,13 @@ export class BossAI {
       this.observeTimer += dt;
       if (this.observeTimer >= this.observeDuration) {
         this.observeTimer = 0;
+        
         // Transition to approach or attack
-        if (distToPlayer <= this.getAttackRange(phaseConfig) && attackCooldown <= 0) {
-          const attackId = this.selectAttack(phaseConfig);
-          return { state: BossState.ATTACK, moveDirection: new THREE.Vector3(), facingAngle, attackId };
+        if (attackSystem.cooldown <= 0) {
+          const attackId = this.selectAttack(phaseConfig, distToPlayer, attackSystem.attackHistory);
+          if (attackId) {
+            return { state: BossState.ATTACK, moveDirection: new THREE.Vector3(), facingAngle, attackId };
+          }
         }
         return { state: BossState.APPROACH, moveDirection: dirToPlayer, facingAngle, attackId: null };
       }
@@ -76,16 +82,14 @@ export class BossAI {
 
     // APPROACH: Close the distance
     if (currentState === BossState.APPROACH || currentState === BossState.ENRAGED) {
-      const attackRange = this.getAttackRange(phaseConfig);
-
-      if (distToPlayer <= attackRange && attackCooldown <= 0) {
-        // Roll for attack based on aggression
-        if (Math.random() < phaseConfig.aggression) {
-          const attackId = this.selectAttack(phaseConfig);
+      if (attackSystem.cooldown <= 0) {
+        const attackId = this.selectAttack(phaseConfig, distToPlayer, attackSystem.attackHistory);
+        if (attackId && Math.random() < phaseConfig.aggression) {
           return { state: BossState.ATTACK, moveDirection: new THREE.Vector3(), facingAngle, attackId };
         }
       }
 
+      const attackRange = this.getAttackRange(phaseConfig);
       if (distToPlayer > attackRange * 0.8) {
         return { state: currentState, moveDirection: dirToPlayer, facingAngle, attackId: null };
       }
@@ -101,12 +105,35 @@ export class BossAI {
   }
 
   private getAttackRange(phaseConfig: BossPhaseConfig): number {
-    // Boss has longer reach in later phases due to more aggressive lunges
     return 3.5 + (phaseConfig.aggression * 1.0);
   }
 
-  private selectAttack(phaseConfig: BossPhaseConfig): string {
-    const attacks = phaseConfig.attackSet;
-    return attacks[Math.floor(Math.random() * attacks.length)];
+  private selectAttack(phaseConfig: BossPhaseConfig, distToPlayer: number, history: string[]): string | null {
+    const validAttacks: BossAttackConfig[] = [];
+    
+    for (const attackId of phaseConfig.attackSet) {
+      const config = BOSS_ATTACKS.get(attackId);
+      if (!config) continue;
+      
+      // Check distance. Allow some buffer.
+      if (distToPlayer > config.range + 0.5) continue;
+      
+      // Do not repeat same attack more than twice consecutively
+      if (history.length >= 2 && history[history.length - 1] === attackId && history[history.length - 2] === attackId) {
+        continue;
+      }
+      
+      validAttacks.push(config);
+    }
+    
+    if (validAttacks.length === 0) return null;
+    
+    // Sort by priority (highest first)
+    validAttacks.sort((a, b) => b.priority - a.priority);
+    
+    // Pick from highest priority (or random among top priorities if we want variation)
+    // To keep it fair, we'll pick from the top 2 if available
+    const topChoices = validAttacks.slice(0, 2);
+    return topChoices[Math.floor(Math.random() * topChoices.length)].id;
   }
 }

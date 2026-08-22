@@ -35,13 +35,17 @@ export class CrimsonOni implements Boss {
   private isDeathVfxPlayed: boolean = false;
   private previousPhase: BossPhaseId = BossPhaseId.PHASE_1;
 
+  private poise: number = 100;
+  private readonly MAX_POISE: number = 100;
+
   // ─── Boss Stats ──────────────────────────────────────────────────────
   private static readonly MAX_HEALTH = 1000;
   private static readonly HURTBOX_RADIUS = 1.2;
   private static readonly HURTBOX_HEIGHT = 4.0;
   private static readonly COLLISION_RADIUS = 1.0;
   private static readonly HURT_DURATION = 0.3;
-  private static readonly KNOCKBACK_RESISTANCE = 0.85; // Boss barely flinches
+  private static readonly STAGGER_DURATION = 2.0;
+  private static readonly KNOCKBACK_RESISTANCE = 0.95; // Boss barely flinches on normal hits
 
   constructor() {
     this.root = new THREE.Group();
@@ -71,16 +75,32 @@ export class CrimsonOni implements Boss {
 
     // Apply reduced knockback
     const effectiveKnockback = knockbackPower * (1 - CrimsonOni.KNOCKBACK_RESISTANCE);
-    this.velocity.copy(knockbackDir).multiplyScalar(effectiveKnockback);
+    if (effectiveKnockback > 0.01) {
+      this.velocity.copy(knockbackDir).multiplyScalar(effectiveKnockback);
+    }
 
     // Apply defense multiplier
-    const mitigatedDamage = amount * (1 / this.phaseConfig.defenseMultiplier);
+    let mitigatedDamage = amount * (1 / this.phaseConfig.defenseMultiplier);
+    
+    // Player punish window: Boss takes 50% more poise damage during RECOVERY phase
+    let poiseDamage = amount;
+    if (this.attackSystem.currentPhase === BossAttackPhase.RECOVERY) {
+      poiseDamage *= 1.5;
+    }
+
+    this.poise -= poiseDamage;
+    if (this.poise <= 0 && this.state !== BossState.STAGGER && this.state !== BossState.DEFEATED && this.state !== BossState.PHASE_TRANSITION) {
+      this.poise = 0;
+      this.setState(BossState.STAGGER);
+    }
+
     this.health.takeDamage(mitigatedDamage, 'PLAYER');
   }
 
   public reset(position: THREE.Vector3): void {
     this.root.position.copy(position);
     this.health['currentHealth'] = CrimsonOni.MAX_HEALTH;
+    this.poise = this.MAX_POISE;
     this.health.isDead = false;
     this.velocity.set(0, 0, 0);
     this.isDeathVfxPlayed = false;
@@ -172,6 +192,16 @@ export class CrimsonOni implements Boss {
       return;
     }
 
+    // ─── STAGGER ──────────────────────────────────────────────────
+    if (this.state === BossState.STAGGER) {
+      this.applyVelocity(dt, collisionSystem);
+      if (this.stateTimer > CrimsonOni.STAGGER_DURATION) {
+        this.poise = this.MAX_POISE;
+        this.setState(BossState.IDLE);
+      }
+      return;
+    }
+
     // ─── ATTACK ───────────────────────────────────────────────────
     if (this.state === BossState.ATTACK) {
       const forward = new THREE.Vector3(0, 0, 1)
@@ -208,7 +238,7 @@ export class CrimsonOni implements Boss {
       this.root.position,
       playerPos,
       this.state,
-      this.attackSystem.cooldown,
+      this.attackSystem,
       this.phaseConfig,
       dt
     );
@@ -247,20 +277,11 @@ export class CrimsonOni implements Boss {
   private onDamageTaken(_event: HealthEventPayload): void {
     if (this.health.isDead) return;
 
-    // Check for phase transition
-    const hpPercent = this.health.currentHealth / this.health.maxHealth;
-    const newPhaseConfig = getPhaseForHealth(hpPercent);
-
-    if (newPhaseConfig.id !== this.previousPhase) {
-      this.previousPhase = newPhaseConfig.id;
-      this.phase = newPhaseConfig.id;
-      this.phaseConfig = newPhaseConfig;
-      this.attackSystem.reset();
-      this.setState(BossState.PHASE_TRANSITION);
-      this.attackSystem.isInvulnerable = true;
-
-      EventBus.emit('bossPhaseTransition', { phase: this.phase, hpPercent });
-      return;
+    const hpPercent = this.health.getHealthPercent();
+    if (hpPercent <= 0.7 && this.phase === BossPhaseId.PHASE_1) {
+      this.triggerPhaseTransition(BossPhaseId.PHASE_2);
+    } else if (hpPercent <= 0.35 && this.phase === BossPhaseId.PHASE_2) {
+      this.triggerPhaseTransition(BossPhaseId.PHASE_3);
     }
 
     // Only flinch if not currently attacking (boss has hyperarmor during attacks)
