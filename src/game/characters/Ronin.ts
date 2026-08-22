@@ -149,7 +149,8 @@ export class Ronin {
     const isAttacking = this.state.isAttacking();
     
     let intendedMove = new THREE.Vector3();
-    const speed = 4; // GAME_CONFIG.PLAYER.SPEED
+    const isRunning = this.isControlsEnabled && inputManager.isRunPressed();
+    const speed = isRunning ? 8 : 4; // GAME_CONFIG.PLAYER.SPEED
 
     // Priority: HURT > DASH > ATTACK > MOVEMENT
     if (this.state.movement === MovementState.HURT) {
@@ -262,7 +263,8 @@ export class Ronin {
     this.animator.setCombatState(this.state.currentAttackId, this.state.combatPhase, attackProgress);
 
     // Update internal animation
-    this.animator.update(dt);
+    const animSpeedMultiplier = (isRunning && inputMoveDir.lengthSq() > 0 && !isAttacking) ? 1.5 : 1.0;
+    this.animator.update(dt * animSpeedMultiplier);
   }
 
   public playIdle(): void {
