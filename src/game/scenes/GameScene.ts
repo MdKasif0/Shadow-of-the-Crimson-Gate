@@ -33,6 +33,8 @@ import { Boss } from '../boss/Boss';
 import { BossIntroCamera } from '../boss/arena/BossIntroCamera';
 import { BossUI } from '../ui/BossUI';
 import { ArenaHazardSystem } from '../boss/arena/ArenaHazardSystem';
+import { ArenaGenerator } from '../boss/arena/ArenaGenerator';
+import { BossPhaseId } from '../boss/BossPhase';
 
 export class GameScene {
   public scene: THREE.Scene;
