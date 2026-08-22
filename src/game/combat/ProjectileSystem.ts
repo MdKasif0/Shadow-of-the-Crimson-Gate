@@ -12,8 +12,13 @@ export class ProjectileSystem {
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    for (let i = 0; i < this.poolSize; i++) {
-      const proj = new Projectile(`proj_${i}`);
+    for (let i = 0; i < 15; i++) {
+      const proj = new Projectile(`proj_def_${i}`, 'DEFAULT');
+      this.projectiles.push(proj);
+      this.scene.add(proj.root);
+    }
+    for (let i = 0; i < 5; i++) {
+      const proj = new Projectile(`proj_arc_${i}`, 'CRIMSON_ARC');
       this.projectiles.push(proj);
       this.scene.add(proj.root);
     }
