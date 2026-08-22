@@ -41,10 +41,11 @@ export class LightingSystem {
     this.moonLight.shadow.mapSize.height = 2048;
     this.moonLight.shadow.camera.near = 0.5;
     this.moonLight.shadow.camera.far = 250;
-    this.moonLight.shadow.camera.left = -50;
-    this.moonLight.shadow.camera.right = 50;
-    this.moonLight.shadow.camera.top = 100;
-    this.moonLight.shadow.camera.bottom = -100;
+    const md = 160;
+    this.moonLight.shadow.camera.left = -md;
+    this.moonLight.shadow.camera.right = md;
+    this.moonLight.shadow.camera.top = md;
+    this.moonLight.shadow.camera.bottom = -md;
     scene.add(this.moonLight);
   }
 
