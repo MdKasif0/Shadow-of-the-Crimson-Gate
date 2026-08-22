@@ -262,4 +262,11 @@ export class ArenaGenerator {
 
     return group;
   }
+
+  public static purifyArena(dt: number): void {
+    if (this.corruptionMat) {
+      // Fade out corruption
+      this.corruptionMat.opacity = THREE.MathUtils.lerp(this.corruptionMat.opacity, 0, dt * 2.0);
+    }
+  }
 }
