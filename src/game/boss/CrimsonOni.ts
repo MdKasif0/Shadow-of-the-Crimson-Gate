@@ -11,6 +11,7 @@ import { HitboxSystem } from '../combat/HitboxSystem';
 import { CharacterRig } from '../characters/CharacterRig';
 import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
+import { AudioManager } from '../audio/AudioManager';
 
 /**
  * CrimsonOni — The game's first major boss.
