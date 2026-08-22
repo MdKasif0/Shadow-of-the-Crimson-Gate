@@ -117,7 +117,7 @@ export class BossFactory {
 
     // ─── HELPER ─────────────────────────────────────────────────────
     const addMesh = (
-      parent: THREE.Group,
+      parent: THREE.Object3D,
       geo: THREE.BufferGeometry,
       mat: THREE.Material,
       pos?: THREE.Vector3,
@@ -230,7 +230,7 @@ export class BossFactory {
 
   private static buildHead(
     rig: CharacterRig,
-    addMesh: (p: THREE.Group, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
+    addMesh: (p: THREE.Object3D, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
     S: number
   ): void {
     // Angular, broad head
@@ -302,7 +302,7 @@ export class BossFactory {
 
   private static buildArms(
     rig: CharacterRig,
-    addMesh: (p: THREE.Group, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
+    addMesh: (p: THREE.Object3D, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
     S: number
   ): void {
     // Upper arms — massive musculature
@@ -383,7 +383,7 @@ export class BossFactory {
 
   private static buildLegs(
     rig: CharacterRig,
-    addMesh: (p: THREE.Group, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
+    addMesh: (p: THREE.Object3D, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
     S: number
   ): void {
     // Upper legs — massive tree trunks
@@ -430,7 +430,7 @@ export class BossFactory {
 
   private static buildKanabo(
     rig: CharacterRig,
-    addMesh: (p: THREE.Group, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
+    addMesh: (p: THREE.Object3D, g: THREE.BufferGeometry, m: THREE.Material, pos?: THREE.Vector3, rot?: THREE.Euler) => THREE.Mesh,
     S: number
   ): void {
     const weaponGroup = new THREE.Group();
