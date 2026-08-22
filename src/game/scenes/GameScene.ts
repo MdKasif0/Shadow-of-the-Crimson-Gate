@@ -70,6 +70,8 @@ export class GameScene {
   private audioZoneManager: AudioZoneManager;
   private bossIntroCamera: BossIntroCamera;
   private bossUI: BossUI;
+  private bossIsDefeatedSequence: boolean = false;
+  private purificationTimer: number = 0;
   private hasBossIntroPlayed: boolean = false;
   private isCinematicActive: boolean = false;
   private hasShownTitle: boolean = false;
@@ -127,9 +129,13 @@ export class GameScene {
     this.objectiveUI = new ObjectiveUI();
 
     // Boss is in the Boss Arena
-    this.boss = new CrimsonOni();
-    this.boss.reset(new THREE.Vector3(0, 0, -135)); // Boss Arena center
-    this.scene.add(this.boss.root);
+    if (!this.playerProgress.crimsonOniDefeated) {
+      this.boss = new CrimsonOni();
+      this.boss.reset(new THREE.Vector3(0, 0, -135)); // Boss Arena center
+      this.scene.add(this.boss.root);
+    } else {
+      this.boss = null;
+    }
 
     EventBus.on('restartEncounter', () => {
       this.resetEncounter();
@@ -159,6 +165,38 @@ export class GameScene {
       setTimeout(() => {
         this.player.isControlsEnabled = true;
       }, 2500);
+    });
+
+    EventBus.on('bossDeath', (data: any) => {
+      this.bossIsDefeatedSequence = true;
+      this.purificationTimer = 0;
+      this.player.isControlsEnabled = false;
+      
+      // Heavy hit stop & shake
+      this.hitStopTimer = 0.5;
+      this.cameraController.addShake(5.0);
+      
+      // Look at boss
+      if (this.boss) {
+        this.cameraController.setTarget(this.boss.root);
+        this.cameraController.setOffset(new THREE.Vector3(0, 2, 8)); // Low cinematic angle
+      }
+
+      // Energy VFX
+      this.vfx.spawnBossDeathEnergy(data.position);
+      
+      // Sequence timing
+      setTimeout(() => {
+        // Reward
+        this.playerProgress.addEssence(500);
+        this.playerProgress.crimsonOniDefeated = true;
+        this.playerProgress.save();
+        
+        // Restore camera and controls
+        this.cameraController.setTarget(this.player.root);
+        this.cameraController.setOffset(new THREE.Vector3(0, 4, 6)); // Default
+        this.player.isControlsEnabled = true;
+      }, 7000);
     });
 
     EventBus.on('spawnBossProjectile', (data: any) => {
@@ -244,16 +282,36 @@ export class GameScene {
     const playerPos = this.player.root.position;
     let { fogDensity, fogColor, ambientColor, ambientIntensity } = this.zoneManager.getBlendedAtmosphere(playerPos);
 
-    if (this.boss && this.boss.phase === 1) { // PHASE_2
+    if (this.bossIsDefeatedSequence || this.playerProgress.crimsonOniDefeated) {
+      // Force purified atmosphere in boss arena
+      if (this.zoneManager.getCurrentZone() === 'BOSS_ARENA') {
+        fogColor = new THREE.Color(0x111116);
+        fogDensity = 0.015;
+        ambientColor = new THREE.Color(0xffffff);
+        ambientIntensity = 0.3;
+      }
+
+      if (this.bossIsDefeatedSequence) {
+        this.purificationTimer += dt;
+        ArenaGenerator.purifyArena(dt);
+        if (this.purificationTimer > 8.0) {
+          this.bossIsDefeatedSequence = false;
+          if (this.boss) {
+            this.scene.remove(this.boss.root);
+            this.boss = null;
+          }
+        }
+      }
+    } else if (this.boss && this.boss.phase === BossPhaseId.PHASE_2) {
       fogColor = new THREE.Color(0x330000);
       fogDensity = 0.03;
       ambientColor = new THREE.Color(0xff4444);
-      ambientIntensity = 1.6;
-    } else if (this.boss && this.boss.phase === 2) { // PHASE_3
-      fogColor = new THREE.Color(0x220000);
+      ambientIntensity = 0.6;
+    } else if (this.boss && this.boss.phase === BossPhaseId.PHASE_3) {
+      fogColor = new THREE.Color(0x440000);
       fogDensity = 0.04;
-      ambientColor = new THREE.Color(0xff0000);
-      ambientIntensity = 1.8;
+      ambientColor = new THREE.Color(0xff2222);
+      ambientIntensity = 0.8;
     }
 
     this.atmosphere.update(dt, fogDensity, fogColor);
