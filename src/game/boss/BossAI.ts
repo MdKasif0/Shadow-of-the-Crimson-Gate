@@ -115,15 +115,29 @@ export class BossAI {
       const config = BOSS_ATTACKS.get(attackId);
       if (!config) continue;
       
-      // Check distance. Allow some buffer.
-      if (distToPlayer > config.range + 0.5) continue;
+      // Effective range includes lunge distance for gap closers
+      const effectiveRange = config.range + config.lungeDistance;
+      
+      // If player is too far, only allow gap-closers or ranged attacks
+      if (distToPlayer > effectiveRange + 0.5) continue;
       
       // Do not repeat same attack more than twice consecutively
       if (history.length >= 2 && history[history.length - 1] === attackId && history[history.length - 2] === attackId) {
         continue;
       }
       
-      validAttacks.push(config);
+      // Avoid spamming ultimate moves consecutively
+      if (config.cooldown > 10.0 && history[history.length - 1] === attackId) {
+        continue;
+      }
+
+      // If player is far, favor gap closers (boost priority)
+      let dynamicPriority = config.priority;
+      if (distToPlayer > 5.0 && config.lungeDistance > 0) {
+        dynamicPriority += 5;
+      }
+
+      validAttacks.push({ ...config, priority: dynamicPriority });
     }
     
     if (validAttacks.length === 0) return null;
@@ -132,7 +146,6 @@ export class BossAI {
     validAttacks.sort((a, b) => b.priority - a.priority);
     
     // Pick from highest priority (or random among top priorities if we want variation)
-    // To keep it fair, we'll pick from the top 2 if available
     const topChoices = validAttacks.slice(0, 2);
     return topChoices[Math.floor(Math.random() * topChoices.length)].id;
   }
