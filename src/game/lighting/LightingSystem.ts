@@ -36,16 +36,7 @@ export class LightingSystem {
     // Subtle moonlight
     this.moonLight = new THREE.DirectionalLight(0x88bbff, 0.3);
     this.moonLight.position.set(-50, 100, -50);
-    this.moonLight.castShadow = true;
-    this.moonLight.shadow.mapSize.width = 2048;
-    this.moonLight.shadow.mapSize.height = 2048;
-    this.moonLight.shadow.camera.near = 0.5;
-    this.moonLight.shadow.camera.far = 250;
-    const md = 160;
-    this.moonLight.shadow.camera.left = -md;
-    this.moonLight.shadow.camera.right = md;
-    this.moonLight.shadow.camera.top = md;
-    this.moonLight.shadow.camera.bottom = -md;
+    this.moonLight.castShadow = false;
     scene.add(this.moonLight);
   }
 
