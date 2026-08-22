@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BossAttackConfig, BOSS_ATTACKS } from './BossAttackData';
 import { BossPhaseConfig } from './BossPhase';
 import { HitboxSystem } from '../combat/HitboxSystem';
+import { EventBus } from '../core/EventBus';
 
 /**
  * BossAttackSystem — Manages attack lifecycle (windup → active → recovery),
