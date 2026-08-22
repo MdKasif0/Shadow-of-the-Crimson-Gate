@@ -86,6 +86,7 @@ export class GameScene {
     new WorldGenerator(this.scene, this.collisionSystem);
     this.hitboxSystem = new HitboxSystem(this.scene);
     this.projectileSystem = new ProjectileSystem(this.scene);
+    this.arenaHazardSystem = new ArenaHazardSystem(this.scene);
 
     this.playerProgress = new PlayerProgress();
     this.playerStats = new PlayerStats(this.playerProgress.level);
@@ -154,6 +155,54 @@ export class GameScene {
       }, 2500);
     });
 
+    EventBus.on('spawnBossProjectile', (data: any) => {
+      this.projectileSystem.spawnProjectile(
+        data.ownerId,
+        data.startPos,
+        data.direction,
+        data.speed,
+        data.damage,
+        data.knockback,
+        3.0,
+        'CRIMSON_ARC'
+      );
+    });
+
+    EventBus.on('spawnBossHazard', (data: any) => {
+      const bossPos = this.boss ? this.boss.root.position : new THREE.Vector3();
+      const playerPos = this.player.root.position;
+
+      if (data.type === 'RAIN') {
+        // Spawn 3 hazards near player
+        for (let i = 0; i < 3; i++) {
+          const offset = new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6);
+          this.arenaHazardSystem.spawnHazard({
+            position: playerPos.clone().add(offset),
+            radius: 3.5,
+            damage: data.damage,
+            telegraphDuration: 1.5,
+            activeDuration: 0.5
+          });
+        }
+      } else if (data.type === 'ERUPTION') {
+        // Large AOE around player and boss
+        this.arenaHazardSystem.spawnHazard({
+          position: bossPos.clone(),
+          radius: 8.0,
+          damage: data.damage,
+          telegraphDuration: 2.0,
+          activeDuration: 1.0
+        });
+        this.arenaHazardSystem.spawnHazard({
+          position: playerPos.clone(),
+          radius: 6.0,
+          damage: data.damage,
+          telegraphDuration: 2.0,
+          activeDuration: 1.0
+        });
+      }
+    });
+
     setTimeout(() => {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
       EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
@@ -211,7 +260,10 @@ export class GameScene {
     this.interactionSystem.update(playerPos, inputManager);
     this.hitboxSystem.clearActiveHitboxes();
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
+    
+    // Projectile & Hazard System update
     this.projectileSystem.update(dt, this.player, this.vfx, this.cameraController);
+    this.arenaHazardSystem.update(dt, this.player);
     
     // Encounter Update
     this.encounterManager.update(dt, playerPos, this.scene);
@@ -319,7 +371,9 @@ export class GameScene {
     this.enemies.forEach(e => this.scene.remove(e.root));
     this.enemies = [];
     
+    this.boss = null;
     this.projectileSystem.clearAll();
+    this.arenaHazardSystem.reset();
     this.encounterManager.resetAll(this.scene);
     
     this.hasBossIntroPlayed = false;
