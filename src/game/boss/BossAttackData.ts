@@ -113,7 +113,7 @@ export const BOSS_ATTACKS: Map<string, BossAttackConfig> = new Map([
     movement: 'CHARGE',
     priority: 15, // High priority if far away
     hitboxType: 'CONTINUOUS'
-  }]
+  }],
   ['TRIPLE_SWING', {
     id: 'TRIPLE_SWING',
     name: 'Triple Swing',
