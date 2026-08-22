@@ -7,6 +7,7 @@ export enum ObjectiveState {
   CLEAR_SHRINE,
   REACH_TEMPLE,
   CLEAR_TEMPLE,
+  DEFEAT_BOSS,
   COMPLETED
 }
 
@@ -47,6 +48,8 @@ export class ObjectiveManager {
       if (!this.clearedEncounters.has('enc_temple')) {
         this.setState(ObjectiveState.CLEAR_TEMPLE);
       }
+    } else if (zoneId === 'BOSS_ARENA') {
+      this.setState(ObjectiveState.DEFEAT_BOSS);
     }
   }
 
@@ -66,6 +69,7 @@ export class ObjectiveManager {
       case ObjectiveState.CLEAR_SHRINE:    text = "PURIFY THE SHRINE AREA"; break;
       case ObjectiveState.REACH_TEMPLE:    text = "CONTINUE TO THE TEMPLE"; break;
       case ObjectiveState.CLEAR_TEMPLE:    text = "DEFEAT THE TEMPLE GUARDS"; break;
+      case ObjectiveState.DEFEAT_BOSS:     text = "DEFEAT THE CRIMSON ONI"; break;
       case ObjectiveState.COMPLETED:       text = "AREA CLEARED"; break;
     }
     
