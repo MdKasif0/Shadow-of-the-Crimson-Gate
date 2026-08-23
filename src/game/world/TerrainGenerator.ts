@@ -51,14 +51,17 @@ export class TerrainGenerator {
         height *= smoothstep(5, 15, Math.abs(x));
       }
 
-      // Forest path (z: -50 to -20) — rolling but walkable center
+      // Forest path (z: -50 to -20) — Cursed forest path
       if (z > -55 && z < -15) {
-        if (Math.abs(x) < 5) {
-          height *= 0.3; // Flatten the path
-        }
-        // Raise sides slightly for enclosed feel
-        if (Math.abs(x) > 15) {
-          height += Math.abs(x) * 0.05;
+        const pathWidth = 6.0;
+        const distFromPath = Math.abs(x);
+        
+        // Flatten the center path completely
+        if (distFromPath < pathWidth) {
+          height *= 0.1; 
+        } else {
+          // Raise edges to form uneven dirt/rocks alongside path
+          height += (distFromPath - pathWidth) * 0.15;
         }
       }
 
