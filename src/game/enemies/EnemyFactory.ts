@@ -34,7 +34,7 @@ export class EnemyFactory {
   public static createBasicYokai(): CharacterRig {
     const rig = new CharacterRig();
 
-    const addMesh = (parent: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material, yOffset = 0, xOffset = 0, zOffset = 0) => {
+    const addMesh = (parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material, yOffset = 0, xOffset = 0, zOffset = 0) => {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(xOffset, yOffset, zOffset);
       mesh.castShadow = true;
