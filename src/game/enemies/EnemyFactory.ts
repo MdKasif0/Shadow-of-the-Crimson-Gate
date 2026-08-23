@@ -467,22 +467,70 @@ export class EnemyFactory {
     rig.leftLowerLeg.position.set(0, -0.55, 0);
     rig.rightLowerLeg.position.set(0, -0.55, 0);
 
-    addMesh(rig.leftUpperLeg, upperLegGeo, shadowClothMat);
-    addMesh(rig.rightUpperLeg, upperLegGeo, shadowClothMat);
+    // Central flowing skirt (attached to pelvis)
+    const skirtGeo = new THREE.CylinderGeometry(0.2, 0.6, 1.2, 8, 4, true);
+    skirtGeo.translate(0, -0.6, 0);
+    const skPos = skirtGeo.attributes.position;
+    for(let i=0; i<skPos.count; i++) {
+      if(skPos.getY(i) < -0.4) {
+        // Jagged bottom edge
+        const noise = Math.random() * 0.3;
+        skPos.setY(i, skPos.getY(i) + noise);
+        // Wispy outward
+        skPos.setX(i, skPos.getX(i) * (1 + noise));
+        skPos.setZ(i, skPos.getZ(i) * (1 + noise));
+      }
+    }
+    skirtGeo.computeVertexNormals();
+    addMesh(rig.pelvis, skirtGeo, shadowClothMat);
+
+    // Slender dark legs
+    const upperLegGeo = new THREE.CylinderGeometry(0.06, 0.04, 0.6, 6);
+    upperLegGeo.translate(0, -0.3, 0);
+    const lowerLegGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.6, 6);
+    lowerLegGeo.translate(0, -0.3, 0);
+
+    addMesh(rig.leftUpperLeg, upperLegGeo, shadowSkinMat);
+    addMesh(rig.rightUpperLeg, upperLegGeo, shadowSkinMat);
     addMesh(rig.leftLowerLeg, lowerLegGeo, shadowSkinMat);
     addMesh(rig.rightLowerLeg, lowerLegGeo, shadowSkinMat);
-    addMesh(rig.leftFoot, footGeo, shadowSkinMat);
-    addMesh(rig.rightFoot, footGeo, shadowSkinMat);
 
-    // Cloth wisps from pelvis and chest
-    addWisps(rig.pelvis, 4, -0.1);
-    addWisps(rig.chest, 2, -0.2);
+    // Ankle wrapping
+    const ankleWrapGeo = new THREE.TorusGeometry(0.035, 0.01, 4, 8);
+    ankleWrapGeo.rotateX(Math.PI/2);
+    for(let i=0; i<4; i++) {
+      addMesh(rig.leftLowerLeg, ankleWrapGeo, shadowSkinMat, -0.45 + (i*0.03));
+      addMesh(rig.rightLowerLeg, ankleWrapGeo, shadowSkinMat, -0.45 + (i*0.03));
+    }
 
-    // Taller, thinner silhouette — scale Y more than XZ
-    rig.root.scale.set(0.9, 1.3, 0.9);
+    // Bare Clawed Feet
+    const footBaseGeo = new THREE.BoxGeometry(0.08, 0.08, 0.2);
+    footBaseGeo.translate(0, -0.04, 0.05);
+    const lFoot = addMesh(rig.leftFoot, footBaseGeo, shadowSkinMat);
+    const rFoot = addMesh(rig.rightFoot, footBaseGeo, shadowSkinMat);
 
-    // Raise pelvis for longer legs
-    rig.pelvis.position.set(0, 1.2, 0);
+    const toeGeo = new THREE.BoxGeometry(0.02, 0.03, 0.08);
+    toeGeo.translate(0, -0.015, 0.04);
+    const toeClawGeo = new THREE.ConeGeometry(0.01, 0.08, 3);
+    toeClawGeo.translate(0, -0.04, 0.08);
+    toeClawGeo.rotateX(-Math.PI/2); 
+    
+    const addToes = (foot: THREE.Object3D) => {
+      for (let i = -1; i <= 1; i++) {
+        const toe = new THREE.Mesh(toeGeo, shadowSkinMat);
+        toe.position.set(i * 0.025, -0.04, 0.12);
+        const tClaw = new THREE.Mesh(toeClawGeo, shadowClawMat);
+        toe.add(tClaw);
+        foot.add(toe);
+      }
+    };
+    addToes(lFoot);
+    addToes(rFoot);
+
+    // Floating/ominous posture
+    rig.spine.rotation.x = -0.1; // Leaning back slightly
+    rig.chest.rotation.x = 0.1; // Head forward
+    rig.head.rotation.x = -0.1; // Looking down
 
     return rig;
   }
