@@ -126,6 +126,9 @@ export class ToriiGenerator {
 
     // Kasagi (Curved black roof beam)
     class KasagiCurve extends THREE.Curve<THREE.Vector3> {
+      constructor() {
+        super();
+      }
       getPoint(t: number, optionalTarget = new THREE.Vector3()) {
         const x = (t - 0.5) * (separation + 5);
         const y = Math.pow(Math.abs(t - 0.5) * 2, 2) * 0.6; // Upward sweep
