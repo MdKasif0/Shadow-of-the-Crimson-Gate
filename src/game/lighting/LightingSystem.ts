@@ -34,7 +34,7 @@ export class LightingSystem {
     scene.add(this.directional);
 
     // Subtle moonlight
-    this.moonLight = new THREE.DirectionalLight(0x44aaff, 0.8);
+    this.moonLight = new THREE.DirectionalLight(0x88bbff, 0.3);
     this.moonLight.position.set(-50, 100, -50);
     this.moonLight.castShadow = false;
     scene.add(this.moonLight);

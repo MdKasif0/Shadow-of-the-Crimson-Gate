@@ -51,17 +51,14 @@ export class TerrainGenerator {
         height *= smoothstep(5, 15, Math.abs(x));
       }
 
-      // Forest path (z: -50 to -20) — Cursed forest path
+      // Forest path (z: -50 to -20) — rolling but walkable center
       if (z > -55 && z < -15) {
-        const pathWidth = 6.0;
-        const distFromPath = Math.abs(x);
-        
-        // Flatten the center path completely
-        if (distFromPath < pathWidth) {
-          height *= 0.1; 
-        } else {
-          // Raise edges to form uneven dirt/rocks alongside path
-          height += (distFromPath - pathWidth) * 0.15;
+        if (Math.abs(x) < 5) {
+          height *= 0.3; // Flatten the path
+        }
+        // Raise sides slightly for enclosed feel
+        if (Math.abs(x) > 15) {
+          height += Math.abs(x) * 0.05;
         }
       }
 
@@ -93,19 +90,9 @@ export class TerrainGenerator {
         color.setHex(0x1a2520);
         color.lerp(new THREE.Color(0x15201a), Math.abs(colorNoise));
       } else if (z > -55) {
-        // Cursed Forest
-        const pathWidth = 6.0;
-        const distFromPath = Math.abs(x);
-        
-        if (distFromPath < pathWidth) {
-          // Cracked stone path (bluish grey)
-          color.setHex(0x1a2228);
-          color.lerp(new THREE.Color(0x25303a), Math.abs(colorNoise));
-        } else {
-          // Dark dirt / moss edges
-          color.setHex(0x0f1512);
-          color.lerp(new THREE.Color(0x0a0c0a), Math.abs(colorNoise));
-        }
+        // Forest: darker, more brown
+        color.setHex(0x151a18);
+        color.lerp(new THREE.Color(0x0f1410), Math.abs(colorNoise));
       } else {
         // Temple approach: stone-like
         color.setHex(0x1e2530);

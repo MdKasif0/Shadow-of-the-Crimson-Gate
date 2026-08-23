@@ -84,7 +84,7 @@ export class LanternGenerator {
     const core = new THREE.Mesh(coreGeo, emissiveMat);
     prefab.add(core);
 
-    const pointLight = new THREE.PointLight(0xff7722, 1.5, 12);
+    const pointLight = new THREE.PointLight(0xffaa44, 1, 8);
     pointLight.position.set(0, 2.5, 0);
     prefab.add(pointLight);
 
