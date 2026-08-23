@@ -11,16 +11,12 @@ const yokaiClawMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness
 const yokaiHairMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 }); // Messy black hair
 
 // ─── Shadow Yokai Materials ─────────────────────────────────────────────────
-const shadowSkinMat = new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.95 });
-const shadowClothMat = new THREE.MeshStandardMaterial({ color: 0x0a1520, roughness: 1.0 });
-const shadowAccentMat = new THREE.MeshStandardMaterial({ color: 0x1a0a0a, roughness: 0.8 }); // muted crimson
-const shadowHornMat = new THREE.MeshStandardMaterial({ color: 0x0a0a15, roughness: 0.3, metalness: 0.2 });
-const shadowEyeMat = new THREE.MeshStandardMaterial({
-  color: 0x00aacc, emissive: 0x0088aa, emissiveIntensity: 3.0
-});
-const shadowClawMat = new THREE.MeshStandardMaterial({
-  color: 0x112233, emissive: 0x003344, emissiveIntensity: 1.0, roughness: 0.1
-});
+const shadowSkinMat = new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.95 }); // Pitch black textured skin
+const shadowClothMat = new THREE.MeshStandardMaterial({ color: 0x0f1115, roughness: 1.0 }); // Very dark patterned robe
+const shadowAccentMat = new THREE.MeshStandardMaterial({ color: 0x3a3020, roughness: 0.6, metalness: 0.4 }); // Dark bronze/gold accents
+const shadowEyeMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 3.0 });
+const shadowClawMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.1, metalness: 0.8 }); // Glossy black claws
+const shadowSmokeMat = new THREE.MeshStandardMaterial({ color: 0x08080a, transparent: true, opacity: 0.8, depthWrite: false });
 
 // ─── Tengu Materials ────────────────────────────────────────────────────────
 const tenguSkinMat = new THREE.MeshStandardMaterial({ color: 0x552222, roughness: 0.8 });
@@ -285,154 +281,189 @@ export class EnemyFactory {
   public static createShadowYokai(): CharacterRig {
     const rig = new CharacterRig();
 
-    const addMesh = (parent: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material, yOffset = 0) => {
+    const addMesh = (parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material, yOffset = 0, xOffset = 0, zOffset = 0) => {
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.y = yOffset;
+      mesh.position.set(xOffset, yOffset, zOffset);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       parent.add(mesh);
       return mesh;
     };
 
-    // ── Torso: tall, narrow, angular ──
-    const pelvisGeo = new THREE.BoxGeometry(0.25, 0.15, 0.2);
-    const spineGeo = new THREE.BoxGeometry(0.2, 0.35, 0.18);
-    // Elongated narrow chest
-    const chestGeo = new THREE.BoxGeometry(0.35, 0.55, 0.25);
-    // Taper: narrow at waist, angular at shoulders
+    // ─── Proportions & Base ──────────────────────────────────────────────
+    // Very tall and floating/spindly
+    const scale = 1.3;
+    rig.root.scale.set(scale, scale, scale);
+    rig.pelvis.position.set(0, 1.4, 0);
+
+    // ─── Torso & Robes ──────────────────────────────────────────────────
+    // Slender hidden pelvis
+    const pelvisGeo = new THREE.BoxGeometry(0.3, 0.2, 0.2);
+    addMesh(rig.pelvis, pelvisGeo, shadowClothMat);
+    
+    // Spine
+    const spineGeo = new THREE.BoxGeometry(0.25, 0.35, 0.2);
+    addMesh(rig.spine, spineGeo, shadowClothMat, 0.175);
+
+    // Slender chest
+    const chestGeo = new THREE.BoxGeometry(0.4, 0.5, 0.25);
     const cPos = chestGeo.attributes.position;
-    for (let i = 0; i < cPos.count; i++) {
-      const y = cPos.getY(i);
-      if (y < 0) {
-        cPos.setX(i, cPos.getX(i) * 0.5);
-        cPos.setZ(i, cPos.getZ(i) * 0.6);
-      } else {
-        // Sharp angular shoulders
-        cPos.setX(i, cPos.getX(i) * 1.3);
+    for(let i=0; i<cPos.count; i++) {
+      if (cPos.getY(i) < 0) {
+        cPos.setX(i, cPos.getX(i) * 0.6); // Narrow at the waist
       }
     }
     chestGeo.computeVertexNormals();
+    addMesh(rig.chest, chestGeo, shadowClothMat, 0.25);
 
-    // ── Head: angular, slightly elongated ──
-    const headGeo = new THREE.BoxGeometry(0.18, 0.22, 0.2);
-    // Taper top of head
-    const hPos = headGeo.attributes.position;
-    for (let i = 0; i < hPos.count; i++) {
-      if (hPos.getY(i) > 0) {
-        hPos.setX(i, hPos.getX(i) * 0.7);
-        hPos.setZ(i, hPos.getZ(i) * 0.8);
+    // Kimono Lapels (V-neck)
+    const lapelGeo = new THREE.BoxGeometry(0.1, 0.5, 0.05);
+    const lLapel = addMesh(rig.chest, lapelGeo, shadowClothMat, 0.2, 0.08, 0.13);
+    lLapel.rotation.z = -0.3; lLapel.rotation.x = -0.1;
+    const rLapel = addMesh(rig.chest, lapelGeo, shadowClothMat, 0.2, -0.08, 0.13);
+    rLapel.rotation.z = 0.3; rLapel.rotation.x = -0.1;
+
+    // Rope Belt
+    const beltGeo = new THREE.TorusGeometry(0.18, 0.03, 6, 16);
+    beltGeo.rotateX(Math.PI / 2);
+    addMesh(rig.pelvis, beltGeo, shadowSkinMat, 0.1);
+    
+    // Dangling Tassel
+    const tasselCordGeo = new THREE.CylinderGeometry(0.01, 0.01, 0.4);
+    const tasselCord = addMesh(rig.pelvis, tasselCordGeo, shadowSkinMat, -0.1, 0.12, 0.18);
+    const beadGeo = new THREE.SphereGeometry(0.04, 8, 8);
+    addMesh(tasselCord, beadGeo, shadowAccentMat, -0.1);
+    const tasselFringeGeo = new THREE.ConeGeometry(0.03, 0.15, 6);
+    addMesh(tasselCord, tasselFringeGeo, shadowClothMat, -0.2);
+
+    // ─── Head & Face ────────────────────────────────────────────────────
+    const headGeo = new THREE.BoxGeometry(0.2, 0.3, 0.22);
+    const headPos = headGeo.attributes.position;
+    for(let i=0; i<headPos.count; i++) {
+      if(headPos.getY(i) < 0) {
+        headPos.setX(i, headPos.getX(i)*0.5); // Very sharp chin
+        headPos.setZ(i, headPos.getZ(i)*0.6);
+      } else {
+        headPos.setX(i, headPos.getX(i)*0.8); // Narrow top
       }
     }
     headGeo.computeVertexNormals();
+    const headMesh = addMesh(rig.head, headGeo, shadowSkinMat, 0.15);
 
-    // Tall swept-back horns
-    const hornGeo = new THREE.ConeGeometry(0.03, 0.3, 4);
-    hornGeo.translate(0, 0.15, 0);
-    const lHorn = new THREE.Mesh(hornGeo, shadowHornMat);
-    lHorn.position.set(0.08, 0.1, -0.03);
-    lHorn.rotation.z = -0.4;
-    lHorn.rotation.x = -0.5;
-    const rHorn = new THREE.Mesh(hornGeo, shadowHornMat);
-    rHorn.position.set(-0.08, 0.1, -0.03);
-    rHorn.rotation.z = 0.4;
-    rHorn.rotation.x = -0.5;
-
-    // Third central horn (shadow protrusion)
-    const centralHornGeo = new THREE.ConeGeometry(0.02, 0.2, 3);
-    centralHornGeo.translate(0, 0.1, 0);
-    const centralHorn = new THREE.Mesh(centralHornGeo, shadowHornMat);
-    centralHorn.position.set(0, 0.12, -0.05);
-    centralHorn.rotation.x = -0.6;
-
-    // Narrow glowing eyes
-    const eyeGeo = new THREE.BoxGeometry(0.05, 0.015, 0.01);
+    // Small piercing red eyes
+    const eyeGeo = new THREE.BoxGeometry(0.03, 0.015, 0.01);
     const lEye = new THREE.Mesh(eyeGeo, shadowEyeMat);
-    lEye.position.set(0.04, 0.03, 0.1);
+    lEye.position.set(0.04, 0.04, 0.11); lEye.rotation.z = 0.2; lEye.rotation.x = -0.1;
     const rEye = new THREE.Mesh(eyeGeo, shadowEyeMat);
-    rEye.position.set(-0.04, 0.03, 0.1);
+    rEye.position.set(-0.04, 0.04, 0.11); rEye.rotation.z = -0.2; rEye.rotation.x = -0.1;
+    headMesh.add(lEye, rEye);
 
-    // ── Arms: very elongated, thin ──
-    const upperArmGeo = new THREE.BoxGeometry(0.08, 0.6, 0.08);
-    upperArmGeo.translate(0, -0.3, 0);
-    const lowerArmGeo = new THREE.BoxGeometry(0.06, 0.6, 0.06);
-    lowerArmGeo.translate(0, -0.3, 0);
-    // Narrow hands
-    const handGeo = new THREE.BoxGeometry(0.1, 0.2, 0.08);
-    handGeo.translate(0, -0.1, 0);
-
-    // Long sharp fingers (5 per hand)
-    const fingerGeo = new THREE.ConeGeometry(0.012, 0.18, 3);
-    fingerGeo.translate(0, -0.09, 0);
-    const addFingers = (hand: THREE.Object3D) => {
-      for (let i = -2; i <= 2; i++) {
-        const finger = new THREE.Mesh(fingerGeo, shadowClawMat);
-        finger.position.set(i * 0.02, -0.15, 0.02);
-        finger.rotation.x = -0.15;
-        hand.add(finger);
-      }
-    };
-
-    // ── Legs: long, thin ──
-    const upperLegGeo = new THREE.BoxGeometry(0.12, 0.55, 0.12);
-    upperLegGeo.translate(0, -0.275, 0);
-    const lowerLegGeo = new THREE.BoxGeometry(0.09, 0.5, 0.09);
-    lowerLegGeo.translate(0, -0.25, 0);
-    const footGeo = new THREE.BoxGeometry(0.1, 0.06, 0.2);
-    footGeo.translate(0, -0.03, 0.05);
-
-    // ── Shadow cloth wisps ──
-    const wispMat = new THREE.MeshBasicMaterial({
-      color: 0x0a1520, transparent: true, opacity: 0.3,
-      side: THREE.DoubleSide, depthWrite: false
-    });
-    const addWisps = (parent: THREE.Group, count: number, yBase: number) => {
+    // Smoky Tendrils from Head
+    const wispGeo = new THREE.ConeGeometry(0.02, 0.4, 4);
+    wispGeo.translate(0, 0.2, 0);
+    const addWisps = (parent: THREE.Object3D, count: number, radius: number) => {
       for (let i = 0; i < count; i++) {
-        const w = 0.15 + Math.random() * 0.15;
-        const h = 0.3 + Math.random() * 0.4;
-        const wisp = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wispMat);
-        wisp.position.set(
-          (Math.random() - 0.5) * 0.3,
-          yBase - h / 2,
-          (Math.random() - 0.5) * 0.15
-        );
-        wisp.rotation.y = Math.random() * Math.PI;
+        const wisp = new THREE.Mesh(wispGeo, shadowSmokeMat);
+        const angle = (i / count) * Math.PI * 2;
+        wisp.position.set(Math.cos(angle)*radius, 0.1, Math.sin(angle)*radius - 0.05);
+        
+        // Randomly curl the wisps
+        wisp.rotation.x = (Math.random() - 0.5) * 1.5;
+        wisp.rotation.z = (Math.random() - 0.5) * 1.5;
+        wisp.rotation.y = (Math.random() - 0.5) * 1.5;
+        
+        // Add a secondary curve
+        const wisp2 = new THREE.Mesh(wispGeo, shadowSmokeMat);
+        wisp2.position.set(0, 0.4, 0);
+        wisp2.rotation.x = (Math.random() - 0.5) * 1.0;
+        wisp2.rotation.z = (Math.random() - 0.5) * 1.0;
+        wisp2.scale.set(0.7, 0.7, 0.7);
+        wisp.add(wisp2);
+        
         parent.add(wisp);
       }
     };
+    addWisps(headMesh, 12, 0.08);
+    // Add some wisps to upper chest/shoulders
+    addWisps(rig.chest, 8, 0.15);
 
-    // ── Assembly ──
-    addMesh(rig.pelvis, pelvisGeo, shadowClothMat);
-    addMesh(rig.spine, spineGeo, shadowSkinMat);
-    addMesh(rig.chest, chestGeo, shadowSkinMat);
-
-    // Crimson accent sash across chest
-    const sashGeo = new THREE.BoxGeometry(0.38, 0.05, 0.27);
-    addMesh(rig.chest, sashGeo, shadowAccentMat, 0.05);
-
-    const headMesh = addMesh(rig.head, headGeo, shadowSkinMat, 0.11);
-    headMesh.add(lHorn, rHorn, centralHorn, lEye, rEye);
-
-    // Longer arm reach
-    rig.leftUpperArm.position.set(0.25, 0.2, 0);
-    rig.rightUpperArm.position.set(-0.25, 0.2, 0);
+    // ─── Arms (Elongated, massive clawed hands) ─────────────────────────
+    rig.leftUpperArm.position.set(0.25, 0.45, 0); 
+    rig.rightUpperArm.position.set(-0.25, 0.45, 0);
     rig.leftLowerArm.position.set(0, -0.6, 0);
     rig.rightLowerArm.position.set(0, -0.6, 0);
     rig.leftHand.position.set(0, -0.6, 0);
     rig.rightHand.position.set(0, -0.6, 0);
 
-    addMesh(rig.leftUpperArm, upperArmGeo, shadowClothMat);
-    addMesh(rig.rightUpperArm, upperArmGeo, shadowClothMat);
+    const upperArmGeo = new THREE.CylinderGeometry(0.06, 0.04, 0.65, 6);
+    upperArmGeo.translate(0, -0.325, 0);
+    const lowerArmGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.65, 6);
+    lowerArmGeo.translate(0, -0.325, 0);
+    
+    // Robe Sleeves (flowing down)
+    const sleeveGeo = new THREE.BoxGeometry(0.18, 0.8, 0.18);
+    sleeveGeo.translate(0, -0.4, 0);
+    const sPos = sleeveGeo.attributes.position;
+    for(let i=0; i<sPos.count; i++) {
+      if(sPos.getY(i) < -0.2) {
+        sPos.setX(i, sPos.getX(i) * (1 + Math.random()*0.5)); // Tattered/widening at bottom
+        sPos.setZ(i, sPos.getZ(i) * (1 + Math.random()*0.5));
+      }
+    }
+    sleeveGeo.computeVertexNormals();
+
+    addMesh(rig.leftUpperArm, sleeveGeo, shadowClothMat);
+    addMesh(rig.rightUpperArm, sleeveGeo, shadowClothMat);
+    
+    // Exposed black skinny arms underneath
+    addMesh(rig.leftUpperArm, upperArmGeo, shadowSkinMat);
+    addMesh(rig.rightUpperArm, upperArmGeo, shadowSkinMat);
     addMesh(rig.leftLowerArm, lowerArmGeo, shadowSkinMat);
     addMesh(rig.rightLowerArm, lowerArmGeo, shadowSkinMat);
 
+    // Left shoulder armor (Sode)
+    const sodeGeo = new THREE.BoxGeometry(0.15, 0.2, 0.15);
+    addMesh(rig.leftUpperArm, sodeGeo, shadowAccentMat, 0.05, 0.1, 0).rotation.z = -0.2;
+
+    // Huge spindly hands
+    const handGeo = new THREE.BoxGeometry(0.12, 0.15, 0.08);
+    handGeo.translate(0, -0.075, 0);
     const lHand = addMesh(rig.leftHand, handGeo, shadowSkinMat);
     const rHand = addMesh(rig.rightHand, handGeo, shadowSkinMat);
-    addFingers(lHand);
-    addFingers(rHand);
 
-    // Legs
-    rig.leftUpperLeg.position.set(0.08, -0.1, 0);
-    rig.rightUpperLeg.position.set(-0.08, -0.1, 0);
+    // Extreme claws
+    const fingerGeo = new THREE.BoxGeometry(0.015, 0.25, 0.015);
+    fingerGeo.translate(0, -0.125, 0);
+    const clawGeo = new THREE.ConeGeometry(0.01, 0.2, 3);
+    clawGeo.translate(0, -0.1, 0.02); // curving inward
+    
+    const addFingers = (hand: THREE.Object3D, isLeft: boolean) => {
+      for (let i = -1; i <= 1; i++) {
+        const finger = new THREE.Mesh(fingerGeo, shadowSkinMat);
+        finger.position.set(i * 0.04, -0.15, 0.02);
+        finger.rotation.x = -0.2;
+        const claw = new THREE.Mesh(clawGeo, shadowClawMat);
+        claw.position.set(0, -0.25, 0);
+        claw.rotation.x = -0.4;
+        finger.add(claw);
+        hand.add(finger);
+      }
+      // Thumb
+      const thumb = new THREE.Mesh(fingerGeo, shadowSkinMat);
+      thumb.position.set(isLeft ? -0.06 : 0.06, -0.05, 0);
+      thumb.rotation.z = isLeft ? -0.6 : 0.6;
+      const tClaw = new THREE.Mesh(clawGeo, shadowClawMat);
+      tClaw.position.set(0, -0.25, 0);
+      tClaw.rotation.x = -0.2;
+      thumb.add(tClaw);
+      hand.add(thumb);
+    };
+    addFingers(lHand, true);
+    addFingers(rHand, false);
+
+    // ─── Legs (Flowing tattered robes, skinny legs) ─────────────────────
+    rig.leftUpperLeg.position.set(0.1, 0, 0);
+    rig.rightUpperLeg.position.set(-0.1, 0, 0);
     rig.leftLowerLeg.position.set(0, -0.55, 0);
     rig.rightLowerLeg.position.set(0, -0.55, 0);
 
