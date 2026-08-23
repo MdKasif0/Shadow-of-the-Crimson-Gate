@@ -93,9 +93,19 @@ export class TerrainGenerator {
         color.setHex(0x1a2520);
         color.lerp(new THREE.Color(0x15201a), Math.abs(colorNoise));
       } else if (z > -55) {
-        // Forest: darker, more brown
-        color.setHex(0x151a18);
-        color.lerp(new THREE.Color(0x0f1410), Math.abs(colorNoise));
+        // Cursed Forest
+        const pathWidth = 6.0;
+        const distFromPath = Math.abs(x);
+        
+        if (distFromPath < pathWidth) {
+          // Cracked stone path (bluish grey)
+          color.setHex(0x1a2228);
+          color.lerp(new THREE.Color(0x25303a), Math.abs(colorNoise));
+        } else {
+          // Dark dirt / moss edges
+          color.setHex(0x0f1512);
+          color.lerp(new THREE.Color(0x0a0c0a), Math.abs(colorNoise));
+        }
       } else {
         // Temple approach: stone-like
         color.setHex(0x1e2530);
