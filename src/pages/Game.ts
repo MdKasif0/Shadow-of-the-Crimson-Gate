@@ -19,7 +19,6 @@ function navigateHome(): void {
 }
 
 export function createGamePage(): PageComponent {
-  https://127.0.0.1:55361/static/artifacts/bc0c8793-5d14-4b13-963b-6d8028ce8bce/.user_uploaded/media_1787484900356.jpg?csrf=6767a21f-ea6e-41d9-80bf-0a039d89e3a4
   let backButton: HTMLButtonElement | null = null;
   let gameInstance: ThreeGame | null = null;
 
