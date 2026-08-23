@@ -130,13 +130,11 @@ export class ArenaGenerator {
     const gateGrp = new THREE.Group();
     gateGrp.position.set(0, 0, this.CENTER_Z + halfSize);
     
-    // Gate Base
-    addMesh(gateGrp, new THREE.BoxGeometry(8, 2.0, 4), darkStoneMat, new THREE.Vector3(0, 0.8, 0));
-    // Stairs (Front and Back)
-    for (let i = 0; i < 4; i++) {
-      addMesh(gateGrp, new THREE.BoxGeometry(4, 0.3, 0.6), darkStoneMat, new THREE.Vector3(0, i * 0.3 + 0.15, 2.3 + (3 - i) * 0.6));
-      addMesh(gateGrp, new THREE.BoxGeometry(4, 0.3, 0.6), darkStoneMat, new THREE.Vector3(0, i * 0.3 + 0.15, -2.3 - (3 - i) * 0.6));
-    }
+    // Gate Base (Two sides, open center)
+    addMesh(gateGrp, new THREE.BoxGeometry(2, 2.0, 4), darkStoneMat, new THREE.Vector3(-3, 0.8, 0));
+    addMesh(gateGrp, new THREE.BoxGeometry(2, 2.0, 4), darkStoneMat, new THREE.Vector3(3, 0.8, 0));
+    // Flat stone path through the gate
+    addMesh(gateGrp, new THREE.BoxGeometry(4, 0.2, 5), darkStoneMat, new THREE.Vector3(0, 0.1, 0));
     
     // Pillars
     for(let x of [-3.5, -1.5, 1.5, 3.5]) {

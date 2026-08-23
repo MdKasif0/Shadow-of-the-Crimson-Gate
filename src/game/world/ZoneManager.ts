@@ -14,8 +14,8 @@ export interface ZoneConfig {
 const ZONES: ZoneConfig[] = [
   { id: 'ENTRANCE',         label: 'Entrance',          minZ: 40,  maxZ: 65,  fogDensity: 0.015, fogColor: 0x0a0e14, ambientColor: 0xccccff, ambientIntensity: 2.2 },
   { id: 'COURTYARD',        label: 'Sakura Courtyard',  minZ: 0,   maxZ: 40,  fogDensity: 0.018, fogColor: 0x060a10, ambientColor: 0xffffff, ambientIntensity: 2.0 },
-  { id: 'SHRINE',           label: 'Shrine Area',       minZ: -20, maxZ: 0,   fogDensity: 0.020, fogColor: 0x080c12, ambientColor: 0xaaddcc, ambientIntensity: 1.8 },
-  { id: 'FOREST',           label: 'Forest Path',       minZ: -50, maxZ: -20, fogDensity: 0.035, fogColor: 0x040810, ambientColor: 0x889999, ambientIntensity: 1.2 },
+  { id: 'SHRINE',           label: 'Shrine Area',       minZ: -20, maxZ: 0,   fogDensity: 0.025, fogColor: 0x05131a, ambientColor: 0x223344, ambientIntensity: 1.5 },
+  { id: 'FOREST',           label: 'Cursed Forest',     minZ: -50, maxZ: -20, fogDensity: 0.040, fogColor: 0x041118, ambientColor: 0x112233, ambientIntensity: 1.0 },
   { id: 'TEMPLE_APPROACH',  label: 'Temple Approach',   minZ: -85, maxZ: -50, fogDensity: 0.025, fogColor: 0x060a14, ambientColor: 0xccaaee, ambientIntensity: 1.5 },
   { id: 'BOSS_ARENA',       label: 'Boss Arena',        minZ: -140, maxZ: -85, fogDensity: 0.02, fogColor: 0x111520, ambientColor: 0xffcccc, ambientIntensity: 3.0 },
 ];
