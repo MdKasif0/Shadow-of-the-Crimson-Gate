@@ -26,7 +26,6 @@ const tenguMetalMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalnes
 const tenguAccentMat = new THREE.MeshStandardMaterial({ color: 0x881111, roughness: 0.9, flatShading: true }); // Red ropes/tassels
 const tenguGoldMat = new THREE.MeshStandardMaterial({ color: 0xbba855, metalness: 0.8, roughness: 0.3 }); // Gold trim
 const tenguEyeMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xdd8800, emissiveIntensity: 2.0 });
-const tenguEyeMat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffaa00, emissiveIntensity: 2.0 });
 
 export class EnemyFactory {
   public static createBasicYokai(): CharacterRig {
