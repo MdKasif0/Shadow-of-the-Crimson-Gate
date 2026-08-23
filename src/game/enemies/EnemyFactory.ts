@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { CharacterRig } from '../characters/CharacterRig';
 
 // ─── Basic Yokai Materials ──────────────────────────────────────────────────
-const darkSkinMat = new THREE.MeshStandardMaterial({ color: 0x111115, roughness: 0.9 });
-const clothMat = new THREE.MeshStandardMaterial({ color: 0x221133, roughness: 1.0 }); // ragged purple
-const hornMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4 });
-const eyeMat = new THREE.MeshStandardMaterial({ color: 0xff3300, emissive: 0xaa1100, emissiveIntensity: 2.0 });
-const clawMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.2 });
+const yokaiSkinMat = new THREE.MeshStandardMaterial({ color: 0x242a35, roughness: 0.8 }); // Dark slate/blue
+const yokaiClothMat = new THREE.MeshStandardMaterial({ color: 0x1f1b18, roughness: 1.0 }); // Dark, distressed brown/charcoal
+const yokaiRopeMat = new THREE.MeshStandardMaterial({ color: 0x5a4a35, roughness: 0.9, flatShading: true }); // Twisted rope
+const yokaiHornMat = new THREE.MeshStandardMaterial({ color: 0x888877, roughness: 0.6 }); // Bone
+const yokaiEyeMat = new THREE.MeshStandardMaterial({ color: 0xff1100, emissive: 0xcc0000, emissiveIntensity: 2.0 });
+const yokaiClawMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 });
+const yokaiHairMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 }); // Messy black hair
 
 // ─── Shadow Yokai Materials ─────────────────────────────────────────────────
 const shadowSkinMat = new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.95 });
@@ -32,121 +34,248 @@ export class EnemyFactory {
   public static createBasicYokai(): CharacterRig {
     const rig = new CharacterRig();
 
-    const addMesh = (parent: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material, yOffset = 0) => {
+    const addMesh = (parent: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material, yOffset = 0, xOffset = 0, zOffset = 0) => {
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.y = yOffset;
+      mesh.position.set(xOffset, yOffset, zOffset);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       parent.add(mesh);
       return mesh;
     };
 
-    // Make Yokai hunched and broad
-    const pelvisGeo = new THREE.BoxGeometry(0.4, 0.2, 0.3);
-    const spineGeo = new THREE.BoxGeometry(0.35, 0.25, 0.3);
-    const chestGeo = new THREE.BoxGeometry(0.6, 0.45, 0.4); // Very broad
+    // ─── Proportions & Base ──────────────────────────────────────────────
+    // Taller, slender, slightly hunched
+    const scale = 1.15;
+    rig.root.scale.set(scale, scale, scale);
+    rig.pelvis.position.set(0, 1.1, 0);
+
+    // ─── Torso ──────────────────────────────────────────────────────────
+    // Gaunt waist/pelvis
+    const pelvisGeo = new THREE.BoxGeometry(0.35, 0.25, 0.25);
+    addMesh(rig.pelvis, pelvisGeo, yokaiClothMat); // Pants start here
     
-    // Taper chest heavily
+    // Spine (bare stomach)
+    const spineGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.35, 6);
+    addMesh(rig.spine, spineGeo, yokaiSkinMat, 0.15);
+
+    // Chest (gaunt but muscular)
+    const chestGeo = new THREE.BoxGeometry(0.45, 0.4, 0.3);
     const cPos = chestGeo.attributes.position;
     for(let i=0; i<cPos.count; i++) {
       if (cPos.getY(i) < 0) {
-        cPos.setX(i, cPos.getX(i) * 0.6); // Narrow at the waist
+        cPos.setX(i, cPos.getX(i) * 0.7); // Narrow at the waist
       }
     }
     chestGeo.computeVertexNormals();
+    addMesh(rig.chest, chestGeo, yokaiSkinMat, 0.2);
 
-    const headGeo = new THREE.BoxGeometry(0.25, 0.25, 0.25);
-    // Horns
-    const hornGeo = new THREE.ConeGeometry(0.04, 0.15, 4);
-    hornGeo.translate(0, 0.075, 0);
+    // Ribs (simulated with thin boxes on the chest)
+    const ribGeo = new THREE.BoxGeometry(0.42, 0.04, 0.32);
+    for (let i = 0; i < 3; i++) {
+      addMesh(rig.chest, ribGeo, yokaiSkinMat, 0.05 + (i * 0.1));
+    }
 
-    const lHorn = new THREE.Mesh(hornGeo, hornMat);
-    lHorn.position.set(0.1, 0.1, 0);
-    lHorn.rotation.z = -0.3;
-    lHorn.rotation.x = -0.2;
+    // ─── Clothing (Left Shoulder Drape & Rope Belt) ─────────────────────
+    // Rope belt
+    const beltGeo = new THREE.TorusGeometry(0.2, 0.04, 8, 16);
+    beltGeo.rotateX(Math.PI / 2);
+    addMesh(rig.pelvis, beltGeo, yokaiRopeMat, 0.12);
+    // Knot ends hanging
+    const knotGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 5);
+    const lKnot = addMesh(rig.pelvis, knotGeo, yokaiRopeMat, 0, 0.05, 0.22);
+    lKnot.rotation.x = 0.2; lKnot.rotation.z = 0.1;
+    const rKnot = addMesh(rig.pelvis, knotGeo, yokaiRopeMat, 0, -0.05, 0.22);
+    rKnot.rotation.x = 0.3; rKnot.rotation.z = -0.1;
+
+    // Left shoulder cloth drape
+    const drapeGeo = new THREE.BoxGeometry(0.25, 0.4, 0.35);
+    const drape = addMesh(rig.chest, drapeGeo, yokaiClothMat, 0.2, 0.18, 0);
+    drape.rotation.z = -0.3;
+    // Lower drape hanging down back
+    const backDrapeGeo = new THREE.BoxGeometry(0.2, 0.5, 0.1);
+    const bDrape = addMesh(rig.chest, backDrapeGeo, yokaiClothMat, -0.1, 0.18, -0.15);
+    bDrape.rotation.x = 0.2;
     
-    const rHorn = new THREE.Mesh(hornGeo, hornMat);
-    rHorn.position.set(-0.1, 0.1, 0);
-    rHorn.rotation.z = 0.3;
-    rHorn.rotation.x = -0.2;
-    
-    // Eyes
-    const eyeGeo = new THREE.BoxGeometry(0.04, 0.02, 0.01);
-    const lEye = new THREE.Mesh(eyeGeo, eyeMat);
-    lEye.position.set(0.06, 0.02, 0.13);
-    lEye.rotation.z = 0.1;
+    // ─── Head & Face ────────────────────────────────────────────────────
+    const headGeo = new THREE.BoxGeometry(0.22, 0.28, 0.24);
+    const headPos = headGeo.attributes.position;
+    for(let i=0; i<headPos.count; i++) {
+      if(headPos.getY(i) < 0) {
+        headPos.setX(i, headPos.getX(i)*0.8); // tapered chin
+        headPos.setZ(i, headPos.getZ(i)*0.8);
+      }
+    }
+    headGeo.computeVertexNormals();
+    const headMesh = addMesh(rig.head, headGeo, yokaiSkinMat, 0.15);
 
-    const rEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rEye.position.set(-0.06, 0.02, 0.13);
-    rEye.rotation.z = -0.1;
+    // Glowing red eyes (sunken)
+    const eyeGeo = new THREE.BoxGeometry(0.05, 0.02, 0.01);
+    const lEye = new THREE.Mesh(eyeGeo, yokaiEyeMat);
+    lEye.position.set(0.05, 0.03, 0.12); lEye.rotation.z = 0.1;
+    const rEye = new THREE.Mesh(eyeGeo, yokaiEyeMat);
+    rEye.position.set(-0.05, 0.03, 0.12); rEye.rotation.z = -0.1;
+    headMesh.add(lEye, rEye);
+    // Brow ridge (angry)
+    const browGeo = new THREE.BoxGeometry(0.18, 0.03, 0.04);
+    addMesh(headMesh, browGeo, yokaiSkinMat, 0.06, 0, 0.11).rotation.x = 0.1;
 
-    // Arms (Elongated)
-    const upperArmGeo = new THREE.BoxGeometry(0.15, 0.5, 0.15);
-    upperArmGeo.translate(0, -0.25, 0);
-    
-    const lowerArmGeo = new THREE.BoxGeometry(0.12, 0.5, 0.12);
-    lowerArmGeo.translate(0, -0.25, 0);
-    
-    const handGeo = new THREE.BoxGeometry(0.18, 0.25, 0.18);
-    handGeo.translate(0, -0.125, 0);
+    // Elf ears
+    const earGeo = new THREE.ConeGeometry(0.03, 0.15, 3);
+    const lEar = new THREE.Mesh(earGeo, yokaiSkinMat);
+    lEar.position.set(0.12, 0, 0); lEar.rotation.z = -1.2; lEar.rotation.x = -0.2;
+    const rEar = new THREE.Mesh(earGeo, yokaiSkinMat);
+    rEar.position.set(-0.12, 0, 0); rEar.rotation.z = 1.2; rEar.rotation.x = -0.2;
+    headMesh.add(lEar, rEar);
 
-    // Claws
-    const clawGeo = new THREE.ConeGeometry(0.02, 0.15, 3);
-    clawGeo.translate(0, -0.075, 0);
-    const addClaws = (hand: THREE.Object3D) => {
+    // Backward curving horns
+    const hornGeo = new THREE.ConeGeometry(0.03, 0.18, 6);
+    hornGeo.translate(0, 0.09, 0);
+    const lHorn = new THREE.Mesh(hornGeo, yokaiHornMat);
+    lHorn.position.set(0.06, 0.12, 0); lHorn.rotation.x = -0.6; lHorn.rotation.z = -0.2;
+    const rHorn = new THREE.Mesh(hornGeo, yokaiHornMat);
+    rHorn.position.set(-0.06, 0.12, 0); rHorn.rotation.x = -0.6; rHorn.rotation.z = 0.2;
+    headMesh.add(lHorn, rHorn);
+
+    // Messy hair (multiple hanging boxes/cones)
+    const hairGeo = new THREE.ConeGeometry(0.04, 0.4, 3);
+    hairGeo.translate(0, -0.2, 0);
+    for (let i = 0; i < 8; i++) {
+      const hair = new THREE.Mesh(hairGeo, yokaiHairMat);
+      const angle = (i / 8) * Math.PI * 2;
+      const x = Math.cos(angle) * 0.1;
+      const z = Math.sin(angle) * 0.1 - 0.05; // biased towards back
+      hair.position.set(x, 0.15, z);
+      hair.rotation.x = z < 0 ? 0.3 : 0; // hang backwards
+      hair.rotation.z = x * 2;
+      headMesh.add(hair);
+    }
+
+    // ─── Arms (Elongated, clawed hands) ─────────────────────────────────
+    rig.leftUpperArm.position.set(0.28, 0.35, 0); // wider shoulders
+    rig.rightUpperArm.position.set(-0.28, 0.35, 0);
+    rig.leftLowerArm.position.set(0, -0.45, 0);
+    rig.rightLowerArm.position.set(0, -0.45, 0);
+    rig.leftHand.position.set(0, -0.45, 0);
+    rig.rightHand.position.set(0, -0.45, 0);
+
+    const upperArmGeo = new THREE.BoxGeometry(0.12, 0.5, 0.12);
+    upperArmGeo.translate(0, -0.2, 0);
+    const lowerArmGeo = new THREE.BoxGeometry(0.1, 0.5, 0.1);
+    lowerArmGeo.translate(0, -0.2, 0);
+    const handGeo = new THREE.BoxGeometry(0.15, 0.2, 0.12);
+    handGeo.translate(0, -0.1, 0);
+
+    // Left arm is partially covered by cloth drape
+    addMesh(rig.leftUpperArm, upperArmGeo, yokaiSkinMat);
+    const armClothGeo = new THREE.BoxGeometry(0.14, 0.4, 0.14);
+    armClothGeo.translate(0, -0.15, 0);
+    addMesh(rig.leftUpperArm, armClothGeo, yokaiClothMat); // sleeve piece
+
+    addMesh(rig.rightUpperArm, upperArmGeo, yokaiSkinMat);
+    addMesh(rig.leftLowerArm, lowerArmGeo, yokaiSkinMat);
+    addMesh(rig.rightLowerArm, lowerArmGeo, yokaiSkinMat);
+
+    const lHand = addMesh(rig.leftHand, handGeo, yokaiSkinMat);
+    const rHand = addMesh(rig.rightHand, handGeo, yokaiSkinMat);
+
+    // Long spindly fingers with claws
+    const fingerGeo = new THREE.BoxGeometry(0.02, 0.15, 0.02);
+    fingerGeo.translate(0, -0.075, 0);
+    const clawGeo = new THREE.ConeGeometry(0.015, 0.1, 3);
+    clawGeo.translate(0, -0.05, 0.02); // curving inward
+    
+    const addFingers = (hand: THREE.Object3D, isLeft: boolean) => {
       for (let i = -1; i <= 1; i++) {
-        const claw = new THREE.Mesh(clawGeo, clawMat);
-        claw.position.set(i * 0.06, -0.2, 0.05);
-        claw.rotation.x = -0.2;
-        hand.add(claw);
+        const finger = new THREE.Mesh(fingerGeo, yokaiSkinMat);
+        finger.position.set(i * 0.05, -0.2, 0.03);
+        finger.rotation.x = -0.2;
+        const claw = new THREE.Mesh(clawGeo, yokaiClawMat);
+        claw.position.set(0, -0.15, 0);
+        claw.rotation.x = -0.3;
+        finger.add(claw);
+        hand.add(finger);
+      }
+      // Thumb
+      const thumb = new THREE.Mesh(fingerGeo, yokaiSkinMat);
+      thumb.position.set(isLeft ? -0.08 : 0.08, -0.1, 0);
+      thumb.rotation.z = isLeft ? -0.5 : 0.5;
+      const tClaw = new THREE.Mesh(clawGeo, yokaiClawMat);
+      tClaw.position.set(0, -0.15, 0);
+      thumb.add(tClaw);
+      hand.add(thumb);
+    };
+    addFingers(lHand, true);
+    addFingers(rHand, false);
+
+    // ─── Legs (Tattered pants, ropes, clawed feet) ──────────────────────
+    rig.leftUpperLeg.position.set(0.15, 0, 0);
+    rig.rightUpperLeg.position.set(-0.15, 0, 0);
+    rig.leftLowerLeg.position.set(0, -0.5, 0);
+    rig.rightLowerLeg.position.set(0, -0.5, 0);
+    rig.leftFoot.position.set(0, -0.5, 0);
+    rig.rightFoot.position.set(0, -0.5, 0);
+
+    // Upper legs covered in jagged cloth
+    const upperLegClothGeo = new THREE.BoxGeometry(0.18, 0.55, 0.18);
+    upperLegClothGeo.translate(0, -0.25, 0);
+    const ulPos = upperLegClothGeo.attributes.position;
+    for(let i=0; i<ulPos.count; i++) {
+      if(ulPos.getY(i) < -0.1) {
+        ulPos.setX(i, ulPos.getX(i) * (1 + Math.random()*0.2)); // jagged tearing
+      }
+    }
+    upperLegClothGeo.computeVertexNormals();
+    
+    // Lower leg (part cloth, part skin)
+    const lowerLegGeo = new THREE.BoxGeometry(0.12, 0.5, 0.12);
+    lowerLegGeo.translate(0, -0.25, 0);
+    const lowerLegClothGeo = new THREE.BoxGeometry(0.14, 0.25, 0.14); // cloth only half way down
+    lowerLegClothGeo.translate(0, -0.1, 0);
+
+    addMesh(rig.leftUpperLeg, upperLegClothGeo, yokaiClothMat);
+    addMesh(rig.rightUpperLeg, upperLegClothGeo, yokaiClothMat);
+    
+    addMesh(rig.leftLowerLeg, lowerLegGeo, yokaiSkinMat);
+    addMesh(rig.rightLowerLeg, lowerLegGeo, yokaiSkinMat);
+    addMesh(rig.leftLowerLeg, lowerLegClothGeo, yokaiClothMat);
+    addMesh(rig.rightLowerLeg, lowerLegClothGeo, yokaiClothMat);
+
+    // Ankle ropes
+    const ankleRopeGeo = new THREE.TorusGeometry(0.08, 0.02, 6, 8);
+    ankleRopeGeo.rotateX(Math.PI/2);
+    for(let i=0; i<3; i++) {
+      addMesh(rig.leftLowerLeg, ankleRopeGeo, yokaiRopeMat, -0.4 + (i*0.04));
+      addMesh(rig.rightLowerLeg, ankleRopeGeo, yokaiRopeMat, -0.4 + (i*0.04));
+    }
+
+    // Clawed Bare Feet
+    const footBaseGeo = new THREE.BoxGeometry(0.14, 0.1, 0.25);
+    footBaseGeo.translate(0, -0.05, 0.05);
+    const lFoot = addMesh(rig.leftFoot, footBaseGeo, yokaiSkinMat);
+    const rFoot = addMesh(rig.rightFoot, footBaseGeo, yokaiSkinMat);
+
+    const toeGeo = new THREE.BoxGeometry(0.03, 0.04, 0.1);
+    toeGeo.translate(0, -0.02, 0.05);
+    const toeClawGeo = new THREE.ConeGeometry(0.015, 0.08, 3);
+    toeClawGeo.translate(0, -0.04, 0.08);
+    toeClawGeo.rotateX(-Math.PI/2); // point forward
+    
+    const addToes = (foot: THREE.Object3D) => {
+      for (let i = -1; i <= 1; i++) {
+        const toe = new THREE.Mesh(toeGeo, yokaiSkinMat);
+        toe.position.set(i * 0.04, -0.05, 0.15);
+        const tClaw = new THREE.Mesh(toeClawGeo, yokaiClawMat);
+        toe.add(tClaw);
+        foot.add(toe);
       }
     };
+    addToes(lFoot);
+    addToes(rFoot);
 
-    // Legs (Bent/Squat)
-    const upperLegGeo = new THREE.BoxGeometry(0.2, 0.45, 0.2);
-    upperLegGeo.translate(0, -0.225, 0);
-    
-    const lowerLegGeo = new THREE.BoxGeometry(0.16, 0.4, 0.16);
-    lowerLegGeo.translate(0, -0.2, 0);
-    
-    const footGeo = new THREE.BoxGeometry(0.15, 0.1, 0.3);
-    footGeo.translate(0, -0.05, 0.05);
-
-    // Assembly
-    addMesh(rig.pelvis, pelvisGeo, clothMat);
-    addMesh(rig.spine, spineGeo, darkSkinMat);
-    addMesh(rig.chest, chestGeo, darkSkinMat);
-    
-    const headMesh = addMesh(rig.head, headGeo, darkSkinMat, 0.125);
-    headMesh.add(lHorn, rHorn, lEye, rEye);
-
-    // Adjust rig proportions for long arms
-    rig.leftUpperArm.position.set(0.35, 0.15, 0);
-    rig.rightUpperArm.position.set(-0.35, 0.15, 0);
-    rig.leftLowerArm.position.set(0, -0.5, 0);
-    rig.rightLowerArm.position.set(0, -0.5, 0);
-    rig.leftHand.position.set(0, -0.5, 0);
-    rig.rightHand.position.set(0, -0.5, 0);
-
-    addMesh(rig.leftUpperArm, upperArmGeo, clothMat);
-    addMesh(rig.rightUpperArm, upperArmGeo, clothMat);
-    addMesh(rig.leftLowerArm, lowerArmGeo, darkSkinMat);
-    addMesh(rig.rightLowerArm, lowerArmGeo, darkSkinMat);
-    
-    const lHand = addMesh(rig.leftHand, handGeo, darkSkinMat);
-    const rHand = addMesh(rig.rightHand, handGeo, darkSkinMat);
-    addClaws(lHand);
-    addClaws(rHand);
-
-    addMesh(rig.leftUpperLeg, upperLegGeo, clothMat);
-    addMesh(rig.rightUpperLeg, upperLegGeo, clothMat);
-    addMesh(rig.leftLowerLeg, lowerLegGeo, darkSkinMat);
-    addMesh(rig.rightLowerLeg, lowerLegGeo, darkSkinMat);
-    addMesh(rig.leftFoot, footGeo, darkSkinMat);
-    addMesh(rig.rightFoot, footGeo, darkSkinMat);
-
-    // Rescale entirely to make it imposing
-    rig.root.scale.set(1.2, 1.2, 1.2);
+    // Default pose tweaks for a hunched stance
+    rig.spine.rotation.x = 0.1;
+    rig.chest.rotation.x = 0.15;
+    rig.head.rotation.x = -0.15;
 
     return rig;
   }
