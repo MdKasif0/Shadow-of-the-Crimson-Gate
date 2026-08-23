@@ -11,8 +11,11 @@ import { TempleGenerator } from './TempleGenerator';
 import { MountainGenerator } from './MountainGenerator';
 import { CollisionSystem } from '../collision/CollisionSystem';
 import { ArenaGenerator } from '../boss/arena/ArenaGenerator';
+import { WispGenerator } from './WispGenerator';
 
 export class WorldGenerator {
+  public wispsGroup: THREE.Group;
+
   constructor(scene: THREE.Scene, collisionSystem: CollisionSystem) {
     const random = new SeededRandom(GAME_CONFIG.WORLD_SEED);
     
@@ -59,6 +62,12 @@ export class WorldGenerator {
     ));
     worldGroup.add(courtyardTorii);
 
+    // 4c. Cursed Forest Torii (marks start of forest path at z=-20)
+    const forestTorii = ToriiGenerator.generate(collisionSystem);
+    forestTorii.position.set(-6, 0, -20); // Placed on the side like the image
+    forestTorii.rotation.y = Math.PI / 8; // Angled
+    worldGroup.add(forestTorii);
+
     // 5. Small Shrines
     worldGroup.add(ShrineGenerator.generate(random, collisionSystem));
 
@@ -70,6 +79,10 @@ export class WorldGenerator {
 
     // 8. Rocks (perimeter)
     worldGroup.add(RockGenerator.generate(random, collisionSystem));
+
+    // 9. Wisps
+    this.wispsGroup = WispGenerator.generate(random);
+    worldGroup.add(this.wispsGroup);
 
     scene.add(worldGroup);
   }
