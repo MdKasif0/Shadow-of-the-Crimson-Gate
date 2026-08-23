@@ -56,6 +56,7 @@ export class GameScene {
   private atmosphere: AtmosphereSystem;
   
   private zoneManager: ZoneManager;
+  private worldGenerator: WorldGenerator;
   private interactionSystem: InteractionSystem;
   private objectiveManager: ObjectiveManager;
   private objectiveUI: ObjectiveUI;
@@ -87,7 +88,7 @@ export class GameScene {
     this.zoneManager = new ZoneManager();
 
     this.collisionSystem = new CollisionSystem();
-    new WorldGenerator(this.scene, this.collisionSystem);
+    this.worldGenerator = new WorldGenerator(this.scene, this.collisionSystem);
     this.hitboxSystem = new HitboxSystem(this.scene);
     this.projectileSystem = new ProjectileSystem(this.scene);
     this.arenaHazardSystem = new ArenaHazardSystem(this.scene);
@@ -315,6 +316,10 @@ export class GameScene {
     }
 
     this.atmosphere.update(dt, fogDensity, fogColor);
+    
+    // Update world animations (wisps, etc)
+    this.worldGenerator.update(performance.now() / 1000);
+
     this.lighting.update(dt, ambientColor, ambientIntensity);
     const zoneId = this.zoneManager.getCurrentZoneId();
     this.objectiveManager.onZoneEntered(zoneId);
