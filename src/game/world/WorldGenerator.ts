@@ -86,4 +86,10 @@ export class WorldGenerator {
 
     scene.add(worldGroup);
   }
+
+  public update(time: number): void {
+    if (this.wispsGroup) {
+      WispGenerator.update(this.wispsGroup, time);
+    }
+  }
 }
