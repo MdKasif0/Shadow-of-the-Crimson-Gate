@@ -342,7 +342,7 @@ export class GameScene {
     // ─── Boss Update ──────────────────────────────────────────────
     
     // Trigger Cinematic Intro
-    if (this.boss && this.player.root.position.z < -90 && !this.hasBossIntroPlayed) {
+    if (this.boss && this.player.root.position.z < -85 && !this.hasBossIntroPlayed) {
       this.hasBossIntroPlayed = true;
       this.isCinematicActive = true;
       this.hasShownTitle = false;
