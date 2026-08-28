@@ -22,8 +22,9 @@ export class ObjectiveUI {
     this.textElement.style.fontSize = '24px';
     this.textElement.style.letterSpacing = '4px';
     this.textElement.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
-    this.textElement.style.transition = 'opacity 1s ease-in-out';
+    this.textElement.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
     this.textElement.style.opacity = '0';
+    this.textElement.style.transform = 'translateX(-20px)'; // Slide in starting position
     
     // Tiny decorative line under objective
     const line = document.createElement('div');
@@ -64,14 +65,25 @@ export class ObjectiveUI {
   }
 
   private updateObjective(text: string): void {
-    // Fade out
+    // Fade out and slide right slightly
     this.textElement.style.opacity = '0';
+    this.textElement.style.transform = 'translateX(10px)';
     
     setTimeout(() => {
       // Update text (keep the line)
       this.textElement.innerHTML = `${text}<div style="width: 40px; height: 2px; background-color: #6b1111; margin: 8px auto 0 auto;"></div>`;
-      // Fade in
+      
+      // Reset position to left before fading in
+      this.textElement.style.transition = 'none';
+      this.textElement.style.transform = 'translateX(-20px)';
+      
+      // Force reflow
+      void this.textElement.offsetWidth;
+      
+      // Fade in and slide to center
+      this.textElement.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
       this.textElement.style.opacity = '1';
-    }, 1000);
+      this.textElement.style.transform = 'translateX(0)';
+    }, 800); // Wait for fade out to complete
   }
 }

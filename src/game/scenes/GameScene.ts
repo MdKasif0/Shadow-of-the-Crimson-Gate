@@ -36,6 +36,14 @@ import { ArenaHazardSystem } from '../boss/arena/ArenaHazardSystem';
 import { ArenaGenerator } from '../boss/arena/ArenaGenerator';
 import { BossPhaseId } from '../boss/BossPhase';
 
+// ─── Phase 5 Story Imports ──────────────────────────────────────
+import { StoryManager } from '../story/StoryManager';
+import { DialogueManager } from '../dialogue/DialogueManager';
+import { ChapterUI } from '../ui/ChapterUI';
+import { NPCFactory } from '../npc/NPCFactory';
+import { NPC_DATABASE } from '../npc/NPCData';
+import { NPC } from '../npc/NPC';
+import { NPCInteraction } from '../npc/NPCInteraction';
 export class GameScene {
   public scene: THREE.Scene;
   public player: Ronin;
@@ -60,6 +68,12 @@ export class GameScene {
   private objectiveManager: ObjectiveManager;
   private objectiveUI: ObjectiveUI;
   private telegraphVfx: EncounterTelegraphVFX;
+
+  // ─── Phase 5 Systems ──────────────────────────────────────────
+  private storyManager: StoryManager;
+  private dialogueManager: DialogueManager;
+  private chapterUI: ChapterUI;
+  private npcs: NPC[] = [];
 
   private playerProgress: PlayerProgress;
   private playerStats: PlayerStats;
@@ -127,6 +141,22 @@ export class GameScene {
 
     this.objectiveManager = new ObjectiveManager();
     this.objectiveUI = new ObjectiveUI();
+
+    this.storyManager = new StoryManager();
+    this.dialogueManager = new DialogueManager();
+    this.chapterUI = new ChapterUI();
+
+    // Spawn NPCs from database
+    for (const npcDef of NPC_DATABASE) {
+      const npc = new NPC(npcDef);
+      this.scene.add(npc.root);
+      this.npcs.push(npc);
+      
+      this.interactionSystem.register(new NPCInteraction(npc, () => {
+        const dialogue = npc.getDialogue(this.storyManager.flags);
+        this.dialogueManager.startDialogue(dialogue);
+      }));
+    }
 
     // Boss is in the Boss Arena
     if (!this.playerProgress.crimsonOniDefeated) {
@@ -251,6 +281,8 @@ export class GameScene {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
       EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
       EventBus.emit('levelUp', { level: this.playerProgress.level }); // Init UI
+      
+      this.storyManager.startGame();
     }, 100);
   }
 
@@ -272,6 +304,19 @@ export class GameScene {
 
     this.vfx.update(dt, this.time);
     this.telegraphVfx.update(dt, this.time);
+
+    // ─── Dialogue & Intro Block ──────────────────────────────────────
+    const isDialogueActive = this.dialogueManager.isActive;
+    const isIntroActive = this.storyManager.isIntroRunning;
+
+    if (isDialogueActive || isIntroActive) {
+      // Update NPCs idle animation
+      for (const npc of this.npcs) {
+        npc.update(dt);
+        if (isDialogueActive) npc.lookAt(this.player.root.position);
+      }
+      return; // Skip combat/movement processing
+    }
 
     if (this.hitStopTimer > 0) {
       this.hitStopTimer -= dt;
@@ -318,6 +363,15 @@ export class GameScene {
     this.lighting.update(dt, ambientColor, ambientIntensity);
     const zoneId = this.zoneManager.getCurrentZoneId();
     this.objectiveManager.onZoneEntered(zoneId);
+    this.storyManager.onZoneChanged(zoneId);
+
+    // Update NPCs
+    for (const npc of this.npcs) {
+      npc.update(dt);
+      if (playerPos.distanceToSquared(npc.position) < 25) {
+        npc.lookAt(playerPos);
+      }
+    }
 
     // Systems updates
     this.interactionSystem.update(playerPos, inputManager);
@@ -459,5 +513,10 @@ export class GameScene {
     EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     EventBus.emit('essenceUpdate', { amount: 0, added: 0 });
     EventBus.emit('levelUp', { level: 1 });
+    
+    this.storyManager.reset();
+    setTimeout(() => {
+      this.storyManager.startGame();
+    }, 100);
   }
 }
