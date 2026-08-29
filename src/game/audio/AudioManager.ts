@@ -568,6 +568,12 @@ export class AudioManager {
       setTimeout(() => this.play(AudioId.SYS_GAME_OVER), 1500);
     });
 
+    EventBus.on('settingsChanged', (settings: any) => {
+      if (settings.masterVolume !== undefined) this.setMasterVolume(settings.masterVolume);
+      if (settings.musicVolume !== undefined) this.setMusicVolume(settings.musicVolume);
+      if (settings.sfxVolume !== undefined) this.setSfxVolume(settings.sfxVolume);
+    });
+
     EventBus.on('gameStateChanged', (data: { current: string, previous: string | null }) => {
       if (data.current === 'PAUSED') {
         this.pause();

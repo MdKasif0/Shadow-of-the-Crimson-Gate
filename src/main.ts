@@ -14,6 +14,7 @@ import { renderHero } from './components/Hero';
 import { init3DGame, ThreeGame } from './game/Game';
 import { SaveManager } from './game/save/SaveManager';
 import { SettingsManager } from './game/settings/SettingsManager';
+import { AudioManager } from './game/audio/AudioManager';
 import { EventBus } from './game/core/EventBus';
 
 let gameInstance: ThreeGame | null = null;
@@ -29,6 +30,7 @@ function init(): void {
   // Initialize managers
   SettingsManager.getInstance();
   SaveManager.getInstance();
+  AudioManager.init();
   const stateManager = GameStateManager.getInstance();
 
   // Create containers
