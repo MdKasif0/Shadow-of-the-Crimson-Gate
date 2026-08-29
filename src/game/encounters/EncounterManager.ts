@@ -12,6 +12,10 @@ export class EncounterManager {
     this.spawner = new EncounterSpawner();
   }
 
+  public clearAll(): void {
+    this.encounters = [];
+  }
+
   public registerEncounter(config: EncounterConfig): void {
     const enc = new Encounter(config, this.spawner);
     this.encounters.push(enc);
