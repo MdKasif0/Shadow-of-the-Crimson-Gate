@@ -359,9 +359,6 @@ export function renderHero(container: HTMLElement): () => void {
     btnNewGame.addEventListener('click', () => {
       const saveManager = SaveManager.getInstance();
       if (saveManager.hasSave()) {
-        if (!confirm('Start a new journey? Existing progress will be replaced.')) {
-          return;
-        }
         saveManager.deleteSave();
       }
       EventBus.emit('newGame', {});
