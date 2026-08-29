@@ -44,6 +44,13 @@ import { NPCFactory } from '../npc/NPCFactory';
 import { NPC_DATABASE } from '../npc/NPCData';
 import { NPC } from '../npc/NPC';
 import { NPCInteraction } from '../npc/NPCInteraction';
+
+// ─── Phase 5 Step 2 Integration ───────────────────────────────
+import { CheckpointManager } from '../progression/CheckpointManager';
+import { SaveManager } from '../save/SaveManager';
+import { GameStateManager } from '../state/GameStateManager';
+import { GameState } from '../state/GameState';
+
 export class GameScene {
   public scene: THREE.Scene;
   public player: Ronin;
@@ -78,6 +85,7 @@ export class GameScene {
   private playerProgress: PlayerProgress;
   private playerStats: PlayerStats;
   private rewardSystem: RewardSystem;
+  private checkpointManager: CheckpointManager;
 
   // ─── Boss (Phase 4) ───────────────────────────────────────────────
   private boss: CrimsonOni | null = null;
@@ -141,6 +149,7 @@ export class GameScene {
 
     this.objectiveManager = new ObjectiveManager();
     this.objectiveUI = new ObjectiveUI();
+    this.checkpointManager = new CheckpointManager();
 
     this.storyManager = new StoryManager();
     this.dialogueManager = new DialogueManager();
@@ -181,6 +190,92 @@ export class GameScene {
       this.applyPlayerStats();
       this.player['health'].heal(this.player['health'].maxHealth); // Full heal on level up
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+    });
+
+    // ─── Phase 5 Step 2 Flows ─────────────────────────────────────
+    EventBus.on('loadCheckpoint', () => {
+      this.resetEncounter();
+      const pos = this.checkpointManager.getCheckpointPosition();
+      this.player.setPosition(pos.x, pos.y, pos.z);
+      this.player['health'].heal(this.player['health'].maxHealth);
+      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+      this.player.isControlsEnabled = true;
+    });
+
+    EventBus.on('requestSave', () => {
+      const pos = this.player.root.position;
+      SaveManager.getInstance().saveGame({
+        chapter: this.storyManager.state.currentChapter,
+        objective: this.objectiveManager.getActive(),
+        playerPosition: { x: pos.x, y: pos.y, z: pos.z },
+        spiritEssence: this.playerProgress.spiritEssence,
+        level: this.playerProgress.level,
+        clearedEncounters: Array.from(this.playerProgress.clearedEncounters),
+        storyFlags: this.storyManager.flags,
+        crimsonOniDefeated: this.playerProgress.crimsonOniDefeated,
+        shrineStates: {}
+      });
+    });
+
+    EventBus.on('loadGame', (saveData: any) => {
+      if (!saveData) return;
+      
+      this.playerProgress.initFromSave(saveData);
+      this.playerStats = new PlayerStats(this.playerProgress.level);
+      this.applyPlayerStats();
+      this.player['health'].heal(this.player['health'].maxHealth);
+      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+      EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
+      EventBus.emit('levelUp', { level: this.playerProgress.level });
+      
+      if (saveData.playerPosition) {
+        this.player.setPosition(saveData.playerPosition.x, saveData.playerPosition.y, saveData.playerPosition.z);
+      }
+      
+      if (saveData.storyFlags) this.storyManager.state.flags = saveData.storyFlags;
+      if (saveData.chapter) this.storyManager.state.currentChapter = saveData.chapter;
+      if (saveData.objective) this.objectiveManager.setObjective(saveData.objective);
+      
+      if (this.playerProgress.crimsonOniDefeated && this.boss) {
+        this.scene.remove(this.boss.root);
+        this.boss = null;
+      }
+      
+      this.encounterManager.clearAll();
+      const configs = EncounterDatabase.getAll();
+      for (const config of configs) {
+        if (!this.playerProgress.hasClearedEncounter(config.id)) {
+          this.encounterManager.registerEncounter(config);
+        }
+      }
+    });
+    
+    EventBus.on('newGame', () => {
+      this.playerProgress.wipe();
+      this.playerStats = new PlayerStats(1);
+      this.applyPlayerStats();
+      this.player['health'].heal(this.player['health'].maxHealth);
+      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
+      EventBus.emit('essenceUpdate', { amount: 0, added: 0 });
+      EventBus.emit('levelUp', { level: 1 });
+      
+      this.player.setPosition(0, 0, 50);
+      this.storyManager.reset();
+      this.objectiveManager.reset();
+      this.encounterManager.clearAll();
+      const configs = EncounterDatabase.getAll();
+      for (const config of configs) {
+        this.encounterManager.registerEncounter(config);
+      }
+      if (!this.boss) {
+        this.boss = new CrimsonOni();
+        this.scene.add(this.boss.root);
+      }
+      this.boss.reset(new THREE.Vector3(0, 0, -115));
+      setTimeout(() => {
+        this.storyManager.startGame();
+        EventBus.emit('requestSave', {});
+      }, 100);
     });
 
     EventBus.on('bossPhaseTransition', (data: any) => {
@@ -278,11 +373,10 @@ export class GameScene {
     });
 
     setTimeout(() => {
-      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
-      EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
-      EventBus.emit('levelUp', { level: this.playerProgress.level }); // Init UI
-      
-      this.storyManager.startGame();
+      // Don't auto-start game if in menu
+      if (GameStateManager.getInstance().getState() === GameState.PLAYING) {
+        this.storyManager.startGame();
+      }
     }, 100);
   }
 
@@ -414,7 +508,7 @@ export class GameScene {
         this.bossUI.showCinematicTitle('Crimson Oni', 2500);
         this.hasShownTitle = true;
       }
-      
+
       if (!this.bossIntroCamera.isActive) {
         this.isCinematicActive = false;
         this.player.isControlsEnabled = true;
@@ -472,15 +566,25 @@ export class GameScene {
         }
       }
     }
-
     this.hitboxSystem.update();
+
+    // ─── Check Player Death ───────────────────────────────────────
+    if (this.player.health.currentHealth <= 0) {
+      this.player.die();
+      this.player.isControlsEnabled = false;
+      GameStateManager.getInstance().setState(GameState.GAME_OVER);
+    }
   }
 
-  public resetEncounter(): void {
-    this.playerProgress.wipe();
-    this.playerStats.applyLevel(1);
-    this.applyPlayerStats();
-
+  private resetEncounter(): void {
+    // Reset player HP safely based on stats
+    this.player['health'].heal(this.playerStats.maxHealth);
+    
+    // Clean up VFX
+    this.vfx.clear();
+    this.telegraphVfx.clear();
+    this.projectileSystem.clear();
+    
     // Place player at entrance
     this.player.root.position.set(0, 0, 50);
     
@@ -515,8 +619,6 @@ export class GameScene {
     EventBus.emit('levelUp', { level: 1 });
     
     this.storyManager.reset();
-    setTimeout(() => {
-      this.storyManager.startGame();
-    }, 100);
+    // Note: Position resetting and story reset logic is now handled in loadCheckpoint / newGame events
   }
 }
