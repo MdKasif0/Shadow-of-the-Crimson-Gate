@@ -1,100 +1,77 @@
 /**
  * Application Entry Point
  *
- * Sets up a simple hash-based client-side router and mounts
- * the appropriate page component based on the current URL hash.
+ * Boots the GameStateManager, SaveManager, and SettingsManager.
+ * Manages the top-level DOM nodes for the cinematic menu (Hero) and the 3D game.
  */
 
 import './styles/global.css';
 import './styles/hero.css';
 
-import type { PageComponent, Route } from './types/index';
-import { ROUTES } from './utils/constants';
-import { createHomePage } from './pages/Home';
-import { createGamePage } from './pages/Game';
+import { GameStateManager } from './game/state/GameStateManager';
+import { GameState } from './game/state/GameState';
+import { renderHero } from './components/Hero';
+import { init3DGame, ThreeGame } from './game/Game';
+import { SaveManager } from './game/save/SaveManager';
+import { SettingsManager } from './game/settings/SettingsManager';
+import { EventBus } from './game/core/EventBus';
 
-// ─── Route Registry ──────────────────────────────────────────────────────────
+let gameInstance: ThreeGame | null = null;
+let heroCleanup: (() => void) | null = null;
 
-const routes: Route[] = [
-  {
-    path: ROUTES.HOME,
-    component: createHomePage,
-  },
-  {
-    path: ROUTES.GAME,
-    component: createGamePage,
-  },
-];
-
-// ─── Router State ────────────────────────────────────────────────────────────
-
-let currentPage: PageComponent | null = null;
-let appContainer: HTMLElement | null = null;
-
-/**
- * Extracts the route path from the URL hash.
- * Supports: #/, #/game, etc.
- * Falls back to empty string (home) for bare URLs.
- */
-function getHashPath(): string {
-  const hash = window.location.hash;
-
-  // No hash or just '#' → home
-  if (!hash || hash === '#' || hash === '#/') {
-    return '';
-  }
-
-  // Strip leading '#/' and return the path segment
-  return hash.replace(/^#\/?/, '');
-}
-
-/**
- * Finds the matching route for the given path.
- * Returns the home route as fallback.
- */
-function findRoute(path: string): Route {
-  const match = routes.find((route) => route.path === path);
-  return match ?? routes[0]; // Fallback to home
-}
-
-/**
- * Handles route changes: destroys the current page and mounts the new one.
- */
-function handleRouteChange(): void {
-  if (!appContainer) return;
-
-  // Destroy current page
-  if (currentPage) {
-    currentPage.destroy();
-    currentPage = null;
-  }
-
-  // Find and mount new page
-  const path = getHashPath();
-  const route = findRoute(path);
-  currentPage = route.component();
-  currentPage.render(appContainer);
-}
-
-/**
- * Initializes the application.
- */
 function init(): void {
-  appContainer = document.getElementById('app');
-
+  const appContainer = document.getElementById('app');
   if (!appContainer) {
     console.error('[App] Could not find #app container.');
     return;
   }
 
-  // Listen for hash changes
-  window.addEventListener('hashchange', handleRouteChange);
+  // Initialize managers
+  SettingsManager.getInstance();
+  SaveManager.getInstance();
+  const stateManager = GameStateManager.getInstance();
 
-  // Handle initial route
-  handleRouteChange();
+  // Create containers
+  const menuContainer = document.createElement('div');
+  menuContainer.id = 'menu-container';
+  menuContainer.style.position = 'absolute';
+  menuContainer.style.inset = '0';
+  menuContainer.style.zIndex = '100'; // Above game
+
+  const gameContainer = document.createElement('div');
+  gameContainer.id = 'game-container';
+  gameContainer.style.position = 'absolute';
+  gameContainer.style.inset = '0';
+  gameContainer.style.zIndex = '1';
+
+  appContainer.appendChild(gameContainer);
+  appContainer.appendChild(menuContainer);
+
+  // Initialize 3D game immediately (it will render behind the menu, or we can pause it)
+  gameInstance = init3DGame('game-container');
+
+  // Handle State Changes
+  EventBus.on('gameStateChanged', (data: { previous: GameState | null, current: GameState }) => {
+    if (data.current === GameState.MAIN_MENU) {
+      menuContainer.style.display = 'block';
+      if (!heroCleanup) {
+        menuContainer.innerHTML = '';
+        heroCleanup = renderHero(menuContainer);
+      }
+    } else {
+      // Any other state (PLAYING, PAUSED, etc) -> hide menu
+      menuContainer.style.display = 'none';
+      if (heroCleanup) {
+        heroCleanup();
+        heroCleanup = null;
+        menuContainer.innerHTML = '';
+      }
+    }
+  });
+
+  // Start in Main Menu
+  stateManager.setState(GameState.MAIN_MENU);
 }
-
-// ─── Bootstrap ───────────────────────────────────────────────────────────────
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);

@@ -109,14 +109,17 @@ function arrowSVG(className: string = 'hero__cta-arrow'): string {
   </svg>`;
 }
 
+import { SaveManager } from '../game/save/SaveManager';
+import { GameStateManager } from '../game/state/GameStateManager';
+import { GameState } from '../game/state/GameState';
+import { SettingsMenu } from '../game/ui/SettingsMenu';
+import { EventBus } from '../game/core/EventBus';
+
 // ─── Navigation HTML ─────────────────────────────────────────────────────────
 
 function buildNavHTML(): string {
-  const links = NAV_ITEMS.map((item) => {
-    return `<button class="hero-nav__link" data-overlay="${item.overlayId}" id="${item.id}">
-      <span class="hero-nav__link-text">${item.label}</span>
-    </button>`;
-  }).join('');
+  const saveManager = SaveManager.getInstance();
+  const hasSave = saveManager.hasSave();
 
   return `
     <div class="hero-nav-wrapper">
@@ -126,10 +129,14 @@ function buildNavHTML(): string {
         </button>
 
         <div class="hero-nav__links" id="nav-links">
-          ${links}
-          <button type="button" class="hero-nav__cta" id="nav-play">
-            <span class="hero-nav__cta-text">PLAY</span>
-            ${arrowSVG('hero-nav__cta-arrow')}
+          <button class="hero-nav__link" id="nav-continue" ${hasSave ? '' : 'disabled style="opacity: 0.3; cursor: not-allowed;"'}>
+            <span class="hero-nav__link-text">CONTINUE</span>
+          </button>
+          <button class="hero-nav__link" id="nav-new-game">
+            <span class="hero-nav__link-text">NEW GAME</span>
+          </button>
+          <button class="hero-nav__link" id="nav-settings">
+            <span class="hero-nav__link-text">SETTINGS</span>
           </button>
         </div>
 
@@ -208,14 +215,6 @@ export function renderHero(container: HTMLElement): () => void {
 
     <!-- Bottom atmospheric text -->
     <p class="hero__tagline">${HERO_TAGLINE}</p>
-
-    <!-- Play button (bottom-right) -->
-    <button class="hero__cta" id="hero-play" type="button"
-            aria-label="Play — enter the game">
-      <span class="hero__cta-label">Play</span>
-      ${arrowSVG()}
-      <span class="hero__cta-glow" aria-hidden="true"></span>
-    </button>
 
     <!-- Ambient audio and toggle (bottom-left) -->
     <audio id="hero-audio" src="/assets/audio/silent-blade.mp3" loop preload="auto" autoplay></audio>
@@ -338,42 +337,43 @@ export function renderHero(container: HTMLElement): () => void {
 
   container.appendChild(section);
 
-  // ── Overlay Manager Registration ──
+  container.appendChild(section);
 
-  const overlayManager = OverlayManager.getInstance();
-  
-  // Register elements that should blur when overlay opens
-  const contentEl = section.querySelector('.hero__content') as HTMLElement;
-  const taglineEl = section.querySelector('.hero__tagline') as HTMLElement;
-  const ctaEl = section.querySelector('.hero__cta') as HTMLElement;
-  
-  if (contentEl && taglineEl && ctaEl) {
-    overlayManager.registerBackgroundTargets([
-      contentEl, taglineEl, ctaEl
-    ]);
+  // ── Menu Buttons ──
+
+  const btnContinue = section.querySelector('#nav-continue') as HTMLButtonElement;
+  const btnNewGame = section.querySelector('#nav-new-game') as HTMLButtonElement;
+  const btnSettings = section.querySelector('#nav-settings') as HTMLButtonElement;
+
+  if (btnContinue) {
+    btnContinue.addEventListener('click', () => {
+      const saveManager = SaveManager.getInstance();
+      if (saveManager.hasSave()) {
+        EventBus.emit('loadGame', saveManager.getSave());
+        GameStateManager.getInstance().setState(GameState.PLAYING);
+      }
+    });
   }
 
-  // Emblem closes overlay
-  const emblemBtn = section.querySelector('#hero-emblem') as HTMLButtonElement;
-  emblemBtn.addEventListener('click', () => {
-    overlayManager.closeOverlay();
-  }, { signal });
-
-  // Nav Links open overlays
-  const overlayBtns = section.querySelectorAll('.hero-nav__link');
-  overlayBtns.forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const target = e.currentTarget as HTMLButtonElement;
-      const overlayId = target.getAttribute('data-overlay');
-      
-      switch(overlayId) {
-        case 'world': openWorldOverlay(); break;
-        case 'lore': openLoreOverlay(); break;
-        case 'characters': openCharactersOverlay(); break;
-        case 'media': openMediaOverlay(); break;
+  if (btnNewGame) {
+    btnNewGame.addEventListener('click', () => {
+      const saveManager = SaveManager.getInstance();
+      if (saveManager.hasSave()) {
+        if (!confirm('Start a new journey? Existing progress will be replaced.')) {
+          return;
+        }
+        saveManager.deleteSave();
       }
-    }, { signal });
-  });
+      EventBus.emit('newGame', {});
+      GameStateManager.getInstance().setState(GameState.PLAYING);
+    });
+  }
+
+  if (btnSettings) {
+    btnSettings.addEventListener('click', () => {
+      new SettingsMenu(() => {});
+    });
+  }
 
   // ── Parallax ──
 
@@ -403,39 +403,6 @@ export function renderHero(container: HTMLElement): () => void {
     };
 
     rafId = requestAnimationFrame(animateParallax);
-  }
-
-  // ── Play Button ──
-
-  const playButton = section.querySelector('#hero-play') as HTMLButtonElement;
-
-  // Cursor-tracking glow
-  playButton.addEventListener('mousemove', (e: MouseEvent) => {
-    const rect = playButton.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    playButton.style.setProperty('--glow-x', `${x}px`);
-    playButton.style.setProperty('--glow-y', `${y}px`);
-  }, { signal });
-
-  // Play click → cinematic transition → navigate
-  const handlePlayClick = () => {
-    if (isTransitioning) return;
-    isTransitioning = true;
-
-    section.classList.add('hero--transitioning');
-    if (isPlaying) fadeAudioOut();
-
-    setTimeout(() => {
-      window.location.hash = `#/${ROUTES.GAME}`;
-    }, TIMING.PLAY_TRANSITION);
-  };
-
-  playButton.addEventListener('click', handlePlayClick, { signal });
-  
-  const navPlayButton = section.querySelector('#nav-play') as HTMLButtonElement;
-  if (navPlayButton) {
-    navPlayButton.addEventListener('click', handlePlayClick, { signal });
   }
 
   // ── Mobile Navigation Toggle ──

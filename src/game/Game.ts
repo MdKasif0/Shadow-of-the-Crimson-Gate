@@ -7,6 +7,10 @@ import { GameScene } from './scenes/GameScene';
 import { GAME_CONFIG } from './GameConfig';
 import { GameHUD } from './ui/GameHUD';
 import { EventBus } from './core/EventBus';
+import { GameStateManager } from './state/GameStateManager';
+import { GameState } from './state/GameState';
+import { PauseMenu } from './ui/PauseMenu';
+import { GameOverUI } from './ui/GameOverUI';
 
 export class ThreeGame {
   private containerId: string;
@@ -17,8 +21,8 @@ export class ThreeGame {
   private gameScene: GameScene;
   private cameraController: CameraController;
   private hud: GameHUD;
-  
-  private isPaused: boolean = false;
+  private pauseMenu: PauseMenu;
+  private gameOverUI: GameOverUI;
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -32,13 +36,11 @@ export class ThreeGame {
     // 2. Initialize scene
     this.gameScene = new GameScene(this.cameraController);
     
-    // 3. Initialize HUD
+    // 3. Initialize HUD & Menus
     this.hud = new GameHUD(containerId);
+    this.pauseMenu = new PauseMenu();
+    this.gameOverUI = new GameOverUI();
     
-    EventBus.on('gamePauseToggled', (paused: boolean) => {
-      this.isPaused = paused;
-    });
-
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);
     window.addEventListener('resize', this.onResize);
@@ -50,17 +52,30 @@ export class ThreeGame {
     this.render = this.render.bind(this);
     this.loop = new GameLoop(this.update, this.render);
     
-    // Start the game!
+    // Start the game loop!
     this.loop.start();
   }
 
   private update(dt: number): void {
-    if (this.isPaused) return; // Skip updating game logic if paused
-    
     this.input.beginFrame();
 
-    // Update scene logic
-    this.gameScene.update(dt, this.input);
+    const state = GameStateManager.getInstance().getState();
+
+    // Handle Escape for pause toggle
+    if (state === GameState.PLAYING && this.input.isPressed('Escape')) {
+      GameStateManager.getInstance().setState(GameState.PAUSED);
+      this.input.keys['Escape'] = false; // consume
+    } else if (state === GameState.PAUSED && this.input.isPressed('Escape')) {
+      GameStateManager.getInstance().setState(GameState.PLAYING);
+      this.input.keys['Escape'] = false; // consume
+    }
+
+    // Freeze game simulation if paused or in menu
+    if (state === GameState.PLAYING || state === GameState.BOSS) {
+      // Update scene logic
+      this.gameScene.update(dt, this.input);
+    }
+
 
     // Update camera to follow player
     this.cameraController.update(this.gameScene.player.root.position, dt);
