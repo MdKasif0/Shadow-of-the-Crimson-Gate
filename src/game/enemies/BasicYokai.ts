@@ -10,6 +10,7 @@ import { EnemyAI } from './EnemyAI';
 import { BASIC_YOKAI_CONFIG, EnemyConfig } from './EnemyConfig';
 import { AttackRole } from '../combat/AttackDirector';
 import { AudioManager } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
 
 export class BasicYokai implements Enemy {
   public id: string;
@@ -29,6 +30,7 @@ export class BasicYokai implements Enemy {
   private attackCooldown: number = 0;
   private role: AttackRole = AttackRole.PRIMARY_MELEE;
   private homePosition: THREE.Vector3 | null = null;
+  private idleAudioTimer: number = 6 + Math.random() * 6;
 
   public assignRole(role: AttackRole): void {
     this.role = role;
