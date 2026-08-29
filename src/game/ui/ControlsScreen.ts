@@ -1,3 +1,5 @@
+import { AudioManager } from '../audio/AudioManager';
+
 export class ControlsScreen {
   private overlay: HTMLDivElement;
 
@@ -45,10 +47,14 @@ export class ControlsScreen {
     const btn = document.getElementById('btn-close-controls');
     if (btn) {
       btn.addEventListener('click', () => {
+        AudioManager.playUIBack();
         this.destroy();
         this.onClose();
       });
-      btn.addEventListener('mouseenter', () => btn.style.background = 'rgba(204,68,68,0.2)');
+      btn.addEventListener('mouseenter', () => {
+        AudioManager.playUIHover();
+        btn.style.background = 'rgba(204,68,68,0.2)';
+      });
       btn.addEventListener('mouseleave', () => btn.style.background = 'transparent');
     }
 
