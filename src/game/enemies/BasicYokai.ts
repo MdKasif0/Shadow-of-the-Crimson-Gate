@@ -163,9 +163,23 @@ export class BasicYokai implements Enemy {
     
     if (this.state !== decision.state) {
       if (decision.state === EnemyState.ATTACK) {
-        AudioManager.playEnemyAttack();
+        AudioManager.play(AudioId.YOKAI_ATTACK, { pitchMin: 0.9, pitchMax: 1.1 });
       }
       this.setState(decision.state);
+    }
+
+    // Occasional idle/patrol growl
+    this.idleAudioTimer -= dt;
+    if (this.idleAudioTimer <= 0) {
+      this.idleAudioTimer = 8 + Math.random() * 8;
+      if (this.root.position.distanceTo(playerPos) < 18) {
+        AudioManager.playRandom([AudioId.YOKAI_GROWL_01, AudioId.YOKAI_GROWL_02], {
+          volume: 0.35,
+          pitchMin: 0.95,
+          pitchMax: 1.05,
+          cooldownMs: 4000
+        });
+      }
     }
 
     if (this.state === EnemyState.WALK || this.state === EnemyState.STRAFE || this.state === EnemyState.RETREAT) {
