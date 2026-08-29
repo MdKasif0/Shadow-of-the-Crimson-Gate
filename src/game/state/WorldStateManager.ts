@@ -48,13 +48,15 @@ export class WorldStateManager {
     // Modify Forest
     if (zone.id === 'FOREST') {
       if (flags.forestPurified) {
-        finalFogDensity = 0.025;
-        finalFogColor.setHex(0x08101a); // Less oppressive
+        finalFogDensity = 0.02;
+        finalFogColor.setHex(0x182633); // Less oppressive, match new ZoneManager forest vibe
         finalAmbientColor.setHex(0xaaccbb);
+        finalAmbientIntensity = 1.6;
       } else {
-        finalFogDensity = 0.04;
-        finalFogColor.setHex(0x1a0808); // Dark, corrupted
-        finalAmbientColor.setHex(0x664444);
+        finalFogDensity = 0.025;
+        finalFogColor.setHex(0x2a0d0d); // Dark red, corrupted, but visible
+        finalAmbientColor.setHex(0x995555);
+        finalAmbientIntensity = 2.0;
       }
     }
     
