@@ -131,18 +131,6 @@ export class SettingsMenu {
       closeBtn.addEventListener('click', () => {
         this.destroy();
         this.onClose();
-      });
-      closeBtn.addEventListener('mouseenter', () => {
-        closeBtn.style.background = '#cc4444';
-        closeBtn.style.color = '#fff';
-      });
-      closeBtn.addEventListener('mouseleave', () => {
-        closeBtn.style.background = 'transparent';
-        closeBtn.style.color = '#cc4444';
-      });
-    }
-  }
-
   public destroy(): void {
     if (this.overlay && this.overlay.parentNode) {
       this.overlay.parentNode.removeChild(this.overlay);
