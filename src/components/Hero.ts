@@ -32,6 +32,8 @@ import {
   openCharactersOverlay,
   openMediaOverlay
 } from './Overlays';
+import { AudioManager } from '../game/audio/AudioManager';
+import { AudioId } from '../game/audio/AudioRegistry';
 
 // ─── Internal Constants ──────────────────────────────────────────────────────
 
@@ -217,7 +219,7 @@ export function renderHero(container: HTMLElement): () => void {
     <p class="hero__tagline">${HERO_TAGLINE}</p>
 
     <!-- Ambient audio and toggle (bottom-left) -->
-    <audio id="hero-audio" src="/assets/audio/silent-blade.mp3" loop preload="auto" autoplay></audio>
+    <audio id="hero-audio" src="/assets/audio/music/main_theme.wav" loop preload="auto" autoplay></audio>
     <button class="hero__audio-toggle" id="hero-audio-toggle" type="button" aria-label="Toggle audio" aria-pressed="false">
       <svg class="hero__audio-icon hero__audio-icon--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -337,16 +339,21 @@ export function renderHero(container: HTMLElement): () => void {
 
   container.appendChild(section);
 
-  container.appendChild(section);
-
   // ── Menu Buttons ──
 
   const btnContinue = section.querySelector('#nav-continue') as HTMLButtonElement;
   const btnNewGame = section.querySelector('#nav-new-game') as HTMLButtonElement;
   const btnSettings = section.querySelector('#nav-settings') as HTMLButtonElement;
 
+  [btnContinue, btnNewGame, btnSettings].forEach(btn => {
+    if (btn) {
+      btn.addEventListener('mouseenter', () => AudioManager.playUIHover());
+    }
+  });
+
   if (btnContinue) {
     btnContinue.addEventListener('click', () => {
+      AudioManager.playUIConfirm();
       const saveManager = SaveManager.getInstance();
       if (saveManager.hasSave()) {
         EventBus.emit('loadGame', saveManager.getSave());
@@ -357,6 +364,7 @@ export function renderHero(container: HTMLElement): () => void {
 
   if (btnNewGame) {
     btnNewGame.addEventListener('click', () => {
+      AudioManager.playUIConfirm();
       const saveManager = SaveManager.getInstance();
       if (saveManager.hasSave()) {
         saveManager.deleteSave();
@@ -368,6 +376,7 @@ export function renderHero(container: HTMLElement): () => void {
 
   if (btnSettings) {
     btnSettings.addEventListener('click', () => {
+      AudioManager.playUISelect();
       new SettingsMenu(() => {});
     });
   }

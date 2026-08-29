@@ -1,4 +1,5 @@
 import { GAME_TITLE } from '../utils/constants';
+import { AudioManager } from '../game/audio/AudioManager';
 
 /**
  * Core Overlay Manager to handle mounting, unmounting, and animation.
@@ -41,6 +42,8 @@ export class OverlayManager {
       this.closeOverlay();
     }
 
+    AudioManager.playUISelect();
+
     const overlay = document.createElement('div');
     overlay.className = 'hero-overlay';
     overlay.innerHTML = `
@@ -63,6 +66,7 @@ export class OverlayManager {
 
     // Close button logic
     const closeBtn = overlay.querySelector('.hero-overlay__close') as HTMLButtonElement;
+    closeBtn.addEventListener('mouseenter', () => AudioManager.playUIHover());
     closeBtn.addEventListener('click', () => this.closeOverlay());
 
     if (onMount) {
@@ -73,6 +77,7 @@ export class OverlayManager {
   public closeOverlay() {
     if (!this.activeOverlay) return;
     
+    AudioManager.playUIBack();
     const overlay = this.activeOverlay;
     this.activeOverlay = null;
 

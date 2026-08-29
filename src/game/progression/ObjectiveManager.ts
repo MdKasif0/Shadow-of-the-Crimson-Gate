@@ -4,6 +4,8 @@
 import { EventBus } from '../core/EventBus';
 import { Objective } from '../objectives/Objective';
 import { StoryEvents } from '../story/StoryEvent';
+import { AudioManager } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
 
 export class ObjectiveManager {
   private activeObjective: Objective | null = null;
@@ -34,11 +36,13 @@ export class ObjectiveManager {
 
   public setObjective(objective: Objective): void {
     this.activeObjective = objective;
+    AudioManager.play(AudioId.UI_NOTIFICATION, { cooldownMs: 500 });
     EventBus.emit('objectiveUpdate', { text: objective.description });
   }
 
   public completeActive(): void {
     if (this.activeObjective) {
+      AudioManager.play(AudioId.UI_CONFIRM, { cooldownMs: 500 });
       this.activeObjective.isComplete = true;
       this.completedObjectives.add(this.activeObjective.id);
       this.activeObjective = null;
