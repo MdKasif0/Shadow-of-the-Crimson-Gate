@@ -14,6 +14,7 @@ import { GameOverUI } from './ui/GameOverUI';
 import { EpilogueUI } from './ui/EpilogueUI';
 import { ScreenEffectsUI } from './ui/ScreenEffectsUI';
 import { LoadingScreen } from './ui/LoadingScreen';
+import { AudioManager } from './audio/AudioManager';
 
 export class ThreeGame {
   private containerId: string;
@@ -131,6 +132,7 @@ export class ThreeGame {
     this.input.dispose();
     this.hud.destroy();
     this.renderer.destroy();
+    AudioManager.stopAll();
   }
 }
 

@@ -1,5 +1,7 @@
 import { SaveData } from './SaveData';
 import { SAVE_VERSION } from './SaveVersion';
+import { AudioManager } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
 
 const SAVE_KEY = 'shadow-crimson-save';
 
@@ -52,6 +54,7 @@ export class SaveManager {
 
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.currentSave));
+      AudioManager.play(AudioId.UI_CONFIRM, { cooldownMs: 2000 });
       this.showSaveIndicator();
     } catch (e) {
       console.warn("Failed to write save data to localStorage", e);
