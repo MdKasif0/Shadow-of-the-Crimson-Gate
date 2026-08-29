@@ -84,14 +84,20 @@ export class AudioManager {
 
   // --- Specific Sounds ---
 
-  public static playSwordSwing(level: number = 1): void {
+  public static playPlayerAttack(comboIndex: number): void {
+    const freqs = [800, 1000, 1200];
+    const freq = freqs[comboIndex % freqs.length] || 800;
+    this.playSwordSwing(freq);
+  }
+
+  public static playSwordSwing(baseFreq: number = 800): void {
     this.playSound((ctx, dest, time) => {
       const bufferSource = ctx.createBufferSource();
       bufferSource.buffer = this.createNoiseBuffer();
       
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(800 + (level * 200), time);
+      filter.frequency.setValueAtTime(baseFreq, time);
       filter.Q.value = 1.5;
       
       const gain = ctx.createGain();
@@ -124,6 +130,10 @@ export class AudioManager {
       osc.start(time);
       osc.stop(time + 0.1);
     });
+  }
+
+  public static playEnemyAttack(): void {
+    this.playSwordSwing(600); // lower pitch for enemy
   }
 
   public static playEnemyHurt(): void {

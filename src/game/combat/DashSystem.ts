@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PlayerState, MovementState } from './PlayerState';
+import { AudioManager } from '../audio/AudioManager';
 
 export class DashSystem {
   private state: PlayerState;
@@ -25,6 +26,8 @@ export class DashSystem {
     this.isDashing = true;
     this.dashTimer = 0;
     this.cooldownTimer = this.dashCooldown;
+    
+    AudioManager.playDash();
     
     // Lock player state
     this.state.movement = MovementState.DASH;

@@ -99,19 +99,19 @@ export class CameraController {
     } else {
       clampedTarget.x = (this.minX + this.maxX) / 2;
     }
-    
-    const zVisibleDepth = viewDepth * 1.414;
-    // We only constrain Z so the camera can move fully from +60 to -80.
-    const clampMinZ = this.minZ + zVisibleDepth;
-    const clampMaxZ = this.maxZ - zVisibleDepth * 0.2; // Keep spawn visible
-    
+
+    const clampMinZ = this.minZ + viewDepth;
+    const clampMaxZ = this.maxZ; // don't clamp bottom as tightly
     if (clampMinZ < clampMaxZ) {
       clampedTarget.z = THREE.MathUtils.clamp(clampedTarget.z, clampMinZ, clampMaxZ);
-    } else {
-      clampedTarget.z = (this.minZ + this.maxZ) / 2;
     }
-    
+
+    // Apply clamped position
     this.currentPos.copy(clampedTarget).add(this.offset);
+    
+    // Smooth damping for a cinematic feel
+    const smoothedPos = new THREE.Vector3().copy(this.camera.position).lerp(this.currentPos, 1.0 - Math.pow(0.005, dt));
+    this.camera.position.copy(smoothedPos);
 
     // Apply procedural shake
     this.shake.apply(this.currentPos, dt);

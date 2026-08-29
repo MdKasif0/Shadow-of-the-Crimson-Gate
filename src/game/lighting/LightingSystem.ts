@@ -17,15 +17,15 @@ export class LightingSystem {
     this.ambient = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(this.ambient);
 
-    // Main directional (sun/moon)
-    this.directional = new THREE.DirectionalLight(0xffffff, 5.0);
+    // Main directional (moonlight)
+    this.directional = new THREE.DirectionalLight(0xaaccff, 3.5); // Softer, bluish key light
     this.directional.position.set(20, 40, 30);
     this.directional.castShadow = true;
     this.directional.shadow.mapSize.width = 2048;
     this.directional.shadow.mapSize.height = 2048;
     this.directional.shadow.camera.near = 0.5;
     this.directional.shadow.camera.far = 250;
-    const d = 160; // Extended to cover Boss Arena at Z=-140
+    const d = 160; 
     this.directional.shadow.camera.left = -d;
     this.directional.shadow.camera.right = d;
     this.directional.shadow.camera.top = d;
@@ -33,8 +33,8 @@ export class LightingSystem {
     this.directional.shadow.bias = -0.001;
     scene.add(this.directional);
 
-    // Subtle moonlight
-    this.moonLight = new THREE.DirectionalLight(0x88bbff, 0.3);
+    // Subtle ambient bounce
+    this.moonLight = new THREE.DirectionalLight(0x445588, 0.4);
     this.moonLight.position.set(-50, 100, -50);
     this.moonLight.castShadow = false;
     scene.add(this.moonLight);

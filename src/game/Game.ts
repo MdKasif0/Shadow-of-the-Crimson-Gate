@@ -12,6 +12,7 @@ import { GameState } from './state/GameState';
 import { PauseMenu } from './ui/PauseMenu';
 import { GameOverUI } from './ui/GameOverUI';
 import { EpilogueUI } from './ui/EpilogueUI';
+import { ScreenEffectsUI } from './ui/ScreenEffectsUI';
 
 export class ThreeGame {
   private containerId: string;
@@ -25,6 +26,7 @@ export class ThreeGame {
   private pauseMenu: PauseMenu;
   private gameOverUI: GameOverUI;
   private epilogueUI: EpilogueUI;
+  private screenEffectsUI: ScreenEffectsUI;
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -43,6 +45,7 @@ export class ThreeGame {
     this.pauseMenu = new PauseMenu();
     this.gameOverUI = new GameOverUI();
     this.epilogueUI = new EpilogueUI();
+    this.screenEffectsUI = new ScreenEffectsUI();
     
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);

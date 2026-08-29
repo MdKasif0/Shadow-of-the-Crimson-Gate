@@ -1,6 +1,7 @@
 import { PlayerState, CombatPhase } from './PlayerState';
 import { ATTACK_DATA, COMBO_WINDOW_START, AttackDefinition } from './AttackData';
 import { CombatEvents } from './CombatEvents';
+import { AudioManager } from '../audio/AudioManager';
 
 export class CombatSystem {
   public state: PlayerState;
@@ -10,6 +11,7 @@ export class CombatSystem {
   private inputBuffer: boolean = false;
   private comboWindowActive: boolean = false;
   private currentAttackDef: AttackDefinition | null = null;
+  private comboIndex: number = 0;
 
   constructor(state: PlayerState) {
     this.state = state;
@@ -18,6 +20,7 @@ export class CombatSystem {
 
   public registerAttackInput(): void {
     if (this.state.combatPhase === CombatPhase.NONE) {
+      this.comboIndex = 0;
       this.startAttack('ATTACK_1');
     } else if (this.comboWindowActive) {
       this.inputBuffer = true;
@@ -28,6 +31,8 @@ export class CombatSystem {
     this.currentAttackDef = ATTACK_DATA[attackId];
     if (!this.currentAttackDef) return;
 
+    AudioManager.playPlayerAttack(this.comboIndex);
+
     this.state.currentAttackId = attackId;
     this.state.combatPhase = CombatPhase.WINDUP;
     this.attackTimer = 0;
@@ -35,6 +40,7 @@ export class CombatSystem {
     this.comboWindowActive = false;
 
     this.events.emitAttackStarted(attackId);
+    this.comboIndex++;
   }
 
   public update(dt: number): void {

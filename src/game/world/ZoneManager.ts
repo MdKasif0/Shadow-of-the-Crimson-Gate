@@ -14,12 +14,12 @@ export interface ZoneConfig {
 }
 
 const ZONES: ZoneConfig[] = [
-  { id: 'ENTRANCE',         label: 'Entrance',          minZ: 40,  maxZ: 65,  fogDensity: 0.015, fogColor: 0x0a0e14, ambientColor: 0xccccff, ambientIntensity: 2.2 },
-  { id: 'COURTYARD',        label: 'Sakura Courtyard',  minZ: 0,   maxZ: 40,  fogDensity: 0.018, fogColor: 0x060a10, ambientColor: 0xffffff, ambientIntensity: 2.0 },
-  { id: 'SHRINE',           label: 'Shrine Area',       minZ: -20, maxZ: 0,   fogDensity: 0.020, fogColor: 0x080c12, ambientColor: 0xaaddcc, ambientIntensity: 1.8 },
-  { id: 'FOREST',           label: 'Forest Path',       minZ: -50, maxZ: -20, fogDensity: 0.035, fogColor: 0x040810, ambientColor: 0x889999, ambientIntensity: 1.2 },
-  { id: 'TEMPLE_APPROACH',  label: 'Temple Approach',   minZ: -85, maxZ: -50, fogDensity: 0.025, fogColor: 0x060a14, ambientColor: 0xccaaee, ambientIntensity: 1.5 },
-  { id: 'BOSS_ARENA',       label: 'Boss Arena',        minZ: -140, maxZ: -85, fogDensity: 0.02, fogColor: 0x111520, ambientColor: 0xffcccc, ambientIntensity: 3.0 },
+  { id: 'ENTRANCE',         label: 'Entrance',          minZ: 40,  maxZ: 65,  fogDensity: 0.015, fogColor: 0x050a12, ambientColor: 0x223355, ambientIntensity: 1.5 },
+  { id: 'COURTYARD',        label: 'Sakura Courtyard',  minZ: 0,   maxZ: 40,  fogDensity: 0.02,  fogColor: 0x100512, ambientColor: 0x332244, ambientIntensity: 1.8 },
+  { id: 'SHRINE',           label: 'Shrine Area',       minZ: -20, maxZ: 0,   fogDensity: 0.015, fogColor: 0x081216, ambientColor: 0x224444, ambientIntensity: 1.4 },
+  { id: 'FOREST',           label: 'Forest Path',       minZ: -50, maxZ: -20, fogDensity: 0.035, fogColor: 0x040608, ambientColor: 0x112233, ambientIntensity: 1.0 },
+  { id: 'TEMPLE_APPROACH',  label: 'Temple Approach',   minZ: -85, maxZ: -50, fogDensity: 0.03,  fogColor: 0x0a0510, ambientColor: 0x331133, ambientIntensity: 1.2 },
+  { id: 'BOSS_ARENA',       label: 'Boss Arena',        minZ: -140, maxZ: -85, fogDensity: 0.025, fogColor: 0x1a0505, ambientColor: 0x662222, ambientIntensity: 2.0 },
 ];
 
 export class ZoneManager {

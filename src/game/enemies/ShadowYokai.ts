@@ -9,6 +9,7 @@ import { HitboxSystem } from '../combat/HitboxSystem';
 import { EnemyAI } from './EnemyAI';
 import { SHADOW_YOKAI_CONFIG, EnemyConfig } from './EnemyConfig';
 import { AttackRole } from '../combat/AttackDirector';
+import { AudioManager } from '../audio/AudioManager';
 
 export class ShadowYokai implements Enemy {
   public id: string;
@@ -199,6 +200,9 @@ export class ShadowYokai implements Enemy {
     const decision = this.ai.decide(this.root.position, playerPos, this.attackCooldown, this.state, dt, this.role, this.homePosition);
     
     if (this.state !== decision.state) {
+      if (decision.state === EnemyState.ATTACK) {
+        AudioManager.playEnemyAttack();
+      }
       this.setState(decision.state);
     }
 
