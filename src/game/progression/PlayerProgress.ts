@@ -9,7 +9,14 @@ export class PlayerProgress {
   private levelThresholds = [0, 50, 120];
 
   constructor() {
-    this.load();
+    // Initialized from SaveManager during load
+  }
+
+  public initFromSave(data: any): void {
+    if (data.spiritEssence) this.spiritEssence = data.spiritEssence;
+    if (data.level) this.level = data.level;
+    if (data.clearedEncounters) this.clearedEncounters = new Set(data.clearedEncounters);
+    if (data.crimsonOniDefeated) this.crimsonOniDefeated = data.crimsonOniDefeated;
   }
 
   public addEssence(amount: number): void {
@@ -19,7 +26,7 @@ export class PlayerProgress {
     if (this.checkLevelUp()) {
       EventBus.emit('levelUp', { level: this.level });
     }
-    this.save();
+    EventBus.emit('requestSave', {});
   }
 
   public checkLevelUp(): boolean {
@@ -34,48 +41,17 @@ export class PlayerProgress {
 
   public completeEncounter(id: string): void {
     this.clearedEncounters.add(id);
-    this.save();
+    EventBus.emit('requestSave', {});
   }
 
   public hasClearedEncounter(id: string): boolean {
     return this.clearedEncounters.has(id);
   }
 
-  public save(): void {
-    const data = {
-      spiritEssence: this.spiritEssence,
-      level: this.level,
-      clearedEncounters: Array.from(this.clearedEncounters),
-      crimsonOniDefeated: this.crimsonOniDefeated
-    };
-    try {
-      localStorage.setItem('sotcg_progress', JSON.stringify(data));
-    } catch (e) {
-      console.warn("Could not save to localStorage", e);
-    }
-  }
-
-  public load(): void {
-    try {
-      const dataStr = localStorage.getItem('sotcg_progress');
-      if (dataStr) {
-        const data = JSON.parse(dataStr);
-        if (data.spiritEssence) this.spiritEssence = data.spiritEssence;
-        if (data.level) this.level = data.level;
-        if (data.clearedEncounters) this.clearedEncounters = new Set(data.clearedEncounters);
-        if (data.crimsonOniDefeated) this.crimsonOniDefeated = data.crimsonOniDefeated;
-      }
-    } catch (e) {
-      console.warn("Could not load from localStorage", e);
-    }
-  }
-
   public wipe(): void {
     this.spiritEssence = 0;
     this.level = 1;
     this.clearedEncounters.clear();
-    try {
-      localStorage.removeItem('sotcg_progress');
-    } catch (e) {}
+    this.crimsonOniDefeated = false;
   }
 }
