@@ -117,10 +117,10 @@ export class SettingsMenu {
     if (btnFullscreen) {
       btnFullscreen.addEventListener('click', () => {
         if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(err => console.log(err));
+          document.documentElement.requestFullscreen().catch(err => console.warn(err));
           btnFullscreen.textContent = 'EXIT FULLSCREEN';
         } else {
-          document.exitFullscreen().catch(err => console.log(err));
+          document.exitFullscreen().catch(err => console.warn(err));
           btnFullscreen.textContent = 'ENTER FULLSCREEN';
         }
       });
