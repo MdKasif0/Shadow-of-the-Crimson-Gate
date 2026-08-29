@@ -3,6 +3,7 @@ import { GameState } from '../state/GameState';
 import { SettingsMenu } from './SettingsMenu';
 import { ControlsScreen } from './ControlsScreen';
 import { EventBus } from '../core/EventBus';
+import { AudioManager } from '../audio/AudioManager';
 
 export class PauseMenu {
   public element: HTMLElement;

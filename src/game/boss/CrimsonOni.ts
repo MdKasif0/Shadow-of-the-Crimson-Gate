@@ -313,6 +313,7 @@ export class CrimsonOni implements Boss {
     // Only flinch if not currently attacking (boss has hyperarmor during attacks)
     if (this.state !== BossState.ATTACK && this.state !== BossState.PHASE_TRANSITION) {
       this.setState(BossState.HURT);
+      AudioManager.play(AudioId.BOSS_HURT, { cooldownMs: 400 });
     }
 
     EventBus.emit('bossHealth', {
