@@ -100,6 +100,29 @@ export class SettingsMenu {
       document.getElementById(id)?.addEventListener('change', updateSettings);
     });
 
+    const btnClose = document.getElementById('btn-close-settings');
+    if (btnClose) {
+      btnClose.addEventListener('click', this.onClose);
+      btnClose.addEventListener('mouseenter', () => btnClose.style.background = 'rgba(204,68,68,0.2)');
+      btnClose.addEventListener('mouseleave', () => btnClose.style.background = 'transparent');
+    }
+
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    if (btnFullscreen) {
+      btnFullscreen.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.log(err));
+          btnFullscreen.textContent = 'EXIT FULLSCREEN';
+        } else {
+          document.exitFullscreen().catch(err => console.log(err));
+          btnFullscreen.textContent = 'ENTER FULLSCREEN';
+        }
+      });
+      btnFullscreen.addEventListener('mouseenter', () => btnFullscreen.style.background = 'rgba(204,68,68,0.2)');
+      btnFullscreen.addEventListener('mouseleave', () => btnFullscreen.style.background = 'transparent');
+    }
+  }
+
     const closeBtn = document.getElementById('btn-close-settings');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
