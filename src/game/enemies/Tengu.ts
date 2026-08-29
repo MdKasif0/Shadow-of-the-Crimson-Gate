@@ -10,6 +10,7 @@ import { ProjectileSystem } from '../combat/ProjectileSystem';
 import { AttackRole } from '../combat/AttackDirector';
 import { EnemyAI } from './EnemyAI';
 import { TENGU_CONFIG, EnemyConfig } from './EnemyConfig';
+import { AudioManager } from '../audio/AudioManager';
 
 export class Tengu implements Enemy {
   public id: string;
@@ -160,6 +161,9 @@ export class Tengu implements Enemy {
     const decision = this.ai.decide(this.root.position, playerPos, this.attackCooldown, this.state, dt, this.role, this.homePosition);
     
     if (this.state !== decision.state) {
+      if (decision.state === EnemyState.ATTACK) {
+        AudioManager.playEnemyAttack();
+      }
       this.setState(decision.state);
     }
 
