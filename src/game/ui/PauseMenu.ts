@@ -47,24 +47,34 @@ export class PauseMenu {
 
     // Wait a tick for innerHTML to be parsed
     setTimeout(() => {
+      const buttons = this.element.querySelectorAll('button');
+      buttons.forEach(btn => {
+        btn.addEventListener('mouseenter', () => AudioManager.playUIHover());
+      });
+
       document.getElementById('btn-resume')?.addEventListener('click', () => {
+        AudioManager.playUIConfirm();
         GameStateManager.getInstance().setState(GameState.PLAYING);
       });
 
       document.getElementById('btn-restart')?.addEventListener('click', () => {
+        AudioManager.playUIConfirm();
         EventBus.emit('loadCheckpoint', {});
         GameStateManager.getInstance().setState(GameState.PLAYING);
       });
 
       document.getElementById('btn-controls')?.addEventListener('click', () => {
+        AudioManager.playUISelect();
         new ControlsScreen(() => {});
       });
 
       document.getElementById('btn-settings')?.addEventListener('click', () => {
+        AudioManager.playUISelect();
         new SettingsMenu(() => {});
       });
 
       document.getElementById('btn-quit')?.addEventListener('click', () => {
+        AudioManager.playUIBack();
         GameStateManager.getInstance().setState(GameState.MAIN_MENU);
       });
     }, 0);
