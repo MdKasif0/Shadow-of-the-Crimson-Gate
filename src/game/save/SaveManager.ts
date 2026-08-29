@@ -61,17 +61,39 @@ export class SaveManager {
   private load(): void {
     try {
       const dataStr = localStorage.getItem(SAVE_KEY);
-      if (dataStr) {
-        const data = JSON.parse(dataStr) as SaveData;
-        // Simple version check (can implement migration logic here if needed)
-        if (data.version <= SAVE_VERSION) {
-          this.currentSave = data;
-        } else {
-          console.warn("Save version is newer than game version!");
-        }
+      if (!dataStr) return;
+
+      let data: SaveData;
+      try {
+        data = JSON.parse(dataStr) as SaveData;
+      } catch {
+        console.warn('Save data is corrupted. Resetting save.');
+        this.deleteSave();
+        return;
       }
+
+      // Validate essential fields
+      if (typeof data.version !== 'number' || !data.playerPosition) {
+        console.warn('Save data is malformed. Resetting save.');
+        this.deleteSave();
+        return;
+      }
+
+      // Version migration
+      if (data.version < SAVE_VERSION) {
+        // Future: migrate save data here per version
+        data.version = SAVE_VERSION;
+        console.warn(`Migrated save from older version to v${SAVE_VERSION}.`);
+      } else if (data.version > SAVE_VERSION) {
+        console.warn('Save version is newer than game version. Resetting save.');
+        this.deleteSave();
+        return;
+      }
+
+      this.currentSave = data;
     } catch (e) {
-      console.warn("Failed to load save data from localStorage", e);
+      console.error('Unexpected error loading save data.', e);
+      this.deleteSave();
     }
   }
 
