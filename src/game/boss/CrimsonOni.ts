@@ -249,6 +249,7 @@ export class CrimsonOni implements Boss {
     // Start attack if AI decided to attack
     if (decision.state === BossState.ATTACK && decision.attackId) {
       this.attackSystem.startAttack(decision.attackId);
+      AudioManager.playSwordSwing(400); // deep swing for boss
     }
 
     // Movement
