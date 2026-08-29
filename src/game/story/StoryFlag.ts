@@ -10,6 +10,7 @@ export interface StoryFlags {
   templeReached: boolean;
   crimsonOniDefeated: boolean;
   endingStarted: boolean;
+  completedCampaign: boolean;
 }
 
 export function createDefaultFlags(): StoryFlags {
@@ -22,5 +23,6 @@ export function createDefaultFlags(): StoryFlags {
     templeReached: false,
     crimsonOniDefeated: false,
     endingStarted: false,
+    completedCampaign: false,
   };
 }

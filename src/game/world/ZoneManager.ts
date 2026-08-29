@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { StoryFlags } from '../story/StoryFlag';
+import { WorldStateManager } from '../state/WorldStateManager';
 
 export interface ZoneConfig {
   id: string;
@@ -32,7 +34,7 @@ export class ZoneManager {
     return ZONES[0]; // Default to entrance
   }
 
-  public getBlendedAtmosphere(playerPos: THREE.Vector3): { fogDensity: number; fogColor: THREE.Color; ambientColor: THREE.Color; ambientIntensity: number } {
+  public getBlendedAtmosphere(playerPos: THREE.Vector3, flags: StoryFlags): { fogDensity: number; fogColor: THREE.Color; ambientColor: THREE.Color; ambientIntensity: number } {
     const zone = this.getPlayerZone(playerPos);
     if (!zone) {
       return { fogDensity: 0.02, fogColor: new THREE.Color(0x060a10), ambientColor: new THREE.Color(0xffffff), ambientIntensity: 2.0 };
@@ -73,7 +75,8 @@ export class ZoneManager {
       this.currentZoneId = zone.id;
     }
 
-    return { fogDensity, fogColor, ambientColor, ambientIntensity };
+    const worldState = WorldStateManager.getInstance();
+    return worldState.modifyAtmosphere(zone, fogDensity, fogColor, ambientColor, ambientIntensity, flags);
   }
 
   public getCurrentZoneId(): string {

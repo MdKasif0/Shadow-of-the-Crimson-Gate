@@ -418,7 +418,7 @@ export class GameScene {
 
     // Zone & Atmosphere updates
     const playerPos = this.player.root.position;
-    let { fogDensity, fogColor, ambientColor, ambientIntensity } = this.zoneManager.getBlendedAtmosphere(playerPos);
+    let { fogDensity, fogColor, ambientColor, ambientIntensity } = this.zoneManager.getBlendedAtmosphere(playerPos, this.storyManager.flags);
 
     if (this.bossIsDefeatedSequence || this.playerProgress.crimsonOniDefeated) {
       // Force purified atmosphere in boss arena
@@ -452,6 +452,7 @@ export class GameScene {
       ambientIntensity = 2.5;
     }
 
+    WorldStateManager.getInstance().updateParticles(this.vfx, this.storyManager.flags);
     this.atmosphere.update(dt, fogDensity, fogColor);
     this.lighting.update(dt, ambientColor, ambientIntensity);
     const zoneId = this.zoneManager.getCurrentZoneId();
