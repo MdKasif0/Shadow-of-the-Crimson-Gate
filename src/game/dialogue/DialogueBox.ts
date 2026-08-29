@@ -1,7 +1,8 @@
 // ─── Dialogue Box ───────────────────────────────────────────────────────────
 // Cinematic dialogue UI overlay with typewriter text reveal.
 
-import { DialogueNode, DialogueChoice } from './DialogueNode';
+import { DialogueNode } from './DialogueNode';
+import { DialogueChoice } from './DialogueChoice';
 import { AudioManager } from '../audio/AudioManager';
 import { AudioId } from '../audio/AudioRegistry';
 
