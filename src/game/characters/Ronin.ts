@@ -211,7 +211,17 @@ export class Ronin {
         this.targetRotation = Math.atan2(inputMoveDir.x, inputMoveDir.z);
         intendedMove = inputMoveDir.clone().multiplyScalar(speed * dt);
         this.playWalk();
+
+        // Footsteps
+        this.footstepDistance += speed * dt;
+        const stepThreshold = isRunning ? 2.4 : 1.8;
+        if (this.footstepDistance >= stepThreshold) {
+          this.footstepDistance = 0;
+          const isGrass = this.root.position.z < -20 && this.root.position.z > -50;
+          AudioManager.playFootstep(isGrass ? 'grass' : 'stone');
+        }
       } else {
+        this.footstepDistance = 0;
         this.playIdle();
       }
     }
