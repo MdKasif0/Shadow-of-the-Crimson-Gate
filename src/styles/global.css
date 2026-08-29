@@ -103,8 +103,22 @@ a {
   transition: color var(--transition-fast);
 }
 
-a:hover {
+a:hover, a:focus {
   color: var(--color-gold-bright);
+}
+
+/* ─── Responsive Typography ─────────────────────────────────────────────── */
+
+@media (max-width: 1280px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 12px;
+  }
 }
 
 /* ─── Selection ──────────────────────────────────────────────────────────── */

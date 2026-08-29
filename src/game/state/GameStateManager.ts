@@ -29,6 +29,12 @@ export class GameStateManager {
     this.previousState = this.currentState;
     this.currentState = newState;
 
+    if (this.currentState === GameState.PLAYING || this.currentState === GameState.BOSS) {
+      document.body.style.cursor = 'crosshair';
+    } else {
+      document.body.style.cursor = 'default';
+    }
+
     EventBus.emit('gameStateChanged', {
       previous: this.previousState,
       current: this.currentState

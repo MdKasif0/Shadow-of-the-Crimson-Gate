@@ -13,6 +13,7 @@ import { PauseMenu } from './ui/PauseMenu';
 import { GameOverUI } from './ui/GameOverUI';
 import { EpilogueUI } from './ui/EpilogueUI';
 import { ScreenEffectsUI } from './ui/ScreenEffectsUI';
+import { LoadingScreen } from './ui/LoadingScreen';
 
 export class ThreeGame {
   private containerId: string;
@@ -27,6 +28,7 @@ export class ThreeGame {
   private gameOverUI: GameOverUI;
   private epilogueUI: EpilogueUI;
   private screenEffectsUI: ScreenEffectsUI;
+  private loadingScreen: LoadingScreen;
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -46,6 +48,7 @@ export class ThreeGame {
     this.gameOverUI = new GameOverUI();
     this.epilogueUI = new EpilogueUI();
     this.screenEffectsUI = new ScreenEffectsUI();
+    this.loadingScreen = new LoadingScreen();
     
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);
@@ -60,6 +63,9 @@ export class ThreeGame {
     
     // Start the game loop!
     this.loop.start();
+    
+    this.loadingScreen.updateProgress(100, 'Ready');
+    this.loadingScreen.hide();
   }
 
   private update(dt: number): void {
