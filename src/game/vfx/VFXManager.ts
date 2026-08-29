@@ -44,6 +44,10 @@ export class VFXManager {
     this.environment.update(dt, time);
   }
 
+  public clear(): void {
+    // Clear logic for VFX if needed. Most VFX decay naturally.
+  }
+
   // --- Public API (unchanged signatures) ---
 
   public spawnSlash(position: THREE.Vector3, direction: THREE.Vector3, type: number): void {

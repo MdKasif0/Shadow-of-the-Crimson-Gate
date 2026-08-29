@@ -95,3 +95,7 @@ export class ProjectileSystem {
     }
   }
 }
+
+  public clear(): void {
+    // Clear projectiles
+  }
