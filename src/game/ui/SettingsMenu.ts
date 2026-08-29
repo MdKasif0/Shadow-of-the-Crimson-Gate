@@ -1,4 +1,5 @@
 import { SettingsManager } from '../settings/SettingsManager';
+import { AudioManager } from '../audio/AudioManager';
 
 export class SettingsMenu {
   private overlay: HTMLDivElement;
@@ -94,6 +95,8 @@ export class SettingsMenu {
       const cameraShake = (document.getElementById('setting-cam-shake') as HTMLInputElement).checked;
       const reduceMotion = (document.getElementById('setting-reduce-motion') as HTMLInputElement).checked;
 
+      AudioManager.playUISelect();
+
       SettingsManager.getInstance().update({
         masterVolume, musicVolume, graphicsQuality, vfxIntensity, cameraShake, reduceMotion
       });
@@ -106,16 +109,21 @@ export class SettingsMenu {
     const btnClose = document.getElementById('btn-close-settings');
     if (btnClose) {
       btnClose.addEventListener('click', () => {
+        AudioManager.playUIBack();
         this.destroy();
         this.onClose();
       });
-      btnClose.addEventListener('mouseenter', () => btnClose.style.background = 'rgba(204,68,68,0.2)');
+      btnClose.addEventListener('mouseenter', () => {
+        AudioManager.playUIHover();
+        btnClose.style.background = 'rgba(204,68,68,0.2)';
+      });
       btnClose.addEventListener('mouseleave', () => btnClose.style.background = 'transparent');
     }
 
     const btnFullscreen = document.getElementById('btn-fullscreen');
     if (btnFullscreen) {
       btnFullscreen.addEventListener('click', () => {
+        AudioManager.playUIConfirm();
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch(err => console.warn(err));
           btnFullscreen.textContent = 'EXIT FULLSCREEN';
@@ -124,7 +132,10 @@ export class SettingsMenu {
           btnFullscreen.textContent = 'ENTER FULLSCREEN';
         }
       });
-      btnFullscreen.addEventListener('mouseenter', () => btnFullscreen.style.background = 'rgba(204,68,68,0.2)');
+      btnFullscreen.addEventListener('mouseenter', () => {
+        AudioManager.playUIHover();
+        btnFullscreen.style.background = 'rgba(204,68,68,0.2)';
+      });
       btnFullscreen.addEventListener('mouseleave', () => btnFullscreen.style.background = 'transparent');
     }
   }
