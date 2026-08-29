@@ -52,7 +52,9 @@ export class ThreeGame {
     
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);
+    this.onVisibilityChange = this.onVisibilityChange.bind(this);
     window.addEventListener('resize', this.onResize);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
     // Initial size update
     this.onResize();
 
@@ -92,11 +94,7 @@ export class ThreeGame {
     // Update camera to follow player
     this.cameraController.update(this.gameScene.player.root.position, dt);
 
-    // Optional Debug overlay (e.g., exit debug command)
-    if (GAME_CONFIG.DEBUG_MODE && this.input.isPressed('KeyP')) {
-      console.log('Pause/Debug requested');
-      this.input.keys['KeyP'] = false;
-    }
+
 
     this.input.endFrame();
   }
@@ -117,9 +115,19 @@ export class ThreeGame {
     this.renderer.resize();
   }
 
+  private onVisibilityChange(): void {
+    const gsm = GameStateManager.getInstance();
+    if (document.hidden) {
+      if (gsm.getState() === GameState.PLAYING || gsm.getState() === GameState.BOSS) {
+        gsm.setState(GameState.PAUSED);
+      }
+    }
+  }
+
   public destroy(): void {
     this.loop.stop();
     window.removeEventListener('resize', this.onResize);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.input.dispose();
     this.hud.destroy();
     this.renderer.destroy();
