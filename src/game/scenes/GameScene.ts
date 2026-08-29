@@ -185,11 +185,6 @@ export class GameScene {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     });
 
-    EventBus.on('npcDialogueComplete', (data: any) => {
-      this.storyManager.onDialogueComplete(data.id);
-      EventBus.emit('requestSave', {});
-    });
-
     EventBus.on('levelUp', (data: any) => {
       this.playerStats.applyLevel(data.level);
       this.applyPlayerStats();
@@ -319,7 +314,7 @@ export class GameScene {
         // Reward
         this.playerProgress.addEssence(500);
         this.playerProgress.crimsonOniDefeated = true;
-        this.playerProgress.save();
+        EventBus.emit('requestSave', {});
         
         // Restore camera and controls
         this.cameraController.overrideTarget = null;
