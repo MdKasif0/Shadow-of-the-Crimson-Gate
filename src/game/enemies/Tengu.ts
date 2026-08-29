@@ -164,9 +164,22 @@ export class Tengu implements Enemy {
     
     if (this.state !== decision.state) {
       if (decision.state === EnemyState.ATTACK) {
-        AudioManager.playEnemyAttack();
+        AudioManager.play(AudioId.TENGU_ATTACK, { pitchMin: 0.95, pitchMax: 1.05 });
       }
       this.setState(decision.state);
+    }
+
+    // Occasional wing flaps in flight
+    this.wingFlapTimer -= dt;
+    if (this.wingFlapTimer <= 0) {
+      this.wingFlapTimer = 1.2 + Math.random() * 0.8;
+      if (this.root.position.distanceTo(playerPos) < 20) {
+        AudioManager.playRandom([AudioId.TENGU_WING_FLAP_01, AudioId.TENGU_WING_FLAP_02], {
+          volume: 0.25,
+          pitchMin: 0.95,
+          pitchMax: 1.05
+        });
+      }
     }
 
     if (this.state === EnemyState.WALK || this.state === EnemyState.MAINTAIN_DISTANCE || this.state === EnemyState.STRAFE || this.state === EnemyState.RETREAT) {
@@ -198,6 +211,9 @@ export class Tengu implements Enemy {
 
     if (this.stateTimer >= activeStart && this.stateTimer <= activeEnd) {
       if (this.stateTimer - dt < activeStart && projectileSystem) {
+        // Fire projectile sound
+        AudioManager.play(AudioId.TENGU_PROJECTILE, { pitchMin: 0.95, pitchMax: 1.05 });
+
         // Fire projectile
         const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.root.rotation.y);
         const spawnPos = this.root.position.clone();
