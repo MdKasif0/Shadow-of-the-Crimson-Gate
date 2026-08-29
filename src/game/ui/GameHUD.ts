@@ -236,9 +236,7 @@ export class GameHUD {
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {
-    if (e.code === 'Escape') {
-      this.pauseMenu.toggle();
-    }
+    // Other keydown handling if needed
   };
 
   public destroy() {

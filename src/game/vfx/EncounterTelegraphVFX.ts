@@ -124,8 +124,23 @@ export class EncounterTelegraphVFX {
     gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
     
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 32, 32);
+    ctx.beginPath();
+    ctx.arc(16, 16, 16, 0, Math.PI * 2);
+    ctx.fill();
     
-    return new THREE.CanvasTexture(canvas);
+    const tex = new THREE.CanvasTexture(canvas);
+    return tex;
+  }
+
+  public clear(): void {
+    for (const ps of this.particleSystems.values()) {
+      this.scene.remove(ps);
+    }
+    this.particleSystems.clear();
+    
+    for (const mesh of this.activeRings.values()) {
+      this.scene.remove(mesh);
+    }
+    this.activeRings.clear();
   }
 }

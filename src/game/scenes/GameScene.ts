@@ -185,6 +185,11 @@ export class GameScene {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     });
 
+    EventBus.on('npcDialogueComplete', (data: any) => {
+      this.storyManager.onDialogueComplete(data.id);
+      EventBus.emit('requestSave', {});
+    });
+
     EventBus.on('levelUp', (data: any) => {
       this.playerStats.applyLevel(data.level);
       this.applyPlayerStats();
@@ -212,8 +217,7 @@ export class GameScene {
         level: this.playerProgress.level,
         clearedEncounters: Array.from(this.playerProgress.clearedEncounters),
         storyFlags: this.storyManager.flags,
-        crimsonOniDefeated: this.playerProgress.crimsonOniDefeated,
-        shrineStates: {}
+        crimsonOniDefeated: this.playerProgress.crimsonOniDefeated
       });
     });
 
@@ -570,7 +574,6 @@ export class GameScene {
 
     // ─── Check Player Death ───────────────────────────────────────
     if (this.player.health.currentHealth <= 0) {
-      this.player.die();
       this.player.isControlsEnabled = false;
       GameStateManager.getInstance().setState(GameState.GAME_OVER);
     }

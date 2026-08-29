@@ -97,9 +97,7 @@ export class ProjectileSystem {
 
   public clear(): void {
     for (const p of this.projectiles) {
-      if (p.mesh.parent) {
-        p.mesh.parent.remove(p.mesh);
-      }
+      p.deactivate();
     }
     this.projectiles = [];
   }
