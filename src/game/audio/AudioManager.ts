@@ -50,18 +50,94 @@ export class AudioManager {
   // ─── Boss Audio Hooks ──────────────────────────────────────────────────
 
   public static playBossIntro(): void {
-    // Stub: Play dramatic taiko drum hit / riser
-    console.log('[Audio] Playing Boss Intro Music/Stinger');
+    // Dramatic taiko drum hit + low rumble
+    this.playSound((ctx, dest, time) => {
+      // Taiko hit
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(80, time);
+      osc.frequency.exponentialRampToValueAtTime(30, time + 0.8);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(1.0, time);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + 1.5);
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(time);
+      osc.stop(time + 1.5);
+
+      // Impact noise burst
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.createNoiseBuffer();
+      const nFilter = ctx.createBiquadFilter();
+      nFilter.type = 'lowpass';
+      nFilter.frequency.setValueAtTime(200, time);
+      const nGain = ctx.createGain();
+      nGain.gain.setValueAtTime(0.6, time);
+      nGain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
+      noise.connect(nFilter);
+      nFilter.connect(nGain);
+      nGain.connect(dest);
+      noise.start(time);
+      noise.stop(time + 0.5);
+    });
   }
 
   public static playBossPhase(phase: number): void {
-    // Stub: Crossfade to phase-specific combat track
-    console.log(`[Audio] Playing Boss Phase ${phase} Music`);
+    // Escalating riser — higher pitch per phase
+    this.playSound((ctx, dest, time) => {
+      const baseFreq = 100 + (phase - 1) * 80;
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(baseFreq, time);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 4, time + 1.5);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(400, time);
+      filter.frequency.linearRampToValueAtTime(3000, time + 1.5);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(0.5, time + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + 2.0);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(dest);
+      osc.start(time);
+      osc.stop(time + 2.0);
+    });
   }
 
   public static playBossDefeat(): void {
-    // Stub: Stop combat music, play victory/collapse stinger
-    console.log('[Audio] Playing Boss Defeat Audio');
+    // Descending victory chord
+    this.playSound((ctx, dest, time) => {
+      const freqs = [523.25, 659.25, 783.99, 1046.50]; // C major
+      freqs.forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        const gain = ctx.createGain();
+        const t = time + i * 0.2;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.35, t + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 3.0);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 3.0);
+      });
+
+      // Low sustain pad
+      const pad = ctx.createOscillator();
+      pad.type = 'triangle';
+      pad.frequency.value = 130.81; // C3
+      const padGain = ctx.createGain();
+      padGain.gain.setValueAtTime(0, time);
+      padGain.gain.linearRampToValueAtTime(0.3, time + 0.5);
+      padGain.gain.exponentialRampToValueAtTime(0.01, time + 4.0);
+      pad.connect(padGain);
+      padGain.connect(dest);
+      pad.start(time);
+      pad.stop(time + 4.0);
+    });
   }
 
   // --- Core Synthesis ---
