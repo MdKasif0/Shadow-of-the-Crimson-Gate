@@ -1,10 +1,8 @@
 /**
- * Game Page (Placeholder)
+ * Game Page
  *
- * Minimal dark cinematic placeholder for the future Phaser 3 game.
- * Displays a "Game Loading..." state and a back button.
- *
- * The actual Phaser game will be initialized here in a future step.
+ * Full-screen container for the Three.js game engine.
+ * Initializes the 3D game and provides a back-to-title button.
  */
 
 import type { PageComponent } from '../types/index';
