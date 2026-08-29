@@ -296,7 +296,7 @@ export function renderHero(container: HTMLElement): () => void {
       audioToggle.setAttribute('aria-pressed', 'true');
       fadeAudioIn();
     } catch (err) {
-      console.log('Autoplay blocked. User interaction required to play audio.');
+      console.warn('Autoplay blocked. User interaction required to play audio.');
     }
   };
 
