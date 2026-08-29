@@ -103,11 +103,3 @@ export const PARTICLES = {
   /** Number of spirit/glow particle elements */
   SPIRIT_COUNT: 7,
 } as const;
-
-// ─── Phaser (Future) ─────────────────────────────────────────────────────────
-
-export const PHASER_CONFIG = {
-  WIDTH: 1280,
-  HEIGHT: 720,
-  PARENT_ID: 'game-container',
-} as const;
