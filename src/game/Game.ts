@@ -11,6 +11,7 @@ import { GameStateManager } from './state/GameStateManager';
 import { GameState } from './state/GameState';
 import { PauseMenu } from './ui/PauseMenu';
 import { GameOverUI } from './ui/GameOverUI';
+import { EpilogueUI } from './ui/EpilogueUI';
 
 export class ThreeGame {
   private containerId: string;
@@ -23,6 +24,7 @@ export class ThreeGame {
   private hud: GameHUD;
   private pauseMenu: PauseMenu;
   private gameOverUI: GameOverUI;
+  private epilogueUI: EpilogueUI;
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -40,6 +42,7 @@ export class ThreeGame {
     this.hud = new GameHUD(containerId);
     this.pauseMenu = new PauseMenu();
     this.gameOverUI = new GameOverUI();
+    this.epilogueUI = new EpilogueUI();
     
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);

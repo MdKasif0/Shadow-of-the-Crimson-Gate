@@ -32,6 +32,18 @@ export class StoryManager {
       this.state.setFlag('crimsonOniDefeated', true);
       this.completeCurrentObjective();
       this.advanceToChapter(ChapterId.EPILOGUE);
+
+      // Start the 30 second Epilogue sequence
+      setTimeout(() => {
+        this.state.setFlag('endingStarted', true);
+        EventBus.emit('epilogueSequenceStart', {});
+      }, 5000); // 5 seconds after death, start the epilogue visuals
+      
+      setTimeout(() => {
+        this.state.setFlag('completedCampaign', true);
+        EventBus.emit('requestSave', {});
+        EventBus.emit('epilogueSequenceEnd', {});
+      }, 35000); // 35 seconds total
     });
 
     // Listen for shrine activation
@@ -176,7 +188,7 @@ export class StoryManager {
         zoneId: 'FOREST',
         isComplete: false,
       });
-    } else if (encounterId.includes('forest') || encounterId.includes('shrine')) {
+    } else if (encounterId === 'enc_forest_2') {
       this.state.setFlag('forestPurified', true);
       this.completeCurrentObjective();
     }

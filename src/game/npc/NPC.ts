@@ -33,13 +33,12 @@ export class NPC {
 
   /** Get the appropriate dialogue based on story flags */
   public getDialogue(flags: StoryFlags): DialogueNode[] {
-    if (this.def.dialogueAfterFlag && this.def.dialogueAlt) {
-      const flagKey = this.def.dialogueAfterFlag as keyof StoryFlags;
-      if (flags[flagKey]) {
-        return this.def.dialogueAlt;
+    for (const d of this.def.dialogues) {
+      if (d.condition(flags)) {
+        return d.dialogue;
       }
     }
-    return this.def.dialogue;
+    return this.def.dialogues[this.def.dialogues.length - 1].dialogue; // fallback to last
   }
 
   /** Subtle idle animation */

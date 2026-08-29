@@ -50,6 +50,7 @@ import { CheckpointManager } from '../progression/CheckpointManager';
 import { SaveManager } from '../save/SaveManager';
 import { GameStateManager } from '../state/GameStateManager';
 import { GameState } from '../state/GameState';
+import { WorldStateManager } from '../state/WorldStateManager';
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -235,7 +236,7 @@ export class GameScene {
       if (saveData.chapter) this.storyManager.state.currentChapter = saveData.chapter;
       if (saveData.objective) this.objectiveManager.setObjective(saveData.objective);
       
-      if (this.playerProgress.crimsonOniDefeated && this.boss) {
+      if (this.playerProgress.crimsonOniDefeated && !saveData.storyFlags?.completedCampaign && this.boss) {
         this.scene.remove(this.boss.root);
         this.boss = null;
       }
@@ -243,7 +244,7 @@ export class GameScene {
       this.encounterManager.clearAll();
       const configs = EncounterDatabase.getAll();
       for (const config of configs) {
-        if (!this.playerProgress.hasClearedEncounter(config.id)) {
+        if (saveData.storyFlags?.completedCampaign || !this.playerProgress.hasClearedEncounter(config.id)) {
           this.encounterManager.registerEncounter(config);
         }
       }

@@ -21,32 +21,31 @@ export class EncounterDatabase {
         ]
       },
       {
-        id: 'enc_shrine',
-        center: new THREE.Vector3(0, 0, -10),
+        id: 'enc_forest_1',
+        center: new THREE.Vector3(0, 0, -25),
         activationRadius: 12,
         leashRadius: 20,
-        reward: 25,
+        reward: 20,
         waves: [
           {
             enemies: [
-              { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(-6, 0, 4) },
-              { type: 'TENGU', offset: new THREE.Vector3(6, 0, -4) }
+              { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(0, 0, 0) }
             ],
             delayAfterComplete: 0
           }
         ]
       },
       {
-        id: 'enc_forest',
-        center: new THREE.Vector3(0, 0, -35),
-        activationRadius: 10,
-        leashRadius: 18,
-        reward: 25,
+        id: 'enc_forest_2',
+        center: new THREE.Vector3(0, 0, -45),
+        activationRadius: 12,
+        leashRadius: 20,
+        reward: 35,
         waves: [
           {
             enemies: [
-              { type: 'BASIC_YOKAI', offset: new THREE.Vector3(0, 0, -6) },
-              { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(0, 0, 6) }
+              { type: 'TENGU', offset: new THREE.Vector3(0, 0, 0) },
+              { type: 'BASIC_YOKAI', offset: new THREE.Vector3(-5, 0, 5) }
             ],
             delayAfterComplete: 0
           }
@@ -54,22 +53,21 @@ export class EncounterDatabase {
       },
       {
         id: 'enc_temple',
-        center: new THREE.Vector3(0, 0, -60),
+        center: new THREE.Vector3(0, 0, -70),
         activationRadius: 14,
         leashRadius: 22,
-        reward: 25,
+        reward: 50,
         waves: [
           {
             enemies: [
-              { type: 'BASIC_YOKAI', offset: new THREE.Vector3(-6, 0, 0) },
+              { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(-6, 0, 0) },
               { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(6, 0, 0) }
             ],
             delayAfterComplete: 1.5
           },
           {
             enemies: [
-              { type: 'SHADOW_YOKAI', offset: new THREE.Vector3(-6, 0, -4) },
-              { type: 'TENGU', offset: new THREE.Vector3(6, 0, 4) }
+              { type: 'TENGU', offset: new THREE.Vector3(0, 0, -4) }
             ],
             delayAfterComplete: 0
           }
