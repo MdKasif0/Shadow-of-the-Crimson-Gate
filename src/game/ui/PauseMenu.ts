@@ -58,9 +58,7 @@ export class PauseMenu {
       });
 
       document.getElementById('btn-quit')?.addEventListener('click', () => {
-        if (confirm('Return to main menu? Unsaved progress will be lost.')) {
-          GameStateManager.getInstance().setState(GameState.MAIN_MENU);
-        }
+        GameStateManager.getInstance().setState(GameState.MAIN_MENU);
       });
     }, 0);
   }

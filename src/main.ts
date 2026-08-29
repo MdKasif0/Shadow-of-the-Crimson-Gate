@@ -71,6 +71,14 @@ function init(): void {
 
   // Start in Main Menu
   stateManager.setState(GameState.MAIN_MENU);
+
+  if (stateManager.getState() === GameState.MAIN_MENU) {
+    menuContainer.style.display = 'block';
+    if (!heroCleanup) {
+      menuContainer.innerHTML = '';
+      heroCleanup = renderHero(menuContainer);
+    }
+  }
 }
 
 if (document.readyState === 'loading') {
