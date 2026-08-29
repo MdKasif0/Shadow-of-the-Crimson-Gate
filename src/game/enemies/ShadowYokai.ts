@@ -10,6 +10,7 @@ import { EnemyAI } from './EnemyAI';
 import { SHADOW_YOKAI_CONFIG, EnemyConfig } from './EnemyConfig';
 import { AttackRole } from '../combat/AttackDirector';
 import { AudioManager } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
 
 export class ShadowYokai implements Enemy {
   public id: string;
@@ -29,6 +30,7 @@ export class ShadowYokai implements Enemy {
   private attackCooldown: number = 0;
   private role: AttackRole = AttackRole.FLANKER;
   private homePosition: THREE.Vector3 | null = null;
+  private whisperTimer: number = 8 + Math.random() * 8;
 
   public assignRole(role: AttackRole): void {
     this.role = role;
@@ -201,9 +203,21 @@ export class ShadowYokai implements Enemy {
     
     if (this.state !== decision.state) {
       if (decision.state === EnemyState.ATTACK) {
-        AudioManager.playEnemyAttack();
+        AudioManager.play(AudioId.SHADOW_ATTACK, { pitchMin: 0.95, pitchMax: 1.05 });
       }
       this.setState(decision.state);
+    }
+
+    // Occasional shadow whisper
+    this.whisperTimer -= dt;
+    if (this.whisperTimer <= 0) {
+      this.whisperTimer = 10 + Math.random() * 10;
+      if (this.root.position.distanceTo(playerPos) < 15) {
+        AudioManager.play(AudioId.SHADOW_WHISPER, {
+          volume: 0.25,
+          cooldownMs: 6000
+        });
+      }
     }
 
     // Handle movement based on AI decision

@@ -11,6 +11,7 @@ import { AttackRole } from '../combat/AttackDirector';
 import { EnemyAI } from './EnemyAI';
 import { TENGU_CONFIG, EnemyConfig } from './EnemyConfig';
 import { AudioManager } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
 
 export class Tengu implements Enemy {
   public id: string;
@@ -30,6 +31,7 @@ export class Tengu implements Enemy {
   private attackCooldown: number = 0;
   private role: AttackRole = AttackRole.SUPPORT;
   private homePosition: THREE.Vector3 | null = null;
+  private wingFlapTimer: number = 1.0 + Math.random();
 
   public assignRole(role: AttackRole): void {
     this.role = role;
