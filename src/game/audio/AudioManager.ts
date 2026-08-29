@@ -1,394 +1,592 @@
+/**
+ * AudioManager — Production audio system.
+ * 
+ * Single authoritative manager for all game audio.
+ * Uses Web Audio API with file-based playback, bus routing,
+ * cooldowns, concurrency limits, pitch/volume variation, and caching.
+ */
+
 import { EventBus } from '../core/EventBus';
+import { AudioId, AudioCategory, AudioPriority, AUDIO_REGISTRY } from './AudioRegistry';
+import { AudioBus, AudioBuses, createAudioBuses } from './AudioBus';
+
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+const MAX_CONCURRENT_SFX = 24;
+const MUSIC_CROSSFADE_DURATION = 2.0;
+
+// ─── Types ─────────────────────────────────────────────────────────────────
+
+interface ActiveSource {
+  source: AudioBufferSourceNode;
+  gainNode: GainNode;
+  id: AudioId;
+  priority: AudioPriority;
+  startTime: number;
+}
+
+export interface PlayOptions {
+  volume?: number;       // Override volume (0–1)
+  pitchMin?: number;     // Min playback rate (e.g. 0.96)
+  pitchMax?: number;     // Max playback rate (e.g. 1.04)
+  cooldownMs?: number;   // Minimum ms between plays of same ID
+  loop?: boolean;        // Override loop setting
+}
+
+// ─── Audio State ───────────────────────────────────────────────────────────
+
+export enum AudioState {
+  MENU,
+  EXPLORATION,
+  COMBAT,
+  BOSS_PHASE_1,
+  BOSS_PHASE_2,
+  BOSS_PHASE_3,
+  VICTORY,
+  ENDING,
+  GAME_OVER,
+  PAUSED,
+}
+
+// ─── AudioManager ──────────────────────────────────────────────────────────
 
 export class AudioManager {
   private static ctx: AudioContext | null = null;
-  private static masterGain: GainNode | null = null;
+  private static buses: AudioBuses | null = null;
   private static initialized: boolean = false;
-  private static isMuted: boolean = false;
-  private static ambientOscillator: OscillatorNode | null = null;
-  private static ambientGain: GainNode | null = null;
+  private static suspended: boolean = true;
+
+  // Cache: AudioId → decoded AudioBuffer
+  private static bufferCache: Map<string, AudioBuffer> = new Map();
+  // Track which files have already been warned as missing
+  private static warnedMissing: Set<string> = new Set();
+  // Loading promises to avoid double-fetching
+  private static loadingPromises: Map<string, Promise<AudioBuffer | null>> = new Map();
+
+  // Active SFX sources for concurrency limits
+  private static activeSources: ActiveSource[] = [];
+  // Cooldown timestamps: AudioId → last play time
+  private static cooldowns: Map<string, number> = new Map();
+
+  // Current music source
+  private static currentMusic: ActiveSource | null = null;
+  private static currentMusicId: AudioId | null = null;
+
+  // Active ambient loops: AudioId → ActiveSource
+  private static activeLoops: Map<string, ActiveSource> = new Map();
+
+  // Audio state
+  private static audioState: AudioState = AudioState.MENU;
+
+  // ─── Init ──────────────────────────────────────────────────────────────
 
   public static init(): void {
     if (this.initialized) return;
+    this.initialized = true;
 
-    // Create AudioContext on first interaction
-    const initAudio = () => {
+    // Create AudioContext on first user interaction (browser policy)
+    const resume = () => {
       if (!this.ctx) {
         this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 0.5;
-        this.masterGain.connect(this.ctx.destination);
-        this.initialized = true;
+        this.buses = createAudioBuses(this.ctx);
+        this.suspended = false;
 
-        this.startAmbient();
+        // Preload critical assets
+        this.preloadEssentials();
+      } else if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+        this.suspended = false;
       }
-      document.removeEventListener('click', initAudio);
-      document.removeEventListener('keydown', initAudio);
+      document.removeEventListener('click', resume);
+      document.removeEventListener('keydown', resume);
     };
 
-    document.addEventListener('click', initAudio);
-    document.addEventListener('keydown', initAudio);
+    document.addEventListener('click', resume);
+    document.addEventListener('keydown', resume);
 
     this.bindEvents();
   }
 
+  // ─── Bus Accessors ─────────────────────────────────────────────────────
+
+  private static getBus(category: AudioCategory): AudioBus | null {
+    if (!this.buses) return null;
+    switch (category) {
+      case AudioCategory.MUSIC: return this.buses.music;
+      case AudioCategory.AMBIENCE: return this.buses.ambience;
+      case AudioCategory.UI: return this.buses.ui;
+      default: return this.buses.sfx;
+    }
+  }
+
+  // ─── Volume Controls (for SettingsManager) ─────────────────────────────
+
+  public static setMasterVolume(v: number): void {
+    this.buses?.master.setVolume(v);
+  }
+
+  public static setMusicVolume(v: number): void {
+    this.buses?.music.setVolume(v);
+  }
+
+  public static setSfxVolume(v: number): void {
+    this.buses?.sfx.setVolume(v);
+  }
+
+  public static setAmbienceVolume(v: number): void {
+    this.buses?.ambience.setVolume(v);
+  }
+
+  // ─── Loading ───────────────────────────────────────────────────────────
+
+  private static async loadBuffer(id: AudioId): Promise<AudioBuffer | null> {
+    const entry = AUDIO_REGISTRY[id];
+    if (!entry) return null;
+
+    // Check cache
+    if (this.bufferCache.has(id)) {
+      return this.bufferCache.get(id)!;
+    }
+
+    // Check if already loading
+    if (this.loadingPromises.has(id)) {
+      return this.loadingPromises.get(id)!;
+    }
+
+    const promise = this.fetchAndDecode(id, entry.path, entry.optional);
+    this.loadingPromises.set(id, promise);
+    const buffer = await promise;
+    this.loadingPromises.delete(id);
+    return buffer;
+  }
+
+  private static async fetchAndDecode(id: AudioId, path: string, optional: boolean): Promise<AudioBuffer | null> {
+    if (!this.ctx) return null;
+    try {
+      const response = await fetch(path);
+      if (!response.ok) {
+        if (!optional && !this.warnedMissing.has(id)) {
+          console.warn(`[Audio] Missing asset: ${path}`);
+          this.warnedMissing.add(id);
+        }
+        return null;
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+      this.bufferCache.set(id, audioBuffer);
+      return audioBuffer;
+    } catch {
+      if (!optional && !this.warnedMissing.has(id)) {
+        console.warn(`[Audio] Failed to load: ${path}`);
+        this.warnedMissing.add(id);
+      }
+      return null;
+    }
+  }
+
+  private static preloadEssentials(): void {
+    // Preload frequently needed sounds immediately
+    const essentials = [
+      AudioId.SWORD_SWING_01, AudioId.SWORD_SWING_02, AudioId.SWORD_SWING_03,
+      AudioId.SWORD_HIT_01, AudioId.SWORD_HIT_02,
+      AudioId.PLAYER_DASH,
+      AudioId.UI_HOVER, AudioId.UI_SELECT, AudioId.UI_CONFIRM,
+      AudioId.FOOTSTEP_STONE_01, AudioId.FOOTSTEP_STONE_02,
+      AudioId.FOOTSTEP_GRASS_01, AudioId.FOOTSTEP_GRASS_02,
+    ];
+    for (const id of essentials) {
+      this.loadBuffer(id);
+    }
+  }
+
+  // ─── Core Play ─────────────────────────────────────────────────────────
+
+  public static async play(id: AudioId, opts?: PlayOptions): Promise<void> {
+    if (!this.ctx || !this.buses || this.suspended) return;
+
+    const entry = AUDIO_REGISTRY[id];
+    if (!entry) return;
+
+    // Cooldown check
+    const cooldownMs = opts?.cooldownMs ?? 0;
+    if (cooldownMs > 0) {
+      const lastPlay = this.cooldowns.get(id) ?? 0;
+      if (Date.now() - lastPlay < cooldownMs) return;
+    }
+    this.cooldowns.set(id, Date.now());
+
+    // Concurrency limit for SFX
+    if (entry.category !== AudioCategory.MUSIC && entry.category !== AudioCategory.AMBIENCE) {
+      this.cleanupFinished();
+      if (this.activeSources.length >= MAX_CONCURRENT_SFX) {
+        // Evict lowest priority
+        this.evictLowest();
+      }
+    }
+
+    const buffer = await this.loadBuffer(id);
+    if (!buffer || !this.ctx) return;
+
+    const bus = this.getBus(entry.category);
+    if (!bus) return;
+
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = opts?.loop ?? entry.loop;
+
+    // Pitch variation
+    if (opts?.pitchMin !== undefined && opts?.pitchMax !== undefined) {
+      source.playbackRate.value = opts.pitchMin + Math.random() * (opts.pitchMax - opts.pitchMin);
+    }
+
+    // Per-source gain for volume control
+    const gainNode = this.ctx.createGain();
+    const vol = (opts?.volume ?? entry.volume);
+    gainNode.gain.value = vol;
+
+    source.connect(gainNode);
+    gainNode.connect(bus.node);
+
+    const active: ActiveSource = {
+      source, gainNode, id, priority: entry.priority, startTime: this.ctx.currentTime
+    };
+
+    source.start();
+
+    if (!source.loop) {
+      source.onended = () => {
+        const idx = this.activeSources.indexOf(active);
+        if (idx !== -1) this.activeSources.splice(idx, 1);
+      };
+    }
+
+    this.activeSources.push(active);
+  }
+
+  // ─── Play Random ───────────────────────────────────────────────────────
+
+  public static playRandom(ids: AudioId[], opts?: PlayOptions): void {
+    if (ids.length === 0) return;
+    const id = ids[Math.floor(Math.random() * ids.length)];
+    this.play(id, opts);
+  }
+
+  // ─── Music ─────────────────────────────────────────────────────────────
+
+  public static async playMusic(id: AudioId, fadeDuration: number = MUSIC_CROSSFADE_DURATION): Promise<void> {
+    if (this.currentMusicId === id) return; // Don't restart same track
+
+    // Fade out current music
+    if (this.currentMusic && this.ctx) {
+      const old = this.currentMusic;
+      old.gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + fadeDuration);
+      setTimeout(() => {
+        try { old.source.stop(); } catch { /* already stopped */ }
+      }, fadeDuration * 1000 + 100);
+      this.currentMusic = null;
+      this.currentMusicId = null;
+    }
+
+    if (!this.ctx || !this.buses) return;
+
+    const entry = AUDIO_REGISTRY[id];
+    if (!entry) return;
+
+    const buffer = await this.loadBuffer(id);
+    if (!buffer || !this.ctx) return;
+
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = entry.loop;
+
+    const gainNode = this.ctx.createGain();
+    gainNode.gain.value = 0;
+    gainNode.gain.linearRampToValueAtTime(entry.volume, this.ctx.currentTime + fadeDuration);
+
+    source.connect(gainNode);
+    gainNode.connect(this.buses.music.node);
+    source.start();
+
+    this.currentMusic = { source, gainNode, id, priority: entry.priority, startTime: this.ctx.currentTime };
+    this.currentMusicId = id;
+  }
+
+  public static stopMusic(fadeDuration: number = MUSIC_CROSSFADE_DURATION): void {
+    if (!this.currentMusic || !this.ctx) return;
+    const old = this.currentMusic;
+    old.gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + fadeDuration);
+    setTimeout(() => {
+      try { old.source.stop(); } catch { /* already stopped */ }
+    }, fadeDuration * 1000 + 100);
+    this.currentMusic = null;
+    this.currentMusicId = null;
+  }
+
+  // ─── Ambient Loops ─────────────────────────────────────────────────────
+
+  public static async startLoop(id: AudioId, fadeDuration: number = 1.5): Promise<void> {
+    if (this.activeLoops.has(id)) return;
+    if (!this.ctx || !this.buses) return;
+
+    const entry = AUDIO_REGISTRY[id];
+    if (!entry) return;
+
+    const buffer = await this.loadBuffer(id);
+    if (!buffer || !this.ctx) return;
+
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+
+    const gainNode = this.ctx.createGain();
+    gainNode.gain.value = 0;
+    gainNode.gain.linearRampToValueAtTime(entry.volume, this.ctx.currentTime + fadeDuration);
+
+    source.connect(gainNode);
+    gainNode.connect(this.buses.ambience.node);
+    source.start();
+
+    this.activeLoops.set(id, { source, gainNode, id, priority: entry.priority, startTime: this.ctx.currentTime });
+  }
+
+  public static stopLoop(id: AudioId, fadeDuration: number = 1.5): void {
+    const loop = this.activeLoops.get(id);
+    if (!loop || !this.ctx) return;
+
+    loop.gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + fadeDuration);
+    setTimeout(() => {
+      try { loop.source.stop(); } catch { /* already stopped */ }
+    }, fadeDuration * 1000 + 100);
+    this.activeLoops.delete(id);
+  }
+
+  public static stopAllLoops(fadeDuration: number = 1.5): void {
+    for (const [id] of this.activeLoops) {
+      this.stopLoop(id as AudioId, fadeDuration);
+    }
+  }
+
+  // ─── Concurrency Management ────────────────────────────────────────────
+
+  private static cleanupFinished(): void {
+    // AudioBufferSourceNodes auto-remove via onended, but clean up stale references
+    this.activeSources = this.activeSources.filter(s => {
+      try {
+        return s.source.buffer !== null; // still valid
+      } catch { return false; }
+    });
+  }
+
+  private static evictLowest(): void {
+    if (this.activeSources.length === 0) return;
+    let lowestIdx = 0;
+    let lowestPri = this.activeSources[0].priority;
+    for (let i = 1; i < this.activeSources.length; i++) {
+      if (this.activeSources[i].priority < lowestPri) {
+        lowestPri = this.activeSources[i].priority;
+        lowestIdx = i;
+      }
+    }
+    try { this.activeSources[lowestIdx].source.stop(); } catch { /* ok */ }
+    this.activeSources.splice(lowestIdx, 1);
+  }
+
+  // ─── Pause / Resume ────────────────────────────────────────────────────
+
+  public static pause(): void {
+    if (this.ctx && this.ctx.state === 'running') {
+      this.ctx.suspend();
+      this.suspended = true;
+    }
+  }
+
+  public static resume(): void {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+      this.suspended = false;
+    }
+  }
+
+  // ─── Cleanup ───────────────────────────────────────────────────────────
+
+  public static stopAll(): void {
+    // Stop all SFX
+    for (const s of this.activeSources) {
+      try { s.source.stop(); } catch { /* ok */ }
+    }
+    this.activeSources = [];
+
+    // Stop music
+    if (this.currentMusic) {
+      try { this.currentMusic.source.stop(); } catch { /* ok */ }
+      this.currentMusic = null;
+      this.currentMusicId = null;
+    }
+
+    // Stop loops
+    for (const [, loop] of this.activeLoops) {
+      try { loop.source.stop(); } catch { /* ok */ }
+    }
+    this.activeLoops.clear();
+  }
+
+  // ─── Backward-Compatible API ───────────────────────────────────────────
+  // These preserve the exact method signatures used by existing callsites.
+
+  public static playPlayerAttack(comboIndex: number): void {
+    const swings = [AudioId.SWORD_SWING_01, AudioId.SWORD_SWING_02, AudioId.SWORD_SWING_03];
+    const id = swings[comboIndex % swings.length];
+    this.play(id, { pitchMin: 0.95, pitchMax: 1.05, cooldownMs: 100 });
+  }
+
+  public static playSwordSwing(_baseFreq?: number): void {
+    this.playRandom(
+      [AudioId.SWORD_SWING_01, AudioId.SWORD_SWING_02, AudioId.SWORD_SWING_03],
+      { pitchMin: 0.96, pitchMax: 1.04, cooldownMs: 80 }
+    );
+  }
+
+  public static playSwordHit(): void {
+    this.playRandom(
+      [AudioId.SWORD_HIT_01, AudioId.SWORD_HIT_02],
+      { pitchMin: 0.95, pitchMax: 1.05, cooldownMs: 60 }
+    );
+  }
+
+  public static playEnemyAttack(): void {
+    this.play(AudioId.YOKAI_ATTACK, { pitchMin: 0.9, pitchMax: 1.1, cooldownMs: 200 });
+  }
+
+  public static playEnemyHurt(): void {
+    this.play(AudioId.YOKAI_HURT, { pitchMin: 0.95, pitchMax: 1.05, cooldownMs: 150 });
+  }
+
+  public static playEnemyDeath(): void {
+    this.play(AudioId.YOKAI_DEATH, { cooldownMs: 300 });
+  }
+
+  public static playPlayerHurt(): void {
+    this.play(AudioId.YOKAI_HURT, { volume: 0.5, pitchMin: 0.8, pitchMax: 0.9, cooldownMs: 200 });
+  }
+
+  public static playDash(): void {
+    this.play(AudioId.PLAYER_DASH, { cooldownMs: 300 });
+  }
+
+  public static playShrine(): void {
+    this.play(AudioId.SHRINE_ACTIVATE);
+  }
+
+  public static playLevelUp(): void {
+    this.play(AudioId.SYS_LEVEL_UP);
+  }
+
+  public static playEncounterComplete(): void {
+    this.play(AudioId.UI_NOTIFICATION);
+  }
+
+  // ── Boss ──
+
+  public static playBossIntro(): void {
+    this.play(AudioId.BOSS_ROAR_01);
+  }
+
+  public static playBossPhase(phase: number): void {
+    if (phase === 2) this.play(AudioId.BOSS_PHASE_2);
+    if (phase === 3) this.play(AudioId.BOSS_PHASE_3);
+  }
+
+  public static playBossDefeat(): void {
+    this.play(AudioId.BOSS_DEATH);
+    // Transition to victory music after a short delay
+    setTimeout(() => this.playMusic(AudioId.MUSIC_VICTORY), 2000);
+  }
+
+  // ── Tengu-specific ──
+  public static playTenguAttack(): void {
+    this.play(AudioId.TENGU_ATTACK, { cooldownMs: 200 });
+  }
+
+  // ── Shadow-specific ──
+  public static playShadowAttack(): void {
+    this.play(AudioId.SHADOW_ATTACK, { cooldownMs: 200 });
+  }
+
+  // ── Boss-specific ──
+  public static playBossAttack(): void {
+    this.play(AudioId.BOSS_ATTACK, { pitchMin: 0.9, pitchMax: 1.0, cooldownMs: 200 });
+  }
+
+  // ─── Footsteps ─────────────────────────────────────────────────────────
+
+  public static playFootstep(surface: 'stone' | 'grass' = 'stone'): void {
+    if (surface === 'grass') {
+      this.playRandom([AudioId.FOOTSTEP_GRASS_01, AudioId.FOOTSTEP_GRASS_02],
+        { pitchMin: 0.96, pitchMax: 1.04, cooldownMs: 250 });
+    } else {
+      this.playRandom([AudioId.FOOTSTEP_STONE_01, AudioId.FOOTSTEP_STONE_02],
+        { pitchMin: 0.96, pitchMax: 1.04, cooldownMs: 250 });
+    }
+  }
+
+  // ─── UI Sounds ─────────────────────────────────────────────────────────
+
+  public static playUIHover(): void {
+    this.play(AudioId.UI_HOVER, { cooldownMs: 80 });
+  }
+
+  public static playUISelect(): void {
+    this.play(AudioId.UI_SELECT, { cooldownMs: 100 });
+  }
+
+  public static playUIConfirm(): void {
+    this.play(AudioId.UI_CONFIRM, { cooldownMs: 200 });
+  }
+
+  public static playUIBack(): void {
+    this.play(AudioId.UI_BACK, { cooldownMs: 200 });
+  }
+
+  // ─── Event Bindings ────────────────────────────────────────────────────
+
   private static bindEvents(): void {
     EventBus.on('encounterStarted', () => {
-      this.transitionAmbient(40, 0.4); // Tension drone
+      this.stopMusic(1.0);
     });
-    
+
     EventBus.on('encounterComplete', () => {
-      this.transitionAmbient(100, 0.1); // Relaxed drone
       this.playEncounterComplete();
+      this.playMusic(AudioId.MUSIC_EXPLORATION, 2.0);
     });
 
     EventBus.on('levelUp', () => this.playLevelUp());
     EventBus.on('shrineActivated', () => this.playShrine());
     EventBus.on('enemyDeath', () => this.playEnemyDeath());
-  }
 
-  // ─── Boss Audio Hooks ──────────────────────────────────────────────────
+    EventBus.on('playerDeath', () => {
+      this.stopMusic(1.0);
+      setTimeout(() => this.play(AudioId.SYS_GAME_OVER), 1500);
+    });
 
-  public static playBossIntro(): void {
-    // Dramatic taiko drum hit + low rumble
-    this.playSound((ctx, dest, time) => {
-      // Taiko hit
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(80, time);
-      osc.frequency.exponentialRampToValueAtTime(30, time + 0.8);
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(1.0, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 1.5);
-      osc.connect(gain);
-      gain.connect(dest);
-      osc.start(time);
-      osc.stop(time + 1.5);
-
-      // Impact noise burst
-      const noise = ctx.createBufferSource();
-      noise.buffer = this.createNoiseBuffer();
-      const nFilter = ctx.createBiquadFilter();
-      nFilter.type = 'lowpass';
-      nFilter.frequency.setValueAtTime(200, time);
-      const nGain = ctx.createGain();
-      nGain.gain.setValueAtTime(0.6, time);
-      nGain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
-      noise.connect(nFilter);
-      nFilter.connect(nGain);
-      nGain.connect(dest);
-      noise.start(time);
-      noise.stop(time + 0.5);
+    EventBus.on('gameStateChanged', (data: { current: string, previous: string | null }) => {
+      if (data.current === 'PAUSED') {
+        this.pause();
+      } else if (data.previous === 'PAUSED') {
+        this.resume();
+      }
+      if (data.current === 'MAIN_MENU') {
+        this.stopAll();
+        this.playMusic(AudioId.MUSIC_MAIN_THEME, 2.0);
+      }
     });
   }
 
-  public static playBossPhase(phase: number): void {
-    // Escalating riser — higher pitch per phase
-    this.playSound((ctx, dest, time) => {
-      const baseFreq = 100 + (phase - 1) * 80;
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(baseFreq, time);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * 4, time + 1.5);
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(400, time);
-      filter.frequency.linearRampToValueAtTime(3000, time + 1.5);
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, time);
-      gain.gain.linearRampToValueAtTime(0.5, time + 0.3);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 2.0);
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      osc.start(time);
-      osc.stop(time + 2.0);
-    });
-  }
-
-  public static playBossDefeat(): void {
-    // Descending victory chord
-    this.playSound((ctx, dest, time) => {
-      const freqs = [523.25, 659.25, 783.99, 1046.50]; // C major
-      freqs.forEach((f, i) => {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = f;
-        const gain = ctx.createGain();
-        const t = time + i * 0.2;
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.35, t + 0.15);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 3.0);
-        osc.connect(gain);
-        gain.connect(dest);
-        osc.start(t);
-        osc.stop(t + 3.0);
-      });
-
-      // Low sustain pad
-      const pad = ctx.createOscillator();
-      pad.type = 'triangle';
-      pad.frequency.value = 130.81; // C3
-      const padGain = ctx.createGain();
-      padGain.gain.setValueAtTime(0, time);
-      padGain.gain.linearRampToValueAtTime(0.3, time + 0.5);
-      padGain.gain.exponentialRampToValueAtTime(0.01, time + 4.0);
-      pad.connect(padGain);
-      padGain.connect(dest);
-      pad.start(time);
-      pad.stop(time + 4.0);
-    });
-  }
-
-  // --- Core Synthesis ---
-  
-  private static createNoiseBuffer(): AudioBuffer | null {
-    if (!this.ctx) return null;
-    const bufferSize = this.ctx.sampleRate * 2;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    return buffer;
-  }
-
-  private static playSound(setup: (ctx: AudioContext, dest: AudioNode, time: number) => void) {
-    if (!this.ctx || !this.masterGain || this.isMuted) return;
-    setup(this.ctx, this.masterGain, this.ctx.currentTime);
-  }
-
-  // --- Specific Sounds ---
-
-  public static playPlayerAttack(comboIndex: number): void {
-    const freqs = [800, 1000, 1200];
-    const freq = freqs[comboIndex % freqs.length] || 800;
-    this.playSwordSwing(freq);
-  }
-
-  public static playSwordSwing(baseFreq: number = 800): void {
-    this.playSound((ctx, dest, time) => {
-      const bufferSource = ctx.createBufferSource();
-      bufferSource.buffer = this.createNoiseBuffer();
-      
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(baseFreq, time);
-      filter.Q.value = 1.5;
-      
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, time);
-      gain.gain.linearRampToValueAtTime(0.8, time + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
-
-      bufferSource.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-
-      bufferSource.start(time);
-      bufferSource.stop(time + 0.2);
-    });
-  }
-
-  public static playSwordHit(): void {
-    this.playSound((ctx, dest, time) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(150, time);
-      osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
-      
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(1, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
-
-      osc.connect(gain);
-      gain.connect(dest);
-      osc.start(time);
-      osc.stop(time + 0.1);
-    });
-  }
-
-  public static playEnemyAttack(): void {
-    this.playSwordSwing(600); // lower pitch for enemy
-  }
-
-  public static playEnemyHurt(): void {
-    this.playSound((ctx, dest, time) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(200, time);
-      osc.frequency.linearRampToValueAtTime(100, time + 0.1);
-      
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 1000;
-      
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.5, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      osc.start(time);
-      osc.stop(time + 0.1);
-    });
-  }
-
-  public static playEnemyDeath(): void {
-    this.playSound((ctx, dest, time) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(300, time);
-      osc.frequency.exponentialRampToValueAtTime(50, time + 0.5);
-      
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(2000, time);
-      filter.frequency.linearRampToValueAtTime(100, time + 0.5);
-      
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.6, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      osc.start(time);
-      osc.stop(time + 0.5);
-    });
-  }
-
-  public static playPlayerHurt(): void {
-    this.playSound((ctx, dest, time) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(100, time);
-      osc.frequency.exponentialRampToValueAtTime(40, time + 0.3);
-      
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 400;
-      
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(1, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      osc.start(time);
-      osc.stop(time + 0.3);
-    });
-  }
-
-  public static playDash(): void {
-    this.playSound((ctx, dest, time) => {
-      const bufferSource = ctx.createBufferSource();
-      bufferSource.buffer = this.createNoiseBuffer();
-      
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(400, time);
-      filter.frequency.linearRampToValueAtTime(800, time + 0.2);
-      filter.Q.value = 0.5;
-      
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, time);
-      gain.gain.linearRampToValueAtTime(0.5, time + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
-
-      bufferSource.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
-      bufferSource.start(time);
-      bufferSource.stop(time + 0.2);
-    });
-  }
-
-  public static playShrine(): void {
-    this.playSound((ctx, dest, time) => {
-      const freqs = [440, 554.37, 659.25, 880]; // A major arpeggio
-      freqs.forEach((f, i) => {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = f;
-        const gain = ctx.createGain();
-        const t = time + i * 0.15;
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.3, t + 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
-        osc.connect(gain);
-        gain.connect(dest);
-        osc.start(t);
-        osc.stop(t + 1.5);
-      });
-    });
-  }
-
-  public static playLevelUp(): void {
-    this.playSound((ctx, dest, time) => {
-      const freqs = [523.25, 659.25, 783.99, 1046.50]; // C major
-      freqs.forEach((f, i) => {
-        const osc = ctx.createOscillator();
-        osc.type = 'triangle';
-        osc.frequency.value = f;
-        const gain = ctx.createGain();
-        const t = time + i * 0.1;
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.4, t + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
-        osc.connect(gain);
-        gain.connect(dest);
-        osc.start(t);
-        osc.stop(t + 0.6);
-      });
-    });
-  }
-
-  public static playEncounterComplete(): void {
-    this.playSound((ctx, dest, time) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(440, time); // A4
-      
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, time);
-      gain.gain.linearRampToValueAtTime(0.4, time + 0.5);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 3.0);
-
-      osc.connect(gain);
-      gain.connect(dest);
-      osc.start(time);
-      osc.stop(time + 3.0);
-    });
-  }
-
-  // --- Ambient Drone ---
-
-  private static startAmbient(): void {
-    if (!this.ctx || !this.masterGain) return;
-    this.ambientOscillator = this.ctx.createOscillator();
-    this.ambientOscillator.type = 'sine';
-    this.ambientOscillator.frequency.value = 100; // Low rumble
-
-    this.ambientGain = this.ctx.createGain();
-    this.ambientGain.gain.value = 0.1;
-
-    this.ambientOscillator.connect(this.ambientGain);
-    this.ambientGain.connect(this.masterGain);
-
-    this.ambientOscillator.start();
-  }
-
-  private static transitionAmbient(targetFreq: number, targetVolume: number): void {
-    if (!this.ctx || !this.ambientOscillator || !this.ambientGain) return;
-    const time = this.ctx.currentTime;
-    this.ambientOscillator.frequency.linearRampToValueAtTime(targetFreq, time + 2.0);
-    this.ambientGain.gain.linearRampToValueAtTime(targetVolume, time + 2.0);
-  }
+  // ─── Mute (legacy) ────────────────────────────────────────────────────
 
   public static toggleMute(): void {
-    this.isMuted = !this.isMuted;
+    if (this.buses) {
+      const current = this.buses.master.volume;
+      this.buses.master.setVolume(current > 0 ? 0 : 0.7);
+    }
   }
 }
