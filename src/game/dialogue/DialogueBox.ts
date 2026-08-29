@@ -1,6 +1,10 @@
 // ─── Dialogue Box ───────────────────────────────────────────────────────────
 // Cinematic dialogue UI overlay with typewriter text reveal.
 
+import { DialogueNode, DialogueChoice } from './DialogueNode';
+import { AudioManager } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
+
 export class DialogueBox {
   private overlay: HTMLDivElement;
   private letterboxTop: HTMLDivElement;
@@ -126,9 +130,14 @@ export class DialogueBox {
           transition: 'all 0.2s', letterSpacing: '1px', pointerEvents: 'auto',
         });
         btn.textContent = `› ${choice.label}`;
-        btn.addEventListener('mouseenter', () => { btn.style.color = '#cc4444'; btn.style.borderColor = 'rgba(200,50,50,0.6)'; });
+        btn.addEventListener('mouseenter', () => {
+          AudioManager.playUIHover();
+          btn.style.color = '#cc4444';
+          btn.style.borderColor = 'rgba(200,50,50,0.6)';
+        });
         btn.addEventListener('mouseleave', () => { btn.style.color = '#aaa'; btn.style.borderColor = 'rgba(120,30,30,0.3)'; });
         btn.addEventListener('click', () => {
+          AudioManager.playUISelect();
           if (this.onChoiceSelect) this.onChoiceSelect(index);
         });
         this.choicesEl.appendChild(btn);
@@ -136,6 +145,7 @@ export class DialogueBox {
     }
 
     if (!this.isVisible) {
+      AudioManager.play(AudioId.UI_DIALOGUE);
       this.isVisible = true;
       this.overlay.style.opacity = '1';
       this.overlay.style.pointerEvents = 'auto';
