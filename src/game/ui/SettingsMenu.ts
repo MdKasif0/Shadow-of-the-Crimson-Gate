@@ -105,7 +105,10 @@ export class SettingsMenu {
 
     const btnClose = document.getElementById('btn-close-settings');
     if (btnClose) {
-      btnClose.addEventListener('click', this.onClose);
+      btnClose.addEventListener('click', () => {
+        this.destroy();
+        this.onClose();
+      });
       btnClose.addEventListener('mouseenter', () => btnClose.style.background = 'rgba(204,68,68,0.2)');
       btnClose.addEventListener('mouseleave', () => btnClose.style.background = 'transparent');
     }
