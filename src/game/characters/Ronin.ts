@@ -5,6 +5,7 @@ import { CharacterFactory } from './CharacterFactory';
 import { PlayerState, CombatPhase, MovementState } from '../combat/PlayerState';
 import { CombatSystem } from '../combat/CombatSystem';
 import { Katana } from '../combat/Katana';
+import { AudioManager } from '../audio/AudioManager';
 import { InputManager } from '../core/InputManager';
 import { ATTACK_DATA } from '../combat/AttackData';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
@@ -29,6 +30,7 @@ export class Ronin {
   
   private velocity: THREE.Vector3 = new THREE.Vector3();
   private hurtTimer: number = 0;
+  private footstepDistance: number = 0;
 
   constructor() {
     this.state = new PlayerState();
