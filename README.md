@@ -1,89 +1,96 @@
 # Shadow of the Crimson Gate
 
-> A cinematic, Japanese fantasy action-adventure 2D web game.
+A cinematic Japanese dark fantasy action game built entirely with **Three.js** and **TypeScript**. All 3D geometry is procedurally generated — no external models.
 
-![Shadow of the Crimson Gate Hero](public/assets/hero-bg-image.png)
-
-*Shadow of the Crimson Gate* is a premium 2D action-adventure web game. Designed from the ground up for high performance, it bridges a highly immersive, lore-rich landing page directly into a full-scale Phaser 3 game environment—without the overhead of heavy frontend frameworks.
-
-## ✨ Features
-
-- **Cinematic Game World:** Explore a beautifully crafted 2.5D Sakura Courtyard featuring deep parallax scrolling, dynamic depth layering, and atmospheric lighting.
-- **Fluid Arcade Physics:** Take control of the Ronin with highly responsive 8-way directional movement and state-driven animations.
-- **Procedural VFX Architecture:** Experience highly optimized, programmatic Sakura petals and spirit particles powered by custom object pooling and non-linear sinusoidal physics.
-- **Strict Single-Screen Experience:** The application is rigidly locked to a non-scrollable viewport, ensuring a focused, distraction-free environment.
-- **Seamless Engine Transition:** A custom hash-based router transitions players smoothly from the vanilla TypeScript cinematic title screen directly into the active Phaser 3 canvas.
-- **Ambient Audio:** High-quality background audio that intelligently respects browser autoplay policies and persists user preferences.
-
-## 🛠️ Technology Stack
-
-- **Core Engine:** [Phaser 3](https://phaser.io/)
-- **Language:** TypeScript
-- **Styling:** Vanilla CSS3
-- **Build Tool:** [Vite](https://vitejs.dev/)
-- **Architecture:** Zero frontend UI frameworks (No React/Vue) to ensure maximum rendering performance and instantaneous load times.
-
-## 📂 Project Structure
-
-```text
-src/
-├── components/          # UI components and cinematic overlay engine
-├── game/                # Phaser 3 game architecture
-│   ├── config/          # Global settings (Environment, Assets, Depth)
-│   ├── entities/        # Player, Enemies, and interactive actors
-│   ├── scenes/          # Game states (Preload, Combat, GameOver, UI)
-│   ├── state/           # State machines and global enums
-│   └── systems/         # Modular game managers (VFX, Audio, Camera, Wave)
-├── pages/               # Top-level routing views (Home, Game)
-├── styles/              # Global CSS, resets, and layout styling
-├── types/               # Global TypeScript definitions
-├── utils/               # Helper functions and constants
-└── main.ts              # Application entry point and hash-router
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) (v16 or higher)
-- npm or yarn
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/MdKasif0/Shadow-of-the-Crimson-Gate.git
-   cd Shadow-of-the-Crimson-Gate
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
-
-4. **Launch:** Open your browser and navigate to `http://localhost:3000`.
-
-### Building for Production
-
-To build the project for production environments, run:
+## Quick Start
 
 ```bash
-npm run build
+npm install
+npm run dev        # Development server (http://localhost:5173)
+npm run build      # Production build
+npm run preview    # Preview production build
 ```
 
-This will output optimized, minified static files into the `dist/` directory, ready for deployment.
+## Controls
 
-## 🎨 Design Philosophy
+| Key | Action |
+|---|---|
+| **W A S D** | Move |
+| **Mouse / J** | Attack |
+| **Space** | Dash |
+| **E** | Interact (NPCs, Shrines) |
+| **Escape** | Pause |
+| **R** | Reset (Dev) |
 
-The aesthetic direction of the game is **dark, premium, and mysterious**. The visual palette relies heavily on deep charcoals, crimson reds, muted golds, and warm ivory to convey a high-fidelity Japanese fantasy environment. The User Interface remains strictly minimal, ensuring that the environmental artwork and combat mechanics always command the player's attention.
+## Architecture
 
-## 📜 License
+```
+src/
+├── game/
+│   ├── core/          # GameLoop, Renderer, EventBus, InputManager
+│   ├── state/         # GameStateManager, GameState, WorldState
+│   ├── scenes/        # GameScene (main scene orchestrator)
+│   ├── world/         # Procedural terrain, trees, rocks, temples, shrines
+│   ├── characters/    # Ronin (player), CharacterRig, Animator
+│   ├── enemies/       # BasicYokai, ShadowYokai, Tengu, AI, Factory
+│   ├── boss/          # CrimsonOni, BossAI, Phases, Arena
+│   ├── combat/        # CombatSystem, DashSystem, Hitboxes, Damage
+│   ├── encounters/    # EncounterManager, Database, Spawner, Waves
+│   ├── camera/        # CameraController, CameraShake
+│   ├── collision/     # Grid-based collision
+│   ├── vfx/           # ParticlePool, Slash/Hit/Dash/Death VFX
+│   ├── lighting/      # LightingSystem (moonlight, ambient)
+│   ├── atmosphere/    # Sakura, Spirit particles, Wind
+│   ├── audio/         # AudioManager (Web Audio API synthesis)
+│   ├── dialogue/      # DialogueBox, DialogueManager
+│   ├── npc/           # NPC system, ShrineKeeper
+│   ├── story/         # StoryManager, Chapters, Flags, Intro
+│   ├── objectives/    # ObjectiveManager
+│   ├── progression/   # Essence, Leveling, Rewards
+│   ├── save/          # SaveManager (localStorage)
+│   ├── settings/      # SettingsManager (quality, audio, accessibility)
+│   └── ui/            # HUD, Menus, Pause, Settings, Dialogue, Loading
+│
+├── components/        # Hero (landing page)
+├── pages/             # Home, Game
+└── main.ts            # Entry point + router
+```
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+## Game Flow
 
-*Note: Artwork and audio assets remain the intellectual property of their respective creators and are subject to their own licensing terms.*
+```
+Main Menu → New Game → Intro → Chapter 1 (Courtyard) → Shrine Keeper
+→ Basic Yokai Encounter → Shrine → Chapter 2 (Forest)
+→ Shadow Yokai → Tengu → Chapter 3 (Temple Approach)
+→ Chapter 4 (Boss Arena) → Crimson Oni (3 Phases)
+→ Victory → Epilogue → Ending → Main Menu
+```
+
+## Save System
+
+- Saves to `localStorage` under key `shadow-crimson-save`
+- Auto-saves at checkpoints and after boss defeat
+- Version-tagged for forward compatibility
+- Gracefully recovers from corrupted save data
+
+## Performance Settings
+
+| Setting | Options |
+|---|---|
+| Graphics Quality | LOW / MEDIUM / HIGH |
+| VFX Intensity | LOW / MEDIUM / HIGH |
+| Camera Shake | ON / OFF |
+| Reduce Motion | ON / OFF |
+| Master Volume | 0–100% |
+| Music Volume | 0–100% |
+| Fullscreen | Toggle |
+
+## Technical Details
+
+- **Rendering**: Single `THREE.WebGLRenderer` with capped pixel ratio (max 2x)
+- **Game Loop**: Single `requestAnimationFrame` loop with delta time clamped to 100ms
+- **Particles**: `InstancedMesh`-based pooling for all VFX
+- **Audio**: Entirely synthesized via Web Audio API (no external audio files)
+- **Lighting**: 3 lights total (directional moonlight + ambient + bounce)
+- **Shadows**: PCF soft shadow maps at 2048×2048
+- **Tab Safety**: Auto-pauses when browser tab loses focus
