@@ -459,6 +459,8 @@ export class GameScene {
     const zoneId = this.zoneManager.getCurrentZoneId();
     this.objectiveManager.onZoneEntered(zoneId);
     this.storyManager.onZoneChanged(zoneId);
+    this.audioZoneManager.onZoneChanged(zoneId);
+    this.audioZoneManager.update(dt);
 
     // Update NPCs
     for (const npc of this.npcs) {
