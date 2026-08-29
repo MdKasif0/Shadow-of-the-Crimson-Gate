@@ -12,6 +12,7 @@ import { CharacterRig } from '../characters/CharacterRig';
 import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
 import { AudioManager } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
 import { GAME_CONFIG } from '../GameConfig';
 
 /**
@@ -249,7 +250,13 @@ export class CrimsonOni implements Boss {
     // Start attack if AI decided to attack
     if (decision.state === BossState.ATTACK && decision.attackId) {
       this.attackSystem.startAttack(decision.attackId);
-      AudioManager.playSwordSwing(400); // deep swing for boss
+      if (decision.attackId.includes('SMASH') || decision.attackId.includes('SLAM')) {
+        AudioManager.play(AudioId.BOSS_SMASH);
+      } else if (decision.attackId.includes('CHARGE')) {
+        AudioManager.play(AudioId.BOSS_CHARGE);
+      } else {
+        AudioManager.playBossAttack();
+      }
     }
 
     // Movement
