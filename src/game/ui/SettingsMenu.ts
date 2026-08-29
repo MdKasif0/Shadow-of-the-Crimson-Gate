@@ -126,11 +126,6 @@ export class SettingsMenu {
     }
   }
 
-    const closeBtn = document.getElementById('btn-close-settings');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.destroy();
-        this.onClose();
   public destroy(): void {
     if (this.overlay && this.overlay.parentNode) {
       this.overlay.parentNode.removeChild(this.overlay);
