@@ -1,96 +1,137 @@
-# Shadow of the Crimson Gate
+# ⛩️ Shadow of the Crimson Gate
 
-A cinematic Japanese dark fantasy action game built entirely with **Three.js** and **TypeScript**. All 3D geometry is procedurally generated — no external models.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Three.js](https://img.shields.io/badge/Three.js-r185-black?logo=threedotjs&logoColor=white)](https://threejs.org/)
+[![Vite](https://img.shields.io/badge/Vite-6.3-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Quick Start
+> A cinematic Japanese dark fantasy action game built entirely with **Three.js** and **TypeScript**. Features real-time katana combat, multi-phase boss encounters, dynamic atmospheric shaders, and procedural 3D geometry without external model dependencies.
+
+---
+
+## 🏛️ System Architecture
+
+```mermaid
+flowchart TB
+    subgraph InputState ["Input & State Management"]
+        Input["Input Manager\n(WASD, Mouse, Space)"]
+        Bus["Event Bus\n(Pub/Sub Broker)"]
+        State["Game & World State\n(Quests, Checkpoints, Flags)"]
+        Save["Save Manager\n(localStorage + Recovery)"]
+    end
+
+    subgraph CoreLoop ["Engine & Core Loop"]
+        Loop["Game Loop\n(rAF Clamped Δt, Auto-pause)"]
+        Scene["Game Scene\n(Three.js Scene Graph)"]
+        Camera["Camera Controller\n(Dynamic Framing + Shake)"]
+    end
+
+    subgraph Gameplay ["Gameplay Simulation"]
+        Player["Ronin (Player)\n(Procedural Rig & Animation)"]
+        Combat["Combat & Dash System\n(i-Frames, Hitboxes, Combos)"]
+        AI["Yokai & Boss AI\n(State Machines, Phases 1-3)"]
+        Collision["Spatial Grid Partition\n(Broadphase Collision)"]
+    end
+
+    subgraph VisualAudio ["Audiovisuals & Rendering"]
+        Render["WebGL Renderer\n(PCF Shadows, DPR Clamp)"]
+        Lighting["Dynamic Lighting\n(Moonlight, Torches, Fog)"]
+        VFX["Particle Pool\n(InstancedMesh Petals, Slashes)"]
+        Audio["Audio Engine\n(Web Audio API Synthesis)"]
+    end
+
+    Input --> Loop
+    Loop --> Gameplay
+    Loop --> VisualAudio
+    Bus <--> State
+    State <--> Save
+    Gameplay --> Collision
+    Gameplay --> Scene
+    Combat --> VFX
+    Combat --> Audio
+    Scene --> Render
+    Camera --> Render
+```
+
+---
+
+## 🎮 Game Progression Flow
+
+```mermaid
+flowchart LR
+    A([Main Menu]) --> B[Ch. 1: Sakura Courtyard\nTutorial & Basic Yokai]
+    B --> C[Ch. 2: Corrupted Forest\nShadow Yokai & Tengu]
+    C --> D[Ch. 3: Temple Approach\nCorruption Cleansing]
+    D --> E[Ch. 4: Crimson Arena\nBoss: Crimson Oni]
+    E --> F{Boss Phase 1 - 3}
+    F --> G([Victory & Epilogue])
+```
+
+---
+
+## ⚡ Core Technical Highlights
+
+| Component | Technical Implementation |
+|---|---|
+| **Procedural World** | 100% code-generated 3D geometry (Ronin rig, Yokai, Shrines, Torii gates, flora). Zero GLTF/OBJ payload overhead. |
+| **Real-Time Combat** | Frame-accurate katana combos, dodge roll invulnerability windows (`i-frames`), and reactive knockback. |
+| **Boss State Machine** | 3 distinct combat phases for the *Crimson Oni* featuring sweeping blade arcs, ground slams, and arena fire hazards. |
+| **Audiovisuals & FX** | Zero external audio files — synthesized audio effects via Web Audio API. GPU-accelerated `InstancedMesh` sakura petals & slashes. |
+| **Engine Optimizations** | Spatial grid collision partitioning, DPR clamp (max 2.0), delta-time clamping (100ms cap), and tab-blur auto-pause. |
+
+---
+
+## 🕹️ Controls
+
+| Action | Primary Input | Secondary / Alternate |
+|---|---|---|
+| **Movement** | `W` `A` `S` `D` | — |
+| **Katana Strike** | `Left Click` | `J` |
+| **Dash / Dodge** | `Space` | — |
+| **Interact (Shrines, NPCs)** | `E` | — |
+| **Pause Menu** | `Escape` | — |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js (v18.0 or newer)
+- npm or pnpm
+
+### Installation & Run
 
 ```bash
+# Clone the repository
+git clone https://github.com/MdKasif0/Shadow-of-the-Crimson-Gate.git
+cd "Shadow of the Crimson Gate"
+
+# Install dependencies
 npm install
-npm run dev        # Development server (http://localhost:5173)
-npm run build      # Production build
-npm run preview    # Preview production build
+
+# Start local dev server (http://localhost:5173 or :3000)
+npm run dev
+
+# Create optimized production build
+npm run build
+
+# Preview production build locally
+npm run preview
 ```
 
-## Controls
+---
 
-| Key | Action |
-|---|---|
-| **W A S D** | Move |
-| **Mouse / J** | Attack |
-| **Space** | Dash |
-| **E** | Interact (NPCs, Shrines) |
-| **Escape** | Pause |
-| **R** | Reset (Dev) |
+## ⚙️ Performance & Accessibility Settings
 
-## Architecture
+The in-game settings modal allows full real-time customization:
+- **Graphics Quality**: Low / Medium / High (adjusts shadow map resolution and light bounces)
+- **VFX Density**: Low / Medium / High (adjusts particle pool batch count)
+- **Camera Shake & Motion Reduction**: Configurable toggles for accessibility
+- **Audio Mixers**: Independent Master and Ambient/SFX sliders
 
-```
-src/
-├── game/
-│   ├── core/          # GameLoop, Renderer, EventBus, InputManager
-│   ├── state/         # GameStateManager, GameState, WorldState
-│   ├── scenes/        # GameScene (main scene orchestrator)
-│   ├── world/         # Procedural terrain, trees, rocks, temples, shrines
-│   ├── characters/    # Ronin (player), CharacterRig, Animator
-│   ├── enemies/       # BasicYokai, ShadowYokai, Tengu, AI, Factory
-│   ├── boss/          # CrimsonOni, BossAI, Phases, Arena
-│   ├── combat/        # CombatSystem, DashSystem, Hitboxes, Damage
-│   ├── encounters/    # EncounterManager, Database, Spawner, Waves
-│   ├── camera/        # CameraController, CameraShake
-│   ├── collision/     # Grid-based collision
-│   ├── vfx/           # ParticlePool, Slash/Hit/Dash/Death VFX
-│   ├── lighting/      # LightingSystem (moonlight, ambient)
-│   ├── atmosphere/    # Sakura, Spirit particles, Wind
-│   ├── audio/         # AudioManager (Web Audio API synthesis)
-│   ├── dialogue/      # DialogueBox, DialogueManager
-│   ├── npc/           # NPC system, ShrineKeeper
-│   ├── story/         # StoryManager, Chapters, Flags, Intro
-│   ├── objectives/    # ObjectiveManager
-│   ├── progression/   # Essence, Leveling, Rewards
-│   ├── save/          # SaveManager (localStorage)
-│   ├── settings/      # SettingsManager (quality, audio, accessibility)
-│   └── ui/            # HUD, Menus, Pause, Settings, Dialogue, Loading
-│
-├── components/        # Hero (landing page)
-├── pages/             # Home, Game
-└── main.ts            # Entry point + router
-```
+---
 
-## Game Flow
+## 📄 License
 
-```
-Main Menu → New Game → Intro → Chapter 1 (Courtyard) → Shrine Keeper
-→ Basic Yokai Encounter → Shrine → Chapter 2 (Forest)
-→ Shadow Yokai → Tengu → Chapter 3 (Temple Approach)
-→ Chapter 4 (Boss Arena) → Crimson Oni (3 Phases)
-→ Victory → Epilogue → Ending → Main Menu
-```
-
-## Save System
-
-- Saves to `localStorage` under key `shadow-crimson-save`
-- Auto-saves at checkpoints and after boss defeat
-- Version-tagged for forward compatibility
-- Gracefully recovers from corrupted save data
-
-## Performance Settings
-
-| Setting | Options |
-|---|---|
-| Graphics Quality | LOW / MEDIUM / HIGH |
-| VFX Intensity | LOW / MEDIUM / HIGH |
-| Camera Shake | ON / OFF |
-| Reduce Motion | ON / OFF |
-| Master Volume | 0–100% |
-| Music Volume | 0–100% |
-| Fullscreen | Toggle |
-
-## Technical Details
-
-- **Rendering**: Single `THREE.WebGLRenderer` with capped pixel ratio (max 2x)
-- **Game Loop**: Single `requestAnimationFrame` loop with delta time clamped to 100ms
-- **Particles**: `InstancedMesh`-based pooling for all VFX
-- **Audio**: Entirely synthesized via Web Audio API (no external audio files)
-- **Lighting**: 3 lights total (directional moonlight + ambient + bounce)
-- **Shadows**: PCF soft shadow maps at 2048×2048
-- **Tab Safety**: Auto-pauses when browser tab loses focus
+This project is open-source and released under the [MIT License](LICENSE).  
+Copyright (c) 2024–2026 **Md Kasif Uddin**.
