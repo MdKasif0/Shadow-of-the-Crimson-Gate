@@ -89,6 +89,14 @@ export class AudioZoneManager {
       this.state = AudioState.VICTORY;
     });
 
+    // Death stops the music, so bring it back after a respawn
+    EventBus.on('playerRespawned', () => {
+      this.inCombat = false;
+      this.inBoss = false;
+      this.state = AudioState.EXPLORATION;
+      AudioManager.playMusic(AudioId.MUSIC_EXPLORATION, 2.0);
+    });
+
     EventBus.on('gameStateChanged', (data: { current: string }) => {
       if (data.current === 'MAIN_MENU') {
         this.currentZoneId = '';

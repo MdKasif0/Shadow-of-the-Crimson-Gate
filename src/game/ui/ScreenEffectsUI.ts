@@ -1,4 +1,5 @@
 import { EventBus } from '../core/EventBus';
+import { SettingsManager } from '../settings/SettingsManager';
 
 export class ScreenEffectsUI {
   private overlay: HTMLDivElement;
@@ -52,12 +53,8 @@ export class ScreenEffectsUI {
   }
 
   private triggerFlash(color: string, duration: number): void {
-    // Check if reduce motion/vfx is enabled (can be pulled from a settings manager later)
-    const vfxIntensity = localStorage.getItem('shadow-crimson-settings') 
-      ? JSON.parse(localStorage.getItem('shadow-crimson-settings')!).vfxIntensity 
-      : 1.0;
-      
-    if (vfxIntensity < 0.2) return; // Very low VFX = no flash
+    const { vfxIntensity, reduceMotion } = SettingsManager.getInstance().get();
+    if (vfxIntensity === 'LOW' || reduceMotion) return;
 
     this.overlay.style.transition = 'none';
     this.overlay.style.backgroundColor = color;

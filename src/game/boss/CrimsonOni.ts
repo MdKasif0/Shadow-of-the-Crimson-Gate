@@ -38,11 +38,11 @@ export class CrimsonOni implements Boss {
   private isDeathVfxPlayed: boolean = false;
   private previousPhase: BossPhaseId = BossPhaseId.PHASE_1;
 
-  private poise: number = 100;
-  private readonly MAX_POISE: number = 100;
+  private poise: number = 50;
+  private readonly MAX_POISE: number = 50;
 
   // ─── Boss Stats ──────────────────────────────────────────────────────
-  private static readonly MAX_HEALTH = 1000;
+  private static readonly MAX_HEALTH = 500;
   private static readonly HURTBOX_RADIUS = 1.2;
   private static readonly HURTBOX_HEIGHT = 4.0;
   private static readonly COLLISION_RADIUS = 1.0;

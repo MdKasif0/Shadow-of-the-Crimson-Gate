@@ -58,6 +58,13 @@ export class HitboxSystem {
     }
   }
 
+  /** Live entities re-register every frame, so this only removes ones that no longer exist. */
+  public clearHurtboxes(): void {
+    for (const id of Array.from(this.hurtboxes.keys())) {
+      this.unregisterHurtbox(id);
+    }
+  }
+
   public clearActiveHitboxes(): void {
     this.activeHitboxes = [];
     

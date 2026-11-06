@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { SettingsManager } from '../settings/SettingsManager';
+import { VFX_DENSITY } from '../settings/SettingsData';
 
 export interface ParticleState {
   active: boolean;
@@ -57,6 +59,10 @@ export class ParticlePool {
   }
 
   public emit(pos: THREE.Vector3, vel: THREE.Vector3, life: number, scale: number = 1, color?: THREE.Color): void {
+    // Thin out particles according to the VFX Density setting
+    const density = VFX_DENSITY[SettingsManager.getInstance().get().vfxIntensity];
+    if (Math.random() > density) return;
+
     // Find first inactive particle
     let index = -1;
     for (let i = 0; i < this.maxParticles; i++) {

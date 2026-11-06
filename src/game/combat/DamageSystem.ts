@@ -60,7 +60,8 @@ export class DamageSystem {
           EventBus.emit('enemyHealth', {
             current: newHp,
             max: targetEnemy.health['maxHealth'],
-            delta: newHp - oldHp
+            delta: newHp - oldHp,
+            name: targetEnemy.enemyType.replace('_', ' ')
           });
 
           if (newHp <= 0) {

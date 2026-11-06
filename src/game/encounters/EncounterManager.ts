@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { EncounterConfig } from './EncounterConfig';
-import { Encounter } from './Encounter';
+import { Encounter, EncounterState } from './Encounter';
 import { EncounterSpawner } from './EncounterSpawner';
 import { Enemy } from '../enemies/Enemy';
 
@@ -42,6 +42,15 @@ export class EncounterManager {
   public resetAll(scene: THREE.Scene): void {
     for (const enc of this.encounters) {
       enc.cleanup(scene);
+    }
+  }
+
+  /** Resets unfinished fights for a respawn. Completed ones stay completed. */
+  public resetIncomplete(scene: THREE.Scene): void {
+    for (const enc of this.encounters) {
+      if (enc.state !== EncounterState.COMPLETED) {
+        enc.cleanup(scene);
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../GameConfig';
 import { CameraShake } from './CameraShake';
+import { SettingsManager } from '../settings/SettingsManager';
 
 /**
  * CameraController — Orthographic isometric camera with smooth tracking and shake.
@@ -58,6 +59,8 @@ export class CameraController {
   }
 
   public addShake(intensity: number): void {
+    const { cameraShake, reduceMotion } = SettingsManager.getInstance().get();
+    if (!cameraShake || reduceMotion) return;
     this.shake.addShake(intensity);
   }
 

@@ -51,7 +51,6 @@ export enum AudioId {
   AMB_DISTANT_WIND     = 'amb_distant_wind',
 
   // Player
-  FOOTSTEP_STONE_01    = 'footstep_stone_01',
   FOOTSTEP_STONE_02    = 'footstep_stone_02',
   FOOTSTEP_GRASS_01    = 'footstep_grass_01',
   FOOTSTEP_GRASS_02    = 'footstep_grass_02',
@@ -84,7 +83,6 @@ export enum AudioId {
   SHADOW_TELEPORT      = 'shadow_teleport',
   SHADOW_ATTACK        = 'shadow_attack',
   SHADOW_HIT           = 'shadow_hit',
-  SHADOW_HURT          = 'shadow_hurt',
   SHADOW_DEATH         = 'shadow_death',
   SHADOW_ENERGY        = 'shadow_energy',
 
@@ -187,7 +185,6 @@ export const AUDIO_REGISTRY: Record<AudioId, AudioEntry> = {
   [AudioId.AMB_DISTANT_WIND]:    { path: `${BASE}/ambience/distant_wind.wav`,      category: AudioCategory.AMBIENCE, priority: AudioPriority.LOW, loop: true, volume: 0.15, optional: false },
 
   // ── Player ──
-  [AudioId.FOOTSTEP_STONE_01]:   { path: `${BASE}/player/footstep_stone_01.wav`, category: AudioCategory.PLAYER, priority: AudioPriority.LOW,    loop: false, volume: 0.3, optional: false },
   [AudioId.FOOTSTEP_STONE_02]:   { path: `${BASE}/player/footstep_stone_02.wav`, category: AudioCategory.PLAYER, priority: AudioPriority.LOW,    loop: false, volume: 0.3, optional: false },
   [AudioId.FOOTSTEP_GRASS_01]:   { path: `${BASE}/player/footstep_grass_01.wav`, category: AudioCategory.PLAYER, priority: AudioPriority.LOW,    loop: false, volume: 0.25,optional: false },
   [AudioId.FOOTSTEP_GRASS_02]:   { path: `${BASE}/player/footstep_grass_02.wav`, category: AudioCategory.PLAYER, priority: AudioPriority.LOW,    loop: false, volume: 0.25,optional: false },
@@ -220,7 +217,6 @@ export const AUDIO_REGISTRY: Record<AudioId, AudioEntry> = {
   [AudioId.SHADOW_TELEPORT]:     { path: `${BASE}/enemies/shadow_yokai/shadow_teleport.wav`, category: AudioCategory.ENEMY, priority: AudioPriority.NORMAL, loop: false, volume: 0.4,  optional: false },
   [AudioId.SHADOW_ATTACK]:       { path: `${BASE}/enemies/shadow_yokai/shadow_attack.wav`,   category: AudioCategory.ENEMY, priority: AudioPriority.NORMAL, loop: false, volume: 0.45, optional: false },
   [AudioId.SHADOW_HIT]:          { path: `${BASE}/enemies/shadow_yokai/shadow_hit.wav`,      category: AudioCategory.ENEMY, priority: AudioPriority.HIGH,   loop: false, volume: 0.5,  optional: false },
-  [AudioId.SHADOW_HURT]:         { path: `${BASE}/enemies/shadow_yokai/shadow_hurt.wav`,     category: AudioCategory.ENEMY, priority: AudioPriority.NORMAL, loop: false, volume: 0.4,  optional: false },
   [AudioId.SHADOW_DEATH]:        { path: `${BASE}/enemies/shadow_yokai/shadow_death.wav`,    category: AudioCategory.ENEMY, priority: AudioPriority.HIGH,   loop: false, volume: 0.5,  optional: false },
   [AudioId.SHADOW_ENERGY]:       { path: `${BASE}/enemies/shadow_yokai/shadow_energy.wav`,   category: AudioCategory.ENEMY, priority: AudioPriority.LOW,    loop: false, volume: 0.3,  optional: false },
 

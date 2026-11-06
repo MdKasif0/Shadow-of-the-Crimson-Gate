@@ -122,6 +122,11 @@ export class EnemyAI {
       }
     }
 
+    // Ready to attack but just out of reach: close in, or a melee enemy would strafe here forever
+    if (canAttack && !inAttackRange && !this.config.projectileSpeed) {
+      return { state: EnemyState.WALK, moveDirection: dirToPlayer, facingAngle };
+    }
+
     // Too close? Retreat to preferred distance
     if (distToPlayer < this.config.preferredDistance * 0.8) {
       const retreatDir = dirToPlayer.clone().negate();
