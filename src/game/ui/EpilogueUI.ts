@@ -15,7 +15,7 @@ export class EpilogueUI {
       display: 'none', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       transition: 'background-color 4s ease',
-      color: '#fff', fontFamily: "'Cinzel', 'Noto Serif JP', serif",
+      color: '#fff', fontFamily: "'Cinzel', serif",
       pointerEvents: 'none'
     });
 

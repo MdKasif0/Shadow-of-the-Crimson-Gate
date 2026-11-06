@@ -16,6 +16,10 @@ import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
 import { LightingSystem } from '../lighting/LightingSystem';
 import { OcclusionFader } from '../camera/OcclusionFader';
+import { AttackTelegraph } from '../vfx/AttackTelegraph';
+import { createLockOnMarker, LockOnMarker } from '../vfx/LockOnMarker';
+import { MusicMood } from '../audio/AudioManager';
+import { AudioId } from '../audio/AudioRegistry';
 import { easeInOut } from '../camera/CameraController';
 import { windTime } from '../utils/Wind';
 import { StoryEvents } from '../story/StoryEvent';
@@ -62,6 +66,14 @@ import { WorldStateManager } from '../state/WorldStateManager';
 /** Enemies this close pull the camera's framing towards them. */
 const COMBAT_FRAMING_RANGE = 12;
 const BOSS_FRAMING_RANGE = 40;
+const LOCK_ON_RANGE = 18;
+const LOCK_ON_BREAK_RANGE = 26;
+/** Enemies this close start the battle music. */
+const COMBAT_MUSIC_RANGE = 16;
+/** How long battle music plays on after the last enemy leaves that range. */
+const COMBAT_MUSIC_LINGER = 5;
+
+const realTimeNow = () => performance.now() / 1000;
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -81,6 +93,13 @@ export class GameScene {
 
   private lighting: LightingSystem;
   private occlusion = new OcclusionFader();
+  private attackTelegraph!: AttackTelegraph;
+  private lockMarker!: LockOnMarker;
+  /** The enemy or boss being locked on to. */
+  private lockTarget: Enemy | CrimsonOni | null = null;
+  private slowMotionTimer: number = 0;
+  private slowMotionScale: number = 1;
+  private combatMusicTimer: number = 0;
   private atmosphere: AtmosphereSystem;
   
   private zoneManager: ZoneManager;
@@ -155,6 +174,8 @@ export class GameScene {
     }
 
     this.vfx = new VFXManager(this.scene, this.cameraController);
+    this.attackTelegraph = new AttackTelegraph(this.scene);
+    this.lockMarker = createLockOnMarker(this.scene);
     this.telegraphVfx = new EncounterTelegraphVFX(this.scene, this.encounterManager);
 
     this.interactionSystem = new InteractionSystem();
@@ -189,6 +210,18 @@ export class GameScene {
     } else {
       this.boss = null;
     }
+
+    EventBus.on('perfectDodge', (data: { position: THREE.Vector3 }) => {
+      this.startSlowMotion(0.28, 0.8);
+      AudioManager.play(AudioId.SPIRIT_CHIME, { volume: 0.7 });
+      EventBus.emit('damageNumber', { position: data.position, text: 'PERFECT', kind: 'label' });
+    });
+
+    EventBus.on('finisherStarted', () => {
+      this.startSlowMotion(0.4, 0.85);
+      this.cameraController.addShake(1.2);
+      AudioManager.play(AudioId.SHRINE_PURIFY, { volume: 0.5 });
+    });
 
     EventBus.on('restartEncounter', () => {
       this.respawnAtCheckpoint();
@@ -307,6 +340,8 @@ export class GameScene {
     EventBus.on('bossDeath', (data: any) => {
       this.bossIsDefeatedSequence = true;
       this.purificationTimer = 0;
+      this.startSlowMotion(0.25, 1.4);
+      AudioManager.playBossDefeat();
       this.player.isControlsEnabled = false;
       
       // Heavy hit stop & shake
@@ -419,6 +454,90 @@ export class GameScene {
     }
   }
 
+  /** Toggles lock-on, and moves it to another enemy when the target dies. */
+  private updateLockOn(input: InputManager): void {
+    const position = this.player.root.position;
+
+    if (input.isActionJustPressed('lockOn')) {
+      this.lockTarget = this.lockTarget ? null : this.findLockTarget(LOCK_ON_RANGE);
+    }
+
+    if (this.lockTarget) {
+      const isGone = this.lockTarget.health.isDead || !this.lockTarget.root.parent;
+      const isFar = this.lockTarget.root.position.distanceTo(position) > LOCK_ON_BREAK_RANGE;
+      if (isGone) this.lockTarget = this.findLockTarget(LOCK_ON_RANGE);
+      else if (isFar) this.lockTarget = null;
+    }
+
+    this.lockMarker.update(this.lockTarget?.root.position ?? null, this.lockTarget === this.boss ? 5.4 : 2.7, realTimeNow());
+    this.player.lockTarget = this.lockTarget?.root.position ?? null;
+    this.cameraController.isLockedOn = this.lockTarget !== null;
+  }
+
+  private findLockTarget(range: number): Enemy | CrimsonOni | null {
+    const position = this.player.root.position;
+    let best: Enemy | CrimsonOni | null = null;
+    let bestScore = Infinity;
+
+    const consider = (candidate: Enemy | CrimsonOni) => {
+      if (candidate.health.isDead || !candidate.root.parent) return;
+      const distance = candidate.root.position.distanceTo(position);
+      if (distance > range) return;
+
+      // Prefers what the camera is looking at, but a nearby enemy behind still counts
+      const toCandidate = Math.atan2(candidate.root.position.x - position.x, candidate.root.position.z - position.z);
+      const aim = this.cameraController.yaw + Math.PI;
+      const offAim = Math.abs(Math.atan2(Math.sin(toCandidate - aim), Math.cos(toCandidate - aim)));
+      const score = distance + offAim * 5;
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    };
+
+    this.enemies.forEach(consider);
+    if (this.boss && this.hasBossIntroPlayed && !this.isCinematicActive) consider(this.boss);
+    return best;
+  }
+
+  /** Shows where each attack in its windup is going to land. */
+  private updateTelegraphs(): void {
+    this.attackTelegraph.beginFrame();
+
+    const show = (attacker: Enemy | CrimsonOni) => {
+      const warning = attacker.attackWarning;
+      attacker.glow.setWarning(warning);
+      if (warning > 0) {
+        this.attackTelegraph.show(attacker.id, attacker.root.position, attacker.root.rotation.y, attacker.attackShape, warning);
+      }
+    };
+
+    this.enemies.forEach(show);
+    if (this.boss) show(this.boss);
+
+    this.attackTelegraph.endFrame();
+  }
+
+  /** Chooses the music from what's actually happening around the player. */
+  private updateMusicMood(realDt: number): void {
+    const position = this.player.root.position;
+    let mood: MusicMood = 'explore';
+
+    if (this.bossIsDefeatedSequence || (this.playerProgress.crimsonOniDefeated && this.zoneManager.getCurrentZoneId() === 'BOSS_ARENA')) {
+      mood = 'victory';
+    } else if (this.boss && this.hasBossIntroPlayed && !this.boss.health.isDead
+      && this.boss.root.position.distanceTo(position) < BOSS_FRAMING_RANGE) {
+      mood = this.boss.phase === BossPhaseId.PHASE_3 ? 'boss3' : this.boss.phase === BossPhaseId.PHASE_2 ? 'boss2' : 'boss1';
+    } else {
+      const isEnemyNear = this.enemies.some(enemy =>
+        !enemy.health.isDead && enemy.root.position.distanceTo(position) < COMBAT_MUSIC_RANGE);
+      this.combatMusicTimer = isEnemyNear ? COMBAT_MUSIC_LINGER : Math.max(0, this.combatMusicTimer - realDt);
+      if (this.combatMusicTimer > 0) mood = 'combat';
+    }
+
+    AudioManager.setMusicMood(mood);
+  }
+
   /** Tells the camera what the player is fighting, and feeds soft aim. */
   private updateCameraFocus(): void {
     const camera = this.cameraController;
@@ -445,11 +564,11 @@ export class GameScene {
 
     this.player.aimTargets = aimTargets;
     camera.isBossFocus = isFightingBoss;
-    camera.combatFocus = isFightingBoss ? this.boss!.root.position : nearest;
+    camera.combatFocus = this.lockTarget?.root.position ?? (isFightingBoss ? this.boss!.root.position : nearest);
 
     const glow = !this.boss || this.boss.health.isDead || !this.hasBossIntroPlayed
       ? 0
-      : [32, 52, 80][this.boss.phase];
+      : [14, 22, 34][this.boss.phase];
     this.lighting.setBossGlow(this.boss ? this.boss.root.position : null, glow);
   }
 
@@ -493,11 +612,22 @@ export class GameScene {
 
   private time: number = 0;
 
-  public update(dt: number, inputManager: InputManager): void {
+  /** Time runs slower for gameplay, while the camera and music carry on at full speed. */
+  private startSlowMotion(scale: number, realSeconds: number): void {
+    this.slowMotionScale = scale;
+    this.slowMotionTimer = realSeconds;
+  }
+
+  public update(realDt: number, inputManager: InputManager): void {
+    this.slowMotionTimer = Math.max(0, this.slowMotionTimer - realDt);
+    const dt = this.slowMotionTimer > 0 ? realDt * this.slowMotionScale : realDt;
+
     this.time += dt;
     windTime.value = this.time;
     this.lighting.tick(dt, this.player.root.position);
+    this.updateLockOn(inputManager);
     this.updateCameraFocus();
+    this.updateMusicMood(realDt);
 
     if (GAME_CONFIG.DEBUG_MODE && inputManager.isPressed('KeyR')) {
       this.respawnAtCheckpoint();
@@ -520,7 +650,7 @@ export class GameScene {
     }
 
     if (this.hitStopTimer > 0) {
-      this.hitStopTimer -= dt;
+      this.hitStopTimer -= realDt;
       return; 
     }
 
@@ -652,9 +782,10 @@ export class GameScene {
       const { hitStopTime, result } = DamageSystem.resolveHits(
         hits, this.player, this.enemies, this.vfx, this.cameraController, this.boss
       );
-      this.hitStopTimer = hitStopTime;
+      this.hitStopTimer = Math.max(this.hitStopTimer, hitStopTime);
     }
     this.hitboxSystem.update();
+    this.updateTelegraphs();
 
     // ─── Check Player Death ───────────────────────────────────────
     if (this.player.health.currentHealth <= 0) {
@@ -681,6 +812,9 @@ export class GameScene {
     this.hitStopTimer = 0;
 
     this.resetBossEncounter();
+    this.lockTarget = null;
+    this.slowMotionTimer = 0;
+    this.combatMusicTimer = 0;
     this.revivePlayer(this.checkpointManager.getCheckpointPosition());
 
     EventBus.emit('playerRespawned', {});

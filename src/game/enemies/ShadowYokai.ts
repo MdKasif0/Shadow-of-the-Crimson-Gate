@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { applyRimLight } from '../utils/RimLight';
+import { applyRimLight, CharacterGlow } from '../utils/RimLight';
+import { AttackShape } from '../vfx/AttackTelegraph';
+import { GAME_CONFIG } from '../GameConfig';
 import { getGlowTexture } from '../utils/ProceduralTextures';
 import { Enemy } from './Enemy';
 import { EnemyState } from './EnemyState';
@@ -22,6 +24,8 @@ export class ShadowYokai implements Enemy {
   public state: EnemyState = EnemyState.IDLE;
   public config: EnemyConfig = SHADOW_YOKAI_CONFIG;
 
+  public glow: CharacterGlow;
+  private staggerSeconds: number = 0;
   private rig: CharacterRig;
   private animator: ShadowYokaiAnimator;
   private ai: EnemyAI;
@@ -53,7 +57,7 @@ export class ShadowYokai implements Enemy {
 
     this.rig = EnemyFactory.createShadowYokai();
     this.root.add(this.rig.root);
-    applyRimLight(this.root, 0x6a78d8, 0.45);
+    this.glow = applyRimLight(this.root, 0x6a78d8, 0.45, { uniqueMaterials: true });
 
     this.animator = new ShadowYokaiAnimator(this.rig);
     this.ai = new EnemyAI(this.config);
@@ -86,8 +90,22 @@ export class ShadowYokai implements Enemy {
     }
   }
 
-  public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
+  public get isStaggered(): boolean {
+    return this.state === EnemyState.HURT && this.staggerSeconds > 0 && !this.health.isDead;
+  }
+
+  public get attackWarning(): number {
+    if (this.state !== EnemyState.ATTACK || this.stateTimer >= this.config.attackWindup) return 0;
+    return this.stateTimer / this.config.attackWindup;
+  }
+
+  public get attackShape(): AttackShape {
+    return { range: this.config.attackRange, angle: Math.PI / 2.5 };
+  }
+
+  public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number, staggerSeconds: number = 0): void {
     if (this.health.isDead) return;
+    this.staggerSeconds = staggerSeconds;
 
     // Apply knockback, mitigated by resistance
     const effectiveKnockback = knockbackPower * (1 - this.config.knockbackResistance);
@@ -133,6 +151,7 @@ export class ShadowYokai implements Enemy {
 
   public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any, projectileSystem?: any, allEnemies?: Enemy[]): void {
     this.stateTimer += dt;
+    this.glow.update(dt);
     this.auraTime += dt;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     
@@ -175,7 +194,7 @@ export class ShadowYokai implements Enemy {
 
     if (this.state === EnemyState.HURT) {
       this.applyVelocity(dt, collisionSystem);
-      if (this.stateTimer > this.config.hurtDuration) {
+      if (this.stateTimer > this.config.hurtDuration + this.staggerSeconds) {
         this.setState(EnemyState.IDLE);
       }
       return;
@@ -208,7 +227,7 @@ export class ShadowYokai implements Enemy {
     
     if (this.state !== decision.state) {
       if (decision.state === EnemyState.ATTACK) {
-        AudioManager.play(AudioId.SHADOW_ATTACK, { pitchMin: 0.95, pitchMax: 1.05 });
+        AudioManager.play(AudioId.SHADOW_ATTACK, { position: this.root.position, pitchMin: 0.95, pitchMax: 1.05 });
       }
       this.setState(decision.state);
     }
@@ -218,7 +237,7 @@ export class ShadowYokai implements Enemy {
     if (this.whisperTimer <= 0) {
       this.whisperTimer = 10 + Math.random() * 10;
       if (this.root.position.distanceTo(playerPos) < 15) {
-        AudioManager.play(AudioId.SHADOW_WHISPER, {
+        AudioManager.play(AudioId.SHADOW_WHISPER, { position: this.root.position,
           volume: 0.25,
           cooldownMs: 6000
         });
@@ -323,7 +342,7 @@ export class ShadowYokai implements Enemy {
       this.root.position.add(resolvedMove);
       
       // Bounds
-      const bounds = { MIN_X: -28, MAX_X: 28, MIN_Z: -28, MAX_Z: 28 };
+      const bounds = GAME_CONFIG.WORLD.BOUNDS;
       this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, bounds.MIN_X, bounds.MAX_X);
       this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);
     }

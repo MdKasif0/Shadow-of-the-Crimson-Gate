@@ -62,6 +62,11 @@ export class ProjectileSystem {
         if (distSq < combinedRadiusSq) {
           const py = player.root.position.y;
           if (proj.position.y > py && proj.position.y < py + 2.0) {
+            if (player.tryPerfectDodge()) {
+              proj.deactivate();
+              continue;
+            }
+
             // Hit!
             const oldHp = player['health']['currentHealth'];
             player.takeDamage(proj.damage, proj.direction, proj.knockback);

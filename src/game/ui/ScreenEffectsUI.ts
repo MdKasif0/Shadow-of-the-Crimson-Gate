@@ -31,6 +31,14 @@ export class ScreenEffectsUI {
       this.triggerFlash('rgba(255, 0, 0, 0.4)', 0.2);
     });
 
+    EventBus.on('perfectDodge', () => {
+      this.triggerFlash('rgba(120, 190, 255, 0.5)', 0.7);
+    });
+
+    EventBus.on('finisherStarted', () => {
+      this.triggerFlash('rgba(255, 60, 40, 0.55)', 0.6);
+    });
+
     EventBus.on('bossPhaseTransition', () => {
       this.triggerFlash('rgba(255, 255, 255, 0.8)', 1.0);
     });

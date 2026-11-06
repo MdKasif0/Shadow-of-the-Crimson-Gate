@@ -34,7 +34,12 @@ export class SettingsManager {
       const stored = localStorage.getItem(SETTINGS_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        this.settings = { ...DEFAULT_SETTINGS, ...parsed };
+        this.settings = {
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          // Merged, so actions added in later versions still get their default key
+          keyBindings: { ...DEFAULT_SETTINGS.keyBindings, ...parsed.keyBindings },
+        };
       }
     } catch (e) {
       console.warn('Failed to load settings', e);

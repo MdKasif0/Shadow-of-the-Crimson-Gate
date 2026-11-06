@@ -65,6 +65,8 @@ export class CameraController {
   public isBossFocus: boolean = false;
   public dialogueFocus: THREE.Vector3 | null = null;
   public isDeathOrbit: boolean = false;
+  /** Locked on: the camera holds the target in frame, and the mouse only tilts it. */
+  public isLockedOn: boolean = false;
 
   // Cinematic sequence
   private shots: CameraShot[] = [];
@@ -96,6 +98,12 @@ export class CameraController {
     this.shake.addShake(intensity);
   }
 
+  /** Pushes the camera along a hit's direction, for impacts that have weight. */
+  public addImpactKick(direction: THREE.Vector3, amount: number): void {
+    const { cameraShake, reduceMotion } = SettingsManager.getInstance().get();
+    if (cameraShake && !reduceMotion) this.shake.addKick(direction, amount);
+  }
+
   public addDashKick(): void {
     if (!SettingsManager.getInstance().get().reduceMotion) this.dashKick = 1;
   }
@@ -103,7 +111,7 @@ export class CameraController {
   /** Applies mouse movement, in pixels. */
   public look(deltaX: number, deltaY: number): void {
     if (deltaX === 0 && deltaY === 0) return;
-    this.yaw -= deltaX * LOOK_SENSITIVITY;
+    if (!this.isLockedOn) this.yaw -= deltaX * LOOK_SENSITIVITY;
     this.pitch = THREE.MathUtils.clamp(this.pitch + deltaY * LOOK_SENSITIVITY, MIN_PITCH, MAX_PITCH);
     this.secondsSinceLook = 0;
   }
@@ -252,7 +260,10 @@ export class CameraController {
       return;
     }
 
-    if (this.combatFocus && this.secondsSinceLook > 1.2) {
+    if (this.combatFocus && this.isLockedOn) {
+      const towardsTarget = Math.atan2(target.x - this.combatFocus.x, target.z - this.combatFocus.z);
+      this.yaw += angleDelta(this.yaw, towardsTarget) * damp(6, dt);
+    } else if (this.combatFocus && this.secondsSinceLook > 1.2) {
       // Swing round so the player and the enemy are both in frame
       const towardsEnemy = Math.atan2(target.x - this.combatFocus.x, target.z - this.combatFocus.z);
       const rate = this.isBossFocus ? 1.8 : 0.9;

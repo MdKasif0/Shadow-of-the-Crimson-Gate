@@ -43,7 +43,7 @@ export class InteractionSystem {
       this.activeInteractable = nearest;
     }
 
-    const isPressed = inputManager.isPressed('KeyE');
+    const isPressed = inputManager.isAction('interact');
     if (isPressed && !this.wasInteractPressed && this.activeInteractable) {
       this.activeInteractable.onInteract();
       this.clearActive(); // Hide prompt immediately after interacting

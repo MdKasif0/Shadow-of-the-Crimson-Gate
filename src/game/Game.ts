@@ -16,6 +16,7 @@ import { ScreenEffectsUI } from './ui/ScreenEffectsUI';
 import { LoadReporter, subProgress } from './ui/LoadingScreen';
 import { AudioManager } from './audio/AudioManager';
 import { StoryEvents } from './story/StoryEvent';
+import { DamageNumbers } from './ui/DamageNumbers';
 
 const ZERO = new THREE.Vector3();
 
@@ -37,6 +38,7 @@ export class ThreeGame {
   private isInDialogue: boolean = false;
   private hasUsedMouseLook: boolean = false;
   private lastDt: number = 0;
+  private damageNumbers = new DamageNumbers();
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -148,6 +150,40 @@ export class ThreeGame {
     document.body.appendChild(this.captureHint);
   }
 
+  /** Lets a gamepad drive any menu: D-pad moves focus, A presses, B backs out. */
+  private updateGamepadMenus(state: GameState): void {
+    const isMenuActive = state !== GameState.PLAYING && state !== GameState.BOSS;
+    if (!isMenuActive && !this.isInDialogue) return;
+
+    const input = this.input;
+    if (input.isPadUpJustPressed || input.isPadDownJustPressed) {
+      const items = Array.from(document.querySelectorAll<HTMLElement>('button, select, input'))
+        .filter(element => {
+          if (element.offsetParent === null || (element as HTMLButtonElement).disabled) return false;
+          const box = element.getBoundingClientRect();
+          // Only what's actually on top, not buttons hidden behind another overlay
+          const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+          return top !== null && (element === top || element.contains(top));
+        });
+      if (items.length > 0) {
+        const current = items.indexOf(document.activeElement as HTMLElement);
+        const step = input.isPadDownJustPressed ? 1 : -1;
+        items[(current + step + items.length) % items.length].focus();
+        AudioManager.playUIHover();
+      }
+    }
+
+    if (input.isPadConfirmJustPressed) {
+      const active = document.activeElement;
+      if (active instanceof HTMLButtonElement) active.click();
+      else if (this.isInDialogue) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter' }));
+    }
+
+    if (input.isPadCancelJustPressed) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' }));
+    }
+  }
+
   private updateCaptureHint(): void {
     if (!this.captureHint) return;
     const shouldShow = GameStateManager.getInstance().getState() === GameState.PLAYING
@@ -160,7 +196,7 @@ export class ThreeGame {
   }
 
   private update(dt: number): void {
-    this.input.beginFrame();
+    this.input.beginFrame(dt);
 
     const state = GameStateManager.getInstance().getState();
 
@@ -175,13 +211,16 @@ export class ThreeGame {
     this.updateCaptureHint();
 
     // Handle Escape for pause toggle
-    if (state === GameState.PLAYING && this.input.isPressed('Escape')) {
+    const wantsPauseToggle = this.input.isPressed('Escape') || this.input.isPadPauseJustPressed;
+    if (state === GameState.PLAYING && wantsPauseToggle) {
       GameStateManager.getInstance().setState(GameState.PAUSED);
       this.input.keys['Escape'] = false; // consume
-    } else if (state === GameState.PAUSED && this.input.isPressed('Escape')) {
+    } else if (state === GameState.PAUSED && wantsPauseToggle) {
       GameStateManager.getInstance().setState(GameState.PLAYING);
       this.input.keys['Escape'] = false; // consume
     }
+
+    this.updateGamepadMenus(state);
 
     // Freeze game simulation if paused or in menu
     if (state === GameState.PLAYING || state === GameState.BOSS) {
@@ -200,6 +239,8 @@ export class ThreeGame {
     const isFrozen = !isActive && state !== GameState.GAME_OVER;
     this.cameraController.update(this.gameScene.player.root.position, dt, isFrozen);
     this.gameScene.updateOcclusion(isFrozen ? 0 : dt);
+    this.damageNumbers.update(isFrozen ? 0 : dt, this.cameraController.camera);
+    AudioManager.updateListener(this.cameraController.camera);
 
     this.lastDt = dt;
     this.input.endFrame();

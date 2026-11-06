@@ -37,7 +37,7 @@ flowchart TB
         Render["WebGL Renderer\n(PCF Shadows, DPR Clamp)"]
         Lighting["Dynamic Lighting\n(Moonlight, Torches, Fog)"]
         VFX["Particle Pool\n(InstancedMesh Petals, Slashes)"]
-        Audio["Audio Engine\n(Web Audio API Synthesis)"]
+        Audio["Audio Engine\n(Web Audio: Score, 3D, Reverb)"]
     end
 
     Input --> Loop
@@ -74,19 +74,36 @@ flowchart LR
 | Component | Technical Implementation |
 |---|---|
 | **Procedural World** | 100% code-generated 3D geometry (Ronin rig, Yokai, Shrines, Torii gates, flora). No external model files. |
-| **Real-Time Combat** | Frame-accurate katana combos, dodge roll invulnerability windows (`i-frames`), and reactive knockback. |
+| **Real-Time Combat** | Katana combos, heavy attacks, perfect dodges with slow motion, a focus-powered finisher, lock-on, stagger states and ground warnings for incoming attacks. |
 | **Boss State Machine** | 3 distinct combat phases for the *Crimson Oni* featuring sweeping blade arcs, ground slams, and arena fire hazards. |
 | **Camera** | Third-person orbit camera with auto-follow, combat framing, dialogue two-shots, cinematic sequences, and fading of anything that blocks the view. |
 | **Rendering** | HDR post-processing (ambient occlusion, bloom, tone mapping, colour grade, vignette, film grain), moonlit follow shadows, a pooled set of real lamp lights, procedural sky and image-based lighting. |
-| **Audiovisuals & FX** | Layered Web Audio mixing with zone ambience. GPU-accelerated `InstancedMesh` particles, grass and path stones. |
+| **Audio** | An original adaptive battle score synthesised live, intensifying through each boss phase, plus 3D positional sound and per-zone reverb. |
+| **Visual FX** | Blood-ink slash strokes, sparks, ink splatter and damage numbers. GPU-accelerated `InstancedMesh` particles, grass and path stones. |
 | **Engine Optimizations** | Spatial grid collision partitioning, DPR clamp (max 2.0), delta-time clamping (100ms cap), and tab-blur auto-pause. |
 
 ---
 
 ## 🕹️ Controls
 
-| Action | Primary Input | Secondary / Alternate |
+All keys can be rebound from the Controls screen.
+
+| Action | Keyboard & Mouse | Gamepad |
 |---|---|---|
+| **Move** | `W` `A` `S` `D` or arrow keys | Left stick |
+| **Camera** | Move mouse (click the game to capture it), or hold right mouse and drag | Right stick |
+| **Sprint** | `Shift` | RT |
+| **Light Attack** | Left click or `J` | X / Square |
+| **Heavy Attack** | Right click (mouse captured) or `K` | Y / Triangle |
+| **Dash / Dodge** | `Space` | A / Cross |
+| **Lock On** | `Q` | LB |
+| **Spirit Cut** (full focus) | `R` | RB |
+| **Interact** | `E` | B / Circle |
+| **Pause** | `Escape` | Start |
+
+Dodging just as a hit lands slows time and builds focus. Landing hits builds it too, and a full meter unlocks the Spirit Cut.
+
+---|---|---|
 | **Movement** | `W` `A` `S` `D` | Arrow keys |
 | **Camera** | Move mouse (click the game to capture it) | Hold right mouse and drag |
 | **Sprint** | `Shift` | — |

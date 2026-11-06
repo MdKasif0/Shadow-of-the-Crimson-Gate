@@ -24,7 +24,7 @@ export class ChapterUI {
 
     this.numberEl = document.createElement('div');
     Object.assign(this.numberEl.style, {
-      color: '#cc4444', fontFamily: "'Noto Serif JP', serif, monospace",
+      color: '#cc4444', fontFamily: "'Cinzel', serif",
       fontSize: '14px', letterSpacing: '8px', textTransform: 'uppercase',
       marginBottom: '8px', fontWeight: '400',
     });
@@ -37,7 +37,7 @@ export class ChapterUI {
 
     this.titleEl = document.createElement('div');
     Object.assign(this.titleEl.style, {
-      color: '#d0ccc0', fontFamily: "'Noto Serif JP', serif, monospace",
+      color: '#d0ccc0', fontFamily: "'Cinzel', serif",
       fontSize: '36px', letterSpacing: '4px', fontWeight: '300',
       textShadow: '0 2px 20px rgba(0,0,0,0.8)',
     });
