@@ -11,17 +11,23 @@ import { TempleGenerator } from './TempleGenerator';
 import { MountainGenerator } from './MountainGenerator';
 import { CollisionSystem } from '../collision/CollisionSystem';
 import { ArenaGenerator } from '../boss/arena/ArenaGenerator';
+import { PathGenerator } from './PathGenerator';
+import { WorldLights } from '../lighting/WorldLights';
 
 export class WorldGenerator {
+  public readonly worldGroup: THREE.Group;
+
   constructor(scene: THREE.Scene, collisionSystem: CollisionSystem) {
     const random = new SeededRandom(GAME_CONFIG.WORLD_SEED);
     
     // Group to hold the entire world
     const worldGroup = new THREE.Group();
     worldGroup.name = 'World';
+    this.worldGroup = worldGroup;
 
     // 1. Terrain
     worldGroup.add(TerrainGenerator.generate(random));
+    worldGroup.add(PathGenerator.generate(random));
 
     // 2. Mountains (distant background)
     worldGroup.add(MountainGenerator.generate(random));
@@ -44,6 +50,7 @@ export class WorldGenerator {
       new THREE.Vector3(4, 8, 56)
     ));
     worldGroup.add(entranceTorii);
+    WorldLights.add(0, 7, 53, 0xffb060, 40, 18);
 
     // 4b. Courtyard Torii (marking courtyard boundary z=20)
     const courtyardTorii = ToriiGenerator.generate(collisionSystem);
@@ -58,6 +65,7 @@ export class WorldGenerator {
       new THREE.Vector3(3.5, 7, 21)
     ));
     worldGroup.add(courtyardTorii);
+    WorldLights.add(0, 6, 18, 0xffb060, 34, 16);
 
     // 5. Small Shrines
     worldGroup.add(ShrineGenerator.generate(random, collisionSystem));
@@ -70,6 +78,13 @@ export class WorldGenerator {
 
     // 8. Rocks (perimeter)
     worldGroup.add(RockGenerator.generate(random, collisionSystem));
+
+    // Sharp, nearby shadows mean every surface can now safely receive them
+    worldGroup.traverse(object => {
+      if ((object as THREE.Mesh).isMesh && !(object as THREE.Sprite).isSprite) {
+        object.receiveShadow = true;
+      }
+    });
 
     scene.add(worldGroup);
   }

@@ -14,6 +14,11 @@ import { AttackDirector } from '../combat/AttackDirector';
 import { VFXManager } from '../vfx/VFXManager';
 import { EventBus } from '../core/EventBus';
 import { LightingSystem } from '../lighting/LightingSystem';
+import { OcclusionFader } from '../camera/OcclusionFader';
+import { easeInOut } from '../camera/CameraController';
+import { windTime } from '../utils/Wind';
+import { StoryEvents } from '../story/StoryEvent';
+import { SettingsManager } from '../settings/SettingsManager';
 import { AtmosphereSystem } from '../atmosphere/AtmosphereSystem';
 import { ProjectileSystem } from '../combat/ProjectileSystem';
 
@@ -53,6 +58,10 @@ import { GameStateManager } from '../state/GameStateManager';
 import { GameState } from '../state/GameState';
 import { WorldStateManager } from '../state/WorldStateManager';
 
+/** Enemies this close pull the camera's framing towards them. */
+const COMBAT_FRAMING_RANGE = 12;
+const BOSS_FRAMING_RANGE = 40;
+
 export class GameScene {
   public scene: THREE.Scene;
   public player: Ronin;
@@ -70,6 +79,7 @@ export class GameScene {
   private hitStopTimer: number = 0;
 
   private lighting: LightingSystem;
+  private occlusion = new OcclusionFader();
   private atmosphere: AtmosphereSystem;
   
   private zoneManager: ZoneManager;
@@ -97,6 +107,7 @@ export class GameScene {
   private bossIsDefeatedSequence: boolean = false;
   private purificationTimer: number = 0;
   private hasBossIntroPlayed: boolean = false;
+  private hasSeenBossIntro: boolean = false;
   private isCinematicActive: boolean = false;
   private hasShownTitle: boolean = false;
 
@@ -111,7 +122,8 @@ export class GameScene {
     this.zoneManager = new ZoneManager();
 
     this.collisionSystem = new CollisionSystem();
-    new WorldGenerator(this.scene, this.collisionSystem);
+    const world = new WorldGenerator(this.scene, this.collisionSystem);
+    this.registerOccluders(world.worldGroup);
     this.hitboxSystem = new HitboxSystem(this.scene);
     this.projectileSystem = new ProjectileSystem(this.scene);
     this.arenaHazardSystem = new ArenaHazardSystem(this.scene);
@@ -129,7 +141,7 @@ export class GameScene {
     // Ensure player is instantiated before AudioZoneManager (though AudioZoneManager doesn't take args currently)
     this.audioZoneManager = new AudioZoneManager();
 
-    this.player.setPosition(0, 0, 50); // Start at entrance
+    this.player.reset(new THREE.Vector3(0, 0, GAME_CONFIG.PLAYER.SPAWN_Z)); // Start at entrance
     this.scene.add(this.player.root);
 
     this.encounterManager = new EncounterManager();
@@ -164,6 +176,7 @@ export class GameScene {
       this.npcs.push(npc);
       
       this.interactionSystem.register(new NPCInteraction(npc, () => {
+        this.cameraController.dialogueFocus = npc.position;
         const dialogue = npc.getDialogue(this.storyManager.flags);
         this.dialogueManager.startDialogue(dialogue);
       }));
@@ -186,6 +199,8 @@ export class GameScene {
     EventBus.on('encounterComplete', (data: { id: string }) => {
       this.playerProgress.completeEncounter(data.id);
     });
+
+    EventBus.on(StoryEvents.INTRO_COMPLETE, () => this.playOpeningShot());
 
     EventBus.on('shrineActivated', () => {
       this.player['health'].heal(this.player['health'].maxHealth);
@@ -238,10 +253,7 @@ export class GameScene {
       if (saveData.chapter) this.storyManager.state.currentChapter = saveData.chapter;
       if (saveData.objective) this.objectiveManager.setObjective(saveData.objective);
       
-      if (this.playerProgress.crimsonOniDefeated && !saveData.storyFlags?.completedCampaign && this.boss) {
-        this.scene.remove(this.boss.root);
-        this.boss = null;
-      }
+      this.resetBossEncounter();
       
       this.encounterManager.resetAll(this.scene);
       this.encounterManager.clearAll();
@@ -255,12 +267,13 @@ export class GameScene {
     
     EventBus.on('newGame', () => {
       this.playerProgress.wipe();
+      this.hasSeenBossIntro = false;
       this.playerStats = new PlayerStats(1);
       this.applyPlayerStats();
       EventBus.emit('essenceUpdate', { amount: 0, added: 0 });
       EventBus.emit('levelSync', { level: 1 });
 
-      const startPos = new THREE.Vector3(0, 0, 50);
+      const startPos = new THREE.Vector3(0, 0, GAME_CONFIG.PLAYER.SPAWN_Z);
       this.checkpointManager.setCheckpointPosition(startPos);
       this.revivePlayer(startPos);
       this.storyManager.reset();
@@ -302,10 +315,7 @@ export class GameScene {
       this.cameraController.addShake(5.0);
       
       // Look at boss
-      if (this.boss) {
-        this.cameraController.overrideTarget = this.boss.root.position.clone();
-        this.cameraController.overrideZoom = 1.8;
-      }
+      if (this.boss) this.playBossDeathShot(this.boss.root.position.clone());
 
       // Energy VFX
       this.vfx.spawnBossDeathEnergy(data.position);
@@ -317,9 +327,6 @@ export class GameScene {
         this.playerProgress.crimsonOniDefeated = true;
         EventBus.emit('requestSave', {});
         
-        // Restore camera and controls
-        this.cameraController.overrideTarget = null;
-        this.cameraController.overrideZoom = null;
         this.player.isControlsEnabled = true;
       }, 7000);
     });
@@ -380,6 +387,102 @@ export class GameScene {
     }, 100);
   }
 
+  public get isStoryIntroRunning(): boolean {
+    return this.storyManager.isIntroRunning;
+  }
+
+  public initEnvironment(renderer: THREE.WebGLRenderer): void {
+    this.lighting.buildEnvironment(renderer, this.scene);
+    // Compile shaders now, rather than stalling the first gameplay frames
+    renderer.compile(this.scene, this.cameraController.camera);
+  }
+
+  public updateOcclusion(dt: number): void {
+    this.occlusion.update(dt, this.cameraController.camera, this.player.root.position);
+  }
+
+  /** Anything tall enough to hide the player can fade out. Ground and low walls can't. */
+  private registerOccluders(world: THREE.Group): void {
+    const bounds = new THREE.Box3();
+    const fadeable = ['Trees', 'Lanterns', 'Shrines', 'CourtyardArena'];
+
+    for (const group of world.children) {
+      if (group.name === 'Torii' || group.name === 'Temple') {
+        this.occlusion.register(group);
+      } else if (fadeable.includes(group.name)) {
+        for (const child of group.children) {
+          if ((child as THREE.Sprite).isSprite) continue;
+          bounds.setFromObject(child);
+          if (bounds.max.y > 2.6) this.occlusion.register(child, group.name === 'Trees');
+        }
+      }
+    }
+  }
+
+  /** Tells the camera what the player is fighting, and feeds soft aim. */
+  private updateCameraFocus(): void {
+    const camera = this.cameraController;
+    const playerPos = this.player.root.position;
+
+    if (!this.dialogueManager.isActive) camera.dialogueFocus = null;
+
+    const aimTargets: THREE.Vector3[] = [];
+    let nearest: THREE.Vector3 | null = null;
+    let nearestDistSq = COMBAT_FRAMING_RANGE * COMBAT_FRAMING_RANGE;
+    for (const enemy of this.enemies) {
+      if (enemy.health.isDead) continue;
+      aimTargets.push(enemy.root.position);
+      const distSq = enemy.root.position.distanceToSquared(playerPos);
+      if (distSq < nearestDistSq) {
+        nearest = enemy.root.position;
+        nearestDistSq = distSq;
+      }
+    }
+
+    const isFightingBoss = this.boss !== null && this.hasBossIntroPlayed && !this.isCinematicActive && !this.boss.health.isDead
+      && this.boss.root.position.distanceToSquared(playerPos) < BOSS_FRAMING_RANGE * BOSS_FRAMING_RANGE;
+    if (isFightingBoss) aimTargets.push(this.boss!.root.position);
+
+    this.player.aimTargets = aimTargets;
+    camera.isBossFocus = isFightingBoss;
+    camera.combatFocus = isFightingBoss ? this.boss!.root.position : nearest;
+
+    const glow = !this.boss || this.boss.health.isDead || !this.hasBossIntroPlayed
+      ? 0
+      : [32, 52, 80][this.boss.phase];
+    this.lighting.setBossGlow(this.boss ? this.boss.root.position : null, glow);
+  }
+
+  /** A slow crane down over the valley as the intro text fades away. */
+  private playOpeningShot(): void {
+    if (SettingsManager.getInstance().get().reduceMotion) return;
+
+    const player = this.player.root.position.clone();
+    this.cameraController.playSequence([{
+      duration: 4.2,
+      sample: (t, position, look) => {
+        const e = easeInOut(t);
+        position.set(Math.sin(t * 1.4) * 5, THREE.MathUtils.lerp(17, player.y + 4, e), THREE.MathUtils.lerp(player.z + 5, player.z + 8.5, e));
+        look.set(0, THREE.MathUtils.lerp(4, 1.5, e), THREE.MathUtils.lerp(player.z - 38, player.z, e));
+        return THREE.MathUtils.lerp(38, 50, e);
+      },
+    }]);
+  }
+
+  /** Circles the fallen boss while the purification plays out. */
+  private playBossDeathShot(boss: THREE.Vector3): void {
+    this.cameraController.playSequence([{
+      duration: 7,
+      sample: (t, position, look) => {
+        const angle = this.cameraController.yaw + t * 1.5;
+        const radius = THREE.MathUtils.lerp(8.5, 11, t);
+        position.set(boss.x + Math.sin(angle) * radius, THREE.MathUtils.lerp(1.2, 3.2, t), boss.z + Math.cos(angle) * radius);
+        look.set(boss.x, 2.2, boss.z);
+        return 42;
+      },
+    }]);
+  }
+
   private applyPlayerStats(): void {
     this.player['health'].maxHealth = this.playerStats.maxHealth;
     this.player['health'].currentHealth = this.playerStats.maxHealth;
@@ -392,6 +495,9 @@ export class GameScene {
 
   public update(dt: number, inputManager: InputManager): void {
     this.time += dt;
+    windTime.value = this.time;
+    this.lighting.tick(dt, this.player.root.position);
+    this.updateCameraFocus();
 
     if (GAME_CONFIG.DEBUG_MODE && inputManager.isPressed('KeyR')) {
       this.respawnAtCheckpoint();
@@ -425,10 +531,10 @@ export class GameScene {
     if (this.bossIsDefeatedSequence || this.playerProgress.crimsonOniDefeated) {
       // Force purified atmosphere in boss arena
       if (this.zoneManager.getCurrentZoneId() === 'BOSS_ARENA') {
-        fogColor = new THREE.Color(0x111520);
-        fogDensity = 0.015;
-        ambientColor = new THREE.Color(0xffcccc);
-        ambientIntensity = 3.0;
+        fogColor = new THREE.Color(0x1e2a44);
+        fogDensity = 0.007;
+        ambientColor = new THREE.Color(0xb8a8c0);
+        ambientIntensity = 1.6;
       }
 
       if (this.bossIsDefeatedSequence) {
@@ -443,19 +549,19 @@ export class GameScene {
         }
       }
     } else if (this.boss && this.boss.phase === BossPhaseId.PHASE_2) {
-      fogColor = new THREE.Color(0x330000);
-      fogDensity = 0.03;
-      ambientColor = new THREE.Color(0xff4444);
-      ambientIntensity = 2.0;
+      fogColor = new THREE.Color(0x401010);
+      fogDensity = 0.015;
+      ambientColor = new THREE.Color(0xa84040);
+      ambientIntensity = 1.3;
     } else if (this.boss && this.boss.phase === BossPhaseId.PHASE_3) {
-      fogColor = new THREE.Color(0x440000);
-      fogDensity = 0.04;
-      ambientColor = new THREE.Color(0xff2222);
-      ambientIntensity = 2.5;
+      fogColor = new THREE.Color(0x4c0c0c);
+      fogDensity = 0.021;
+      ambientColor = new THREE.Color(0xc03030);
+      ambientIntensity = 1.4;
     }
 
     WorldStateManager.getInstance().updateParticles(this.vfx, this.storyManager.flags);
-    this.atmosphere.update(dt, fogDensity, fogColor);
+    this.atmosphere.update(dt, playerPos, fogDensity, fogColor);
     this.lighting.update(dt, ambientColor, ambientIntensity);
     const zoneId = this.zoneManager.getCurrentZoneId();
     this.objectiveManager.onZoneEntered(zoneId);
@@ -496,19 +602,27 @@ export class GameScene {
     // Trigger Cinematic Intro
     if (this.boss && this.player.root.position.z < -85 && !this.hasBossIntroPlayed) {
       this.hasBossIntroPlayed = true;
-      this.isCinematicActive = true;
-      this.hasShownTitle = false;
-      this.player.isControlsEnabled = false;
-      
-      AudioManager.playBossIntro();
-      this.boss.startIntro();
-      this.bossIntroCamera.start(this.boss.root.position, this.player.root.position);
+
+      if (this.hasSeenBossIntro) {
+        // Retrying from the arena checkpoint goes straight back into the fight
+        this.boss.endIntro();
+        this.bossUI.showHealthBar('Crimson Oni');
+        AudioManager.playBossPhase(1);
+      } else {
+        this.hasSeenBossIntro = true;
+        this.isCinematicActive = true;
+        this.hasShownTitle = false;
+        this.player.isControlsEnabled = false;
+
+        AudioManager.playBossIntro();
+        this.boss.startIntro();
+        this.bossIntroCamera.start(this.boss.root.position, this.player.root.position);
+      }
     }
 
     if (this.isCinematicActive && this.boss) {
-      this.bossIntroCamera.update(dt, this.player.root.position, this.boss.root.position);
-      
       if (this.bossIntroCamera.isHolding && !this.hasShownTitle) {
+        this.chapterUI.hide();
         this.bossUI.showCinematicTitle('Crimson Oni', 2500);
         this.hasShownTitle = true;
       }
@@ -576,6 +690,9 @@ export class GameScene {
   private revivePlayer(position: THREE.Vector3): void {
     this.player.reset(position);
     this.player.isControlsEnabled = true;
+    this.cameraController.dialogueFocus = null;
+    this.cameraController.snapTo(position);
+    this.occlusion.reset();
     EventBus.emit('playerHealth', { current: this.player.health.currentHealth, max: this.player.health.maxHealth, delta: 0 });
   }
 
@@ -585,8 +702,6 @@ export class GameScene {
     this.isCinematicActive = false;
     this.hasShownTitle = false;
     this.bossIsDefeatedSequence = false;
-    this.cameraController.overrideTarget = null;
-    this.cameraController.overrideZoom = null;
     this.bossUI.reset();
 
     if (this.playerProgress.crimsonOniDefeated) {

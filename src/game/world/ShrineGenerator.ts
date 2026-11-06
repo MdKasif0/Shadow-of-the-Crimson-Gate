@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utils/MathUtils';
 import { CollisionSystem } from '../collision/CollisionSystem';
+import { createGlowSprite, WorldLights } from '../lighting/WorldLights';
 
 export class ShrineGenerator {
   public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Shrines';
 
-    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x222a33, roughness: 0.9, flatShading: true });
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x2a1a1a, roughness: 0.8 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x11161a, roughness: 0.7, flatShading: true });
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x555a60, roughness: 0.9, flatShading: true });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2a22, roughness: 0.75 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x2a2e38, roughness: 0.55, flatShading: true });
     const goldMat = new THREE.MeshStandardMaterial({ color: 0xc4a35a, metalness: 0.8, roughness: 0.2 });
 
     const createShrine = () => {
@@ -81,6 +82,7 @@ export class ShrineGenerator {
       shrine.position.set(pos.x, 0, pos.z);
       shrine.rotation.y = pos.rotY;
       group.add(shrine);
+      WorldLights.add(pos.x, 2.3, pos.z, 0xffb060, 26, 13);
 
       // Register collision box for the shrine base (approximate)
       collisionSystem.addBox(new THREE.Box3().setFromCenterAndSize(
@@ -94,6 +96,10 @@ export class ShrineGenerator {
     mainShrine.position.set(0, 0, -10);
     mainShrine.scale.setScalar(1.2);
     group.add(mainShrine);
+    WorldLights.add(0, 2.4, -7, 0xffc070, 42, 16, 0.08);
+    const shrineGlow = createGlowSprite(0xffc070, 2.4, 0.5);
+    shrineGlow.position.set(0, 4.95, -10);
+    group.add(shrineGlow);
 
     collisionSystem.addBox(new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(0, 2, -10),

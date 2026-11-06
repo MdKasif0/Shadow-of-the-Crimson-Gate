@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Shadow of the Crimson Gate — A cinematic Japanese fantasy 2D web game",
+  "description": "Shadow of the Crimson Gate — A cinematic Japanese dark fantasy 3D web game",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

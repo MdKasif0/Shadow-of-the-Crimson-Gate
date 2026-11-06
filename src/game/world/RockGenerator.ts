@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SeededRandom } from '../utils/MathUtils';
 import { GAME_CONFIG } from '../GameConfig';
 import { CollisionSystem } from '../collision/CollisionSystem';
+import { TerrainGenerator } from './TerrainGenerator';
 
 export class RockGenerator {
   public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
@@ -13,7 +15,11 @@ export class RockGenerator {
 
     // Create 3 variant rock geometries
     for (let i = 0; i < 3; i++) {
-      const geo = new THREE.IcosahedronGeometry(1, 1);
+      const base = new THREE.IcosahedronGeometry(1, 1);
+      base.deleteAttribute('uv');
+      base.deleteAttribute('normal');
+      // Welded, so faces move together when deformed instead of tearing apart
+      const geo = mergeVertices(base);
       const pos = geo.attributes.position;
       
       // Deform vertices
@@ -34,9 +40,9 @@ export class RockGenerator {
     }
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x222a33,
-      roughness: 0.8,
-      metalness: 0.2,
+      color: 0x3e4248,
+      roughness: 0.9,
+      metalness: 0.02,
       flatShading: true,
     });
 
@@ -61,13 +67,14 @@ export class RockGenerator {
       // Avoid main path
       if (distFromCenter < 8) continue;
       
-      // Avoid temple area
-      if (z < -45 && Math.abs(x) < 18) continue;
+      // Avoid temple area and the arena courtyard
+      if (z < -45 && z > -86 && Math.abs(x) < 18) continue;
+      if (z <= -86 && Math.abs(x) < 26) continue;
       
       // Avoid shrines
       if (z > -15 && z < 10 && Math.abs(x) < 15) continue;
 
-      dummy.position.set(x, 0, z);
+      dummy.position.set(x, TerrainGenerator.heightAt(x, z), z);
       
       // Vary width/height
       const scaleX = random.range(0.8, 2.5);

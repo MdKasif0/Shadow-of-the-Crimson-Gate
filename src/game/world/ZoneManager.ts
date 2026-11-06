@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { StoryFlags } from '../story/StoryFlag';
 import { WorldStateManager } from '../state/WorldStateManager';
+import { EventBus } from '../core/EventBus';
 
 export interface ZoneConfig {
   id: string;
@@ -14,10 +15,10 @@ export interface ZoneConfig {
 }
 
 const ZONES: ZoneConfig[] = [
-  { id: 'ENTRANCE',         label: 'Entrance',          minZ: 40,  maxZ: 65,  fogDensity: 0.012, fogColor: 0x111c30, ambientColor: 0x3a4f78, ambientIntensity: 1.8 },
-  { id: 'COURTYARD',        label: 'Sakura Courtyard',  minZ: 0,   maxZ: 40,  fogDensity: 0.015, fogColor: 0x221128, ambientColor: 0x553d6b, ambientIntensity: 2.0 },
-  { id: 'SHRINE',           label: 'Shrine Area',       minZ: -20, maxZ: 0,   fogDensity: 0.012, fogColor: 0x162430, ambientColor: 0x3c6969, ambientIntensity: 1.6 },
-  { id: 'FOREST',           label: 'Forest Path',       minZ: -50, maxZ: -20, fogDensity: 0.025, fogColor: 0x0c131a, ambientColor: 0x2b4257, ambientIntensity: 1.2 },
+  { id: 'ENTRANCE',         label: 'Entrance',          minZ: 40,  maxZ: 65,  fogDensity: 0.007, fogColor: 0x1c2a44, ambientColor: 0x4a6090, ambientIntensity: 1.25 },
+  { id: 'COURTYARD',        label: 'Sakura Courtyard',  minZ: 0,   maxZ: 40,  fogDensity: 0.008, fogColor: 0x2b1c38, ambientColor: 0x5c4a7c, ambientIntensity: 1.3 },
+  { id: 'SHRINE',           label: 'Shrine Area',       minZ: -20, maxZ: 0,   fogDensity: 0.008, fogColor: 0x1c3038, ambientColor: 0x4a7478, ambientIntensity: 1.2 },
+  { id: 'FOREST',           label: 'Forest Path',       minZ: -50, maxZ: -20, fogDensity: 0.014, fogColor: 0x12232a, ambientColor: 0x34566a, ambientIntensity: 1.0 },
   { id: 'TEMPLE_APPROACH',  label: 'Temple Approach',   minZ: -85, maxZ: -50, fogDensity: 0.02,  fogColor: 0x1a1228, ambientColor: 0x542d54, ambientIntensity: 1.4 },
   { id: 'BOSS_ARENA',       label: 'Boss Arena',        minZ: -140, maxZ: -85, fogDensity: 0.02,  fogColor: 0x2d0d0d, ambientColor: 0x8c3838, ambientIntensity: 2.2 },
 ];
@@ -37,7 +38,7 @@ export class ZoneManager {
   public getBlendedAtmosphere(playerPos: THREE.Vector3, flags: StoryFlags): { fogDensity: number; fogColor: THREE.Color; ambientColor: THREE.Color; ambientIntensity: number } {
     const zone = this.getPlayerZone(playerPos);
     if (!zone) {
-      return { fogDensity: 0.02, fogColor: new THREE.Color(0x060a10), ambientColor: new THREE.Color(0xffffff), ambientIntensity: 2.0 };
+      return { fogDensity: 0.008, fogColor: new THREE.Color(0x1c2a44), ambientColor: new THREE.Color(0x4a6090), ambientIntensity: 1.2 };
     }
 
     // Check if near a zone boundary for blending
@@ -73,6 +74,7 @@ export class ZoneManager {
     // Track zone changes
     if (zone.id !== this.currentZoneId) {
       this.currentZoneId = zone.id;
+      EventBus.emit('zoneChanged', { zoneId: zone.id });
     }
 
     const worldState = WorldStateManager.getInstance();

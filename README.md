@@ -73,10 +73,12 @@ flowchart LR
 
 | Component | Technical Implementation |
 |---|---|
-| **Procedural World** | 100% code-generated 3D geometry (Ronin rig, Yokai, Shrines, Torii gates, flora). Zero GLTF/OBJ payload overhead. |
+| **Procedural World** | 100% code-generated 3D geometry (Ronin rig, Yokai, Shrines, Torii gates, flora). No external model files. |
 | **Real-Time Combat** | Frame-accurate katana combos, dodge roll invulnerability windows (`i-frames`), and reactive knockback. |
 | **Boss State Machine** | 3 distinct combat phases for the *Crimson Oni* featuring sweeping blade arcs, ground slams, and arena fire hazards. |
-| **Audiovisuals & FX** | Zero external audio files — synthesized audio effects via Web Audio API. GPU-accelerated `InstancedMesh` sakura petals & slashes. |
+| **Camera** | Third-person orbit camera with auto-follow, combat framing, dialogue two-shots, cinematic sequences, and fading of anything that blocks the view. |
+| **Rendering** | HDR post-processing (ambient occlusion, bloom, tone mapping, colour grade, vignette, film grain), moonlit follow shadows, a pooled set of real lamp lights, procedural sky and image-based lighting. |
+| **Audiovisuals & FX** | Layered Web Audio mixing with zone ambience. GPU-accelerated `InstancedMesh` particles, grass and path stones. |
 | **Engine Optimizations** | Spatial grid collision partitioning, DPR clamp (max 2.0), delta-time clamping (100ms cap), and tab-blur auto-pause. |
 
 ---
@@ -85,7 +87,9 @@ flowchart LR
 
 | Action | Primary Input | Secondary / Alternate |
 |---|---|---|
-| **Movement** | `W` `A` `S` `D` | — |
+| **Movement** | `W` `A` `S` `D` | Arrow keys |
+| **Camera** | Move mouse (click the game to capture it) | Hold right mouse and drag |
+| **Sprint** | `Shift` | — |
 | **Katana Strike** | `Left Click` | `J` |
 | **Dash / Dodge** | `Space` | — |
 | **Interact (Shrines, NPCs)** | `E` | — |
@@ -124,7 +128,7 @@ npm run preview
 ## ⚙️ Performance & Accessibility Settings
 
 The in-game settings modal allows full real-time customization:
-- **Graphics Quality**: Low / Medium / High (adjusts shadow map resolution and light bounces)
+- **Graphics Quality**: Low / Medium / High (adjusts resolution, shadows, lamp lights, bloom and ambient occlusion). The game also scales quality down automatically if the frame rate stays low.
 - **VFX Density**: Low / Medium / High (adjusts particle pool batch count)
 - **Camera Shake & Motion Reduction**: Configurable toggles for accessibility
 - **Audio Mixers**: Independent Master and Ambient/SFX sliders

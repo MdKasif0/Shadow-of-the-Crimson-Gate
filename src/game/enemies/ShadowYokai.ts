@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { applyRimLight } from '../utils/RimLight';
+import { getGlowTexture } from '../utils/ProceduralTextures';
 import { Enemy } from './Enemy';
 import { EnemyState } from './EnemyState';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
@@ -51,6 +53,7 @@ export class ShadowYokai implements Enemy {
 
     this.rig = EnemyFactory.createShadowYokai();
     this.root.add(this.rig.root);
+    applyRimLight(this.root, 0x6a78d8, 0.45);
 
     this.animator = new ShadowYokaiAnimator(this.rig);
     this.ai = new EnemyAI(this.config);
@@ -63,8 +66,10 @@ export class ShadowYokai implements Enemy {
   }
 
   private createAura() {
-    const auraGeo = new THREE.PlaneGeometry(1.5, 3.0);
+    // Soft-edged, so it reads as a haze rather than a rectangle from any angle
+    const auraGeo = new THREE.PlaneGeometry(2.4, 3.8);
     const auraMat = new THREE.MeshBasicMaterial({
+      map: getGlowTexture(),
       color: 0x0088aa,
       transparent: true,
       opacity: 0.15,

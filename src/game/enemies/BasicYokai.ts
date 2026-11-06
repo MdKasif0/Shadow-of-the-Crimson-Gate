@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyRimLight } from '../utils/RimLight';
 import { Enemy } from './Enemy';
 import { EnemyState } from './EnemyState';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
@@ -47,6 +48,7 @@ export class BasicYokai implements Enemy {
 
     this.rig = EnemyFactory.createBasicYokai();
     this.root.add(this.rig.root);
+    applyRimLight(this.root, 0xa860e0, 0.5);
 
     this.animator = new EnemyAnimator(this.rig);
     this.ai = new EnemyAI(this.config);

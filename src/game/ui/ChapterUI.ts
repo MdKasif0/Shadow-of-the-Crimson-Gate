@@ -65,6 +65,15 @@ export class ChapterUI {
     }, 3500);
   }
 
+  /** Clears the card early, for when another title needs the middle of the screen. */
+  public hide(): void {
+    this.overlay.style.transition = 'opacity 0.3s ease';
+    this.overlay.style.opacity = '0';
+    setTimeout(() => {
+      this.overlay.style.transition = 'opacity 1.2s ease';
+    }, 300);
+  }
+
   public dispose(): void {
     this.overlay.remove();
   }

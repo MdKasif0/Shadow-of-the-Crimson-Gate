@@ -16,6 +16,8 @@ export class ControlsScreen {
 
     const controls = [
       { key: 'W A S D', action: 'Move' },
+      { key: 'Move Mouse', action: 'Look (click the game first)' },
+      { key: 'Shift', action: 'Sprint' },
       { key: 'Mouse / J', action: 'Attack' },
       { key: 'Space', action: 'Dash' },
       { key: 'E', action: 'Interact' },

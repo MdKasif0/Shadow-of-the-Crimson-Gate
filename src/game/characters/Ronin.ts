@@ -11,6 +11,10 @@ import { ATTACK_DATA } from '../combat/AttackData';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
 import { DashSystem } from '../combat/DashSystem';
 import { GAME_CONFIG } from '../GameConfig';
+import { applyRimLight } from '../utils/RimLight';
+
+/** How far away an enemy can be and still pull the player's swing towards it. */
+const AIM_ASSIST_RANGE = 6.5;
 
 export class Ronin {
   public root: THREE.Group;
@@ -28,6 +32,8 @@ export class Ronin {
   
   public isControlsEnabled: boolean = true;
   public damageMultiplier: number = 1;
+  /** Positions of living enemies, used to turn swings towards the nearest one. */
+  public aimTargets: THREE.Vector3[] = [];
 
   private velocity: THREE.Vector3 = new THREE.Vector3();
   private hurtTimer: number = 0;
@@ -65,6 +71,7 @@ export class Ronin {
     this.root = new THREE.Group();
     this.root.name = 'PlayerRonin';
     this.root.add(this.rig.root);
+    applyRimLight(this.root, 0x9fc4ff, 0.75);
   }
 
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
@@ -96,9 +103,9 @@ export class Ronin {
     this.state.currentAttackId = null;
     this.state.invulnerabilityTimer = 0;
     this.velocity.set(0, 0, 0);
-    this.targetRotation = 0;
-    this.currentRotation = 0;
-    this.root.rotation.set(0, 0, 0);
+    this.targetRotation = Math.PI;
+    this.currentRotation = Math.PI;
+    this.root.rotation.set(0, Math.PI, 0);
     this.combat['attackTimer'] = 0;
     this.combat['inputBuffer'] = false;
     this.combat['comboWindowActive'] = false;
@@ -134,6 +141,7 @@ export class Ronin {
     // Process combat inputs
     if (this.isControlsEnabled) {
       if (inputManager.isAttackPressed() && this.state.movement !== MovementState.HURT) {
+        this.aimAttack(inputManager);
         this.combat.registerAttackInput();
       }
 
@@ -279,6 +287,30 @@ export class Ronin {
     // Update internal animation
     const animSpeedMultiplier = (isRunning && inputMoveDir.lengthSq() > 0 && !isAttacking) ? 1.5 : 1.0;
     this.animator.update(dt * animSpeedMultiplier);
+  }
+
+  /** Swing at the nearest enemy, otherwise where the player is heading or the camera is looking. */
+  private aimAttack(inputManager: InputManager): void {
+    const position = this.root.position;
+    let nearest: THREE.Vector3 | null = null;
+    let nearestDistSq = AIM_ASSIST_RANGE * AIM_ASSIST_RANGE;
+    for (const target of this.aimTargets) {
+      const distSq = position.distanceToSquared(target);
+      if (distSq < nearestDistSq) {
+        nearest = target;
+        nearestDistSq = distSq;
+      }
+    }
+
+    if (nearest) {
+      this.targetRotation = Math.atan2(nearest.x - position.x, nearest.z - position.z);
+      return;
+    }
+
+    const moveDir = inputManager.getMovementDirection();
+    this.targetRotation = moveDir.lengthSq() > 0
+      ? Math.atan2(moveDir.x, moveDir.z)
+      : inputManager.cameraYaw + Math.PI;
   }
 
   public playIdle(): void {

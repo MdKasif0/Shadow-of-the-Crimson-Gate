@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { EventBus } from '../core/EventBus';
+import { GAME_CONFIG } from '../GameConfig';
 
 export class CheckpointManager {
   private lastCheckpointPos: THREE.Vector3;
 
   constructor() {
     // Default starting position
-    this.lastCheckpointPos = new THREE.Vector3(0, 0, 50);
+    this.lastCheckpointPos = new THREE.Vector3(0, 0, GAME_CONFIG.PLAYER.SPAWN_Z);
 
     EventBus.on('shrineActivated', () => {
       // Shrines are at z = -10, set checkpoint near it
