@@ -8,6 +8,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { EventBus } from './EventBus';
 import { SettingsManager } from '../settings/SettingsManager';
 import { GRAPHICS_PRESETS, SettingsData } from '../settings/SettingsData';
+import { LoadReporter } from '../ui/LoadingScreen';
 
 /** Display-space grade: split-tone, contrast, vignette and film grain. */
 const GradeShader = {
@@ -62,6 +63,7 @@ const GradeShader = {
 const ADAPT_SLOW_FRAME_SECONDS = 0.026;
 const ADAPT_SLOW_FRAME_SHARE = 0.7;
 const ADAPT_SETTLE_SECONDS = 4;
+const SHADER_COMPILE_LIMIT_MS = 15000;
 const MIN_ADAPTIVE_PIXEL_RATIO = 1;
 
 export class Renderer {
@@ -195,6 +197,32 @@ export class Renderer {
       for (const object of hidden) object.visible = true;
       hidden.length = 0;
     };
+  }
+
+  /**
+   * Compiles shaders and uploads the whole world to the GPU while the loading screen
+   * is up. Otherwise each would stall the game the first time it comes into view.
+   */
+  public async prepare(scene: THREE.Scene, camera: THREE.Camera, report: LoadReporter): Promise<void> {
+    await report(0);
+    // Some drivers never finish reporting, so don't let that hold up the game
+    await Promise.race([
+      this.webgl.compileAsync(scene, camera),
+      new Promise(resolve => setTimeout(resolve, SHADER_COMPILE_LIMIT_MS)),
+    ]);
+    await report(0.8);
+
+    // Draw once with culling off, so everything outside this view is uploaded too
+    const culled: THREE.Object3D[] = [];
+    scene.traverse(object => {
+      if (object.frustumCulled) {
+        object.frustumCulled = false;
+        culled.push(object);
+      }
+    });
+    this.render(scene, camera);
+    for (const object of culled) object.frustumCulled = true;
+    await report(1);
   }
 
   public resize(): void {

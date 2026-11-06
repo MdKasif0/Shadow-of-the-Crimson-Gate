@@ -4,6 +4,7 @@ import { CollisionSystem } from '../collision/CollisionSystem';
 import { GAME_CONFIG } from '../GameConfig';
 import { TerrainGenerator } from './TerrainGenerator';
 import { buildCedar, buildDeadTree, buildSakura } from './FoliageBuilder';
+import { LoadReporter } from '../ui/LoadingScreen';
 
 /** Large sakura placed by hand to frame the walk through the courtyard. */
 const HERO_SAKURA = [
@@ -13,11 +14,15 @@ const HERO_SAKURA = [
 ];
 
 export class TreeGenerator {
-  public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
+  /** Trees are the costliest part of the world, so this pauses for the loading bar as it goes. */
+  public static async generate(random: SeededRandom, collisionSystem: CollisionSystem, report: LoadReporter): Promise<THREE.Group> {
     const group = new THREE.Group();
     group.name = 'Trees';
 
     const bounds = GAME_CONFIG.WORLD.BOUNDS;
+    const forestCedarCount = 70;
+    const treeCount = 125;
+    const totalTrees = HERO_SAKURA.length + forestCedarCount + treeCount;
 
     const place = (tree: THREE.Group, x: number, z: number) => {
       tree.position.set(x, TerrainGenerator.heightAt(x, z) - 0.1, z);
@@ -26,21 +31,21 @@ export class TreeGenerator {
       if (Math.abs(x) <= bounds.MAX_X + 1) {
         collisionSystem.addSphere(new THREE.Vector3(x, 0, z), 0.55);
       }
+      return report(group.children.length / totalTrees);
     };
 
     for (const spot of HERO_SAKURA) {
-      place(buildSakura(random, 1.25, true), spot.x, spot.z);
+      await place(buildSakura(random, 1.25, true), spot.x, spot.z);
     }
 
     // A dense stand of cedars close around the path makes the forest feel enclosed
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < forestCedarCount; i++) {
       const side = random.next() > 0.5 ? 1 : -1;
       const x = side * random.range(7.5, 30);
       const z = random.range(-53, -21);
-      place(random.next() > 0.12 ? buildCedar(random, random.range(0.85, 1.3)) : buildDeadTree(random, 1.1), x, z);
+      await place(random.next() > 0.12 ? buildCedar(random, random.range(0.85, 1.3)) : buildDeadTree(random, 1.1), x, z);
     }
 
-    const treeCount = 125;
     let placed = 0;
     let attempts = 0;
     while (placed < treeCount && attempts++ < 3000) {
@@ -62,7 +67,7 @@ export class TreeGenerator {
         tree = random.next() > 0.45 ? buildDeadTree(random, scale * 1.2) : buildCedar(random, scale);
       }
 
-      place(tree, x, z);
+      await place(tree, x, z);
       placed++;
     }
 

@@ -13,32 +13,33 @@ import { CollisionSystem } from '../collision/CollisionSystem';
 import { ArenaGenerator } from '../boss/arena/ArenaGenerator';
 import { PathGenerator } from './PathGenerator';
 import { WorldLights } from '../lighting/WorldLights';
+import { LoadReporter, subProgress } from '../ui/LoadingScreen';
 
 export class WorldGenerator {
-  public readonly worldGroup: THREE.Group;
-
-  constructor(scene: THREE.Scene, collisionSystem: CollisionSystem) {
+  /**
+   * Builds the world in stages, pausing between them so the loading bar can move.
+   * The stage order must not change: every stage draws from one seeded random
+   * sequence, so reordering them would rearrange the whole world.
+   */
+  public static async build(scene: THREE.Scene, collisionSystem: CollisionSystem, report: LoadReporter): Promise<THREE.Group> {
     const random = new SeededRandom(GAME_CONFIG.WORLD_SEED);
-    
-    // Group to hold the entire world
+
     const worldGroup = new THREE.Group();
     worldGroup.name = 'World';
-    this.worldGroup = worldGroup;
 
-    // 1. Terrain
+    await report(0, 'Raising the valley');
     worldGroup.add(TerrainGenerator.generate(random));
+    await report(0.08);
+
     worldGroup.add(PathGenerator.generate(random));
-
-    // 2. Mountains (distant background)
     worldGroup.add(MountainGenerator.generate(random));
+    await report(0.14, 'Carving the temple');
 
-    // 3. Temple (focal point - now at Temple Approach zone)
     worldGroup.add(TempleGenerator.generate(collisionSystem));
-
-    // 3b. Boss Arena (Phase 4)
     worldGroup.add(ArenaGenerator.generate(random, collisionSystem));
+    await report(0.18);
 
-    // 4. Entrance Torii Gate (at entrance zone z=55)
+    // Entrance Torii Gate
     const entranceTorii = ToriiGenerator.generate(collisionSystem);
     entranceTorii.position.set(0, 0, 55);
     collisionSystem.addBox(new THREE.Box3(
@@ -52,7 +53,7 @@ export class WorldGenerator {
     worldGroup.add(entranceTorii);
     WorldLights.add(0, 7, 53, 0xffb060, 40, 18);
 
-    // 4b. Courtyard Torii (marking courtyard boundary z=20)
+    // Courtyard Torii, marking the courtyard boundary
     const courtyardTorii = ToriiGenerator.generate(collisionSystem);
     courtyardTorii.position.set(0, 0, 20);
     courtyardTorii.scale.setScalar(0.85); // Slightly smaller
@@ -67,16 +68,15 @@ export class WorldGenerator {
     worldGroup.add(courtyardTorii);
     WorldLights.add(0, 6, 18, 0xffb060, 34, 16);
 
-    // 5. Small Shrines
     worldGroup.add(ShrineGenerator.generate(random, collisionSystem));
+    await report(0.2, 'Lighting the lanterns');
 
-    // 6. Lanterns (scattered, guiding path)
     worldGroup.add(LanternGenerator.generate(random, collisionSystem));
+    await report(0.22, 'Tending the sakura');
 
-    // 7. Trees (sides and background)
-    worldGroup.add(TreeGenerator.generate(random, collisionSystem));
+    worldGroup.add(await TreeGenerator.generate(random, collisionSystem, subProgress(report, 0.22, 0.96)));
+    await report(0.96, 'Scattering the stones');
 
-    // 8. Rocks (perimeter)
     worldGroup.add(RockGenerator.generate(random, collisionSystem));
 
     // Sharp, nearby shadows mean every surface can now safely receive them
@@ -87,5 +87,7 @@ export class WorldGenerator {
     });
 
     scene.add(worldGroup);
+    await report(1);
+    return worldGroup;
   }
 }

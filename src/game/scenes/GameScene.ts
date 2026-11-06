@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../GameConfig';
 import { WorldGenerator } from '../world/WorldGenerator';
+import { LoadReporter } from '../ui/LoadingScreen';
 import { Ronin } from '../characters/Ronin';
 import { CollisionSystem } from '../collision/CollisionSystem';
 import { HitboxSystem } from '../combat/HitboxSystem';
@@ -122,8 +123,6 @@ export class GameScene {
     this.zoneManager = new ZoneManager();
 
     this.collisionSystem = new CollisionSystem();
-    const world = new WorldGenerator(this.scene, this.collisionSystem);
-    this.registerOccluders(world.worldGroup);
     this.hitboxSystem = new HitboxSystem(this.scene);
     this.projectileSystem = new ProjectileSystem(this.scene);
     this.arenaHazardSystem = new ArenaHazardSystem(this.scene);
@@ -391,10 +390,11 @@ export class GameScene {
     return this.storyManager.isIntroRunning;
   }
 
-  public initEnvironment(renderer: THREE.WebGLRenderer): void {
+  /** Builds the world in stages. Runs once, before the game loop starts. */
+  public async buildWorld(renderer: THREE.WebGLRenderer, report: LoadReporter): Promise<void> {
+    const world = await WorldGenerator.build(this.scene, this.collisionSystem, report);
+    this.registerOccluders(world);
     this.lighting.buildEnvironment(renderer, this.scene);
-    // Compile shaders now, rather than stalling the first gameplay frames
-    renderer.compile(this.scene, this.cameraController.camera);
   }
 
   public updateOcclusion(dt: number): void {
