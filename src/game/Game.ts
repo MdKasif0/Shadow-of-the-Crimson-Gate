@@ -13,7 +13,7 @@ import { PauseMenu } from './ui/PauseMenu';
 import { GameOverUI } from './ui/GameOverUI';
 import { EpilogueUI } from './ui/EpilogueUI';
 import { ScreenEffectsUI } from './ui/ScreenEffectsUI';
-import { LoadingScreen } from './ui/LoadingScreen';
+import { LoadReporter, subProgress } from './ui/LoadingScreen';
 import { AudioManager } from './audio/AudioManager';
 import { StoryEvents } from './story/StoryEvent';
 
@@ -32,7 +32,6 @@ export class ThreeGame {
   private gameOverUI: GameOverUI;
   private epilogueUI: EpilogueUI;
   private screenEffectsUI: ScreenEffectsUI;
-  private loadingScreen: LoadingScreen;
 
   private captureHint: HTMLDivElement | null = null;
   private isInDialogue: boolean = false;
@@ -57,7 +56,6 @@ export class ThreeGame {
     this.gameOverUI = new GameOverUI();
     this.epilogueUI = new EpilogueUI();
     this.screenEffectsUI = new ScreenEffectsUI();
-    this.loadingScreen = new LoadingScreen();
     
     // 4. Bind window events
     this.onResize = this.onResize.bind(this);
@@ -72,14 +70,18 @@ export class ThreeGame {
     this.render = this.render.bind(this);
     this.loop = new GameLoop(this.update, this.render);
     
-    this.gameScene.initEnvironment(this.renderer.webgl);
     this.bindMouseCapture();
+  }
 
-    // Start the game loop!
+  /** Builds and prepares everything the first frame needs, then starts the game loop. */
+  public async load(report: LoadReporter): Promise<void> {
+    await this.gameScene.buildWorld(this.renderer.webgl, subProgress(report, 0, 0.7));
+
+    await report(0.72, 'Binding the spirits');
+    await this.renderer.prepare(this.gameScene.scene, this.cameraController.camera, subProgress(report, 0.72, 0.98));
+
+    await report(1, 'Opening the gate');
     this.loop.start();
-    
-    this.loadingScreen.updateProgress(100, 'Ready');
-    this.loadingScreen.hide();
   }
 
   /**
@@ -241,6 +243,8 @@ export class ThreeGame {
   }
 }
 
-export function init3DGame(containerId: string): ThreeGame {
-  return new ThreeGame(containerId);
+export async function init3DGame(containerId: string, report: LoadReporter): Promise<ThreeGame> {
+  const game = new ThreeGame(containerId);
+  await game.load(report);
+  return game;
 }

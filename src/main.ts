@@ -16,11 +16,13 @@ import { SaveManager } from './game/save/SaveManager';
 import { SettingsManager } from './game/settings/SettingsManager';
 import { AudioManager } from './game/audio/AudioManager';
 import { EventBus } from './game/core/EventBus';
+import { LoadingScreen, subProgress } from './game/ui/LoadingScreen';
 
 let gameInstance: ThreeGame | null = null;
 let heroCleanup: (() => void) | null = null;
 
-function init(): void {
+async function init(): Promise<void> {
+  const loadingScreen = new LoadingScreen();
   const appContainer = document.getElementById('app');
   if (!appContainer) {
     console.error('[App] Could not find #app container.');
@@ -49,8 +51,17 @@ function init(): void {
   appContainer.appendChild(gameContainer);
   appContainer.appendChild(menuContainer);
 
-  // Initialize 3D game immediately (it will render behind the menu, or we can pause it)
-  gameInstance = init3DGame('game-container');
+  // Build the game while the loading screen is up
+  try {
+    gameInstance = await init3DGame('game-container', subProgress(loadingScreen.report, 0, 0.97));
+    await loadingScreen.report(0.97);
+    await loadingScreen.waitForMenuAssets();
+    await loadingScreen.report(1);
+  } catch (error) {
+    console.error('[App] Failed to start the game.', error);
+    loadingScreen.showError();
+    return;
+  }
 
   // Handle State Changes
   EventBus.on('gameStateChanged', (data: { previous: GameState | null, current: GameState }) => {
@@ -81,10 +92,12 @@ function init(): void {
       heroCleanup = renderHero(menuContainer);
     }
   }
+
+  loadingScreen.hide();
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', () => void init());
 } else {
-  init();
+  void init();
 }

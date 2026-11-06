@@ -1,51 +1,87 @@
+/** Reports load progress from 0 to 1, pausing so the browser can redraw when it's due. */
+export type LoadReporter = (fraction: number, message?: string) => Promise<void>;
+
+/** Longest stretch of work allowed before giving the browser a chance to paint. */
+const MAX_WORK_MS = 32;
+const FADE_OUT_MS = 900;
+
+const HERO_IMAGE = '/assets/hero-bg-image.png';
+/** Don't hold the menu back indefinitely on a slow connection. */
+const ASSET_WAIT_LIMIT_MS = 6000;
+
+/** Waits for the next frame, with a timeout because hidden tabs don't deliver frames. */
+function nextPaint(): Promise<void> {
+  return new Promise(resolve => {
+    const timeout = setTimeout(resolve, 60);
+    requestAnimationFrame(() => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
+}
+
+/** Maps a reporter onto part of the bar, so each stage can count from 0 to 1 itself. */
+export function subProgress(report: LoadReporter, from: number, to: number): LoadReporter {
+  return (fraction, message) => report(from + (to - from) * fraction, message);
+}
+
+/**
+ * LoadingScreen — Drives the boot screen in index.html, which is already visible
+ * before any JavaScript has run.
+ */
 export class LoadingScreen {
-  private overlay: HTMLDivElement;
+  private root: HTMLElement;
+  private bar: HTMLElement;
+  private track: HTMLElement;
+  private message: HTMLElement;
+  private percent: HTMLElement;
+  private lastPaint: number = performance.now();
+  private shownFraction: number = 0;
+  private menuAssets: Promise<unknown>;
 
   constructor() {
-    this.overlay = document.createElement('div');
-    this.overlay.className = 'loading-overlay';
-    Object.assign(this.overlay.style, {
-      position: 'fixed',
-      top: '0', left: '0', width: '100%', height: '100%',
-      backgroundColor: '#050505',
-      zIndex: '9999',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: '#c4a35a',
-      fontFamily: "'Cinzel', serif",
-      transition: 'opacity 1.5s ease',
-      pointerEvents: 'all' // Block interactions during loading
-    });
+    this.root = document.getElementById('boot-screen')!;
+    this.bar = document.getElementById('boot-bar')!;
+    this.track = document.getElementById('boot-track')!;
+    this.message = document.getElementById('boot-message')!;
+    this.percent = document.getElementById('boot-percent')!;
 
-    this.overlay.innerHTML = `
-      <h1 style="font-size: 48px; letter-spacing: 8px; margin-bottom: 20px;">SHADOW OF THE CRIMSON GATE</h1>
-      <div style="display: flex; flex-direction: column; align-items: center;">
-        <div style="width: 200px; height: 2px; background: rgba(196, 163, 90, 0.2); margin-bottom: 10px; position: relative; overflow: hidden;">
-          <div id="loading-bar" style="position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: #c4a35a; transition: width 0.3s ease;"></div>
-        </div>
-        <p id="loading-text" style="font-family: 'Noto Serif JP', serif; font-size: 14px; letter-spacing: 2px; color: #aaddcc;">Awakening the mountain...</p>
-      </div>
-    `;
-
-    document.body.appendChild(this.overlay);
+    // Fetched alongside the world from the start, rather than after it
+    const image = new Image();
+    image.src = HERO_IMAGE;
+    this.menuAssets = Promise.allSettled([image.decode(), document.fonts.ready]);
   }
 
-  public updateProgress(percent: number, message: string): void {
-    const bar = document.getElementById('loading-bar');
-    const text = document.getElementById('loading-text');
-    if (bar) bar.style.width = `${percent}%`;
-    if (text) text.textContent = message;
+  public readonly report: LoadReporter = async (fraction, message) => {
+    // Never let the bar run backwards
+    this.shownFraction = Math.max(this.shownFraction, Math.min(fraction, 1));
+    const percent = Math.round(this.shownFraction * 100);
+
+    this.bar.style.transform = `scaleX(${this.shownFraction})`;
+    this.percent.textContent = `${percent}%`;
+    this.track.setAttribute('aria-valuenow', String(percent));
+    if (message) this.message.textContent = message;
+
+    if (performance.now() - this.lastPaint > MAX_WORK_MS) {
+      await nextPaint();
+      this.lastPaint = performance.now();
+    }
+  };
+
+  /** Waits for the menu's artwork and fonts, so the menu doesn't appear half-styled. */
+  public async waitForMenuAssets(): Promise<void> {
+    const limit = new Promise(resolve => setTimeout(resolve, ASSET_WAIT_LIMIT_MS));
+    await Promise.race([this.menuAssets, limit]);
   }
 
   public hide(): void {
-    this.overlay.style.opacity = '0';
-    this.overlay.style.pointerEvents = 'none';
-    setTimeout(() => {
-      if (this.overlay.parentNode) {
-        this.overlay.parentNode.removeChild(this.overlay);
-      }
-    }, 1500);
+    this.root.classList.add('boot-screen--done');
+    setTimeout(() => this.root.remove(), FADE_OUT_MS);
+  }
+
+  public showError(): void {
+    this.root.classList.add('boot-screen--error');
+    this.message.textContent = 'The gate would not open. This game needs WebGL 2. Try updating your browser or enabling hardware acceleration, then reload.';
+    this.message.setAttribute('role', 'alert');
   }
 }
