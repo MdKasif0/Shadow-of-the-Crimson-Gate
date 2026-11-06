@@ -15,7 +15,7 @@ export class SaveManager {
     this.saveIndicator = document.createElement('div');
     Object.assign(this.saveIndicator.style, {
       position: 'fixed', bottom: '20px', right: '20px',
-      color: '#fff', fontFamily: "'Noto Serif JP', serif",
+      color: '#fff', fontFamily: "'Cinzel', serif",
       fontSize: '14px', letterSpacing: '2px',
       textShadow: '0 1px 4px #000',
       opacity: '0', transition: 'opacity 0.5s ease',

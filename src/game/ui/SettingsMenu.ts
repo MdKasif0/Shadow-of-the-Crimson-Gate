@@ -13,7 +13,7 @@ export class SettingsMenu {
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       backdropFilter: 'blur(10px)',
-      color: '#fff', fontFamily: "'Noto Serif JP', serif",
+      color: '#fff', fontFamily: "'Cinzel', serif",
     });
 
     this.render();
@@ -76,10 +76,10 @@ export class SettingsMenu {
         </div>
 
         <div style="margin-top: 40px; text-align: center; display: flex; justify-content: center; gap: 20px;">
-          <button id="btn-fullscreen" style="padding: 12px 30px; background: transparent; border: 1px solid #cc4444; color: #cc4444; font-family: 'Noto Serif JP', serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">
+          <button id="btn-fullscreen" style="padding: 12px 30px; background: transparent; border: 1px solid #cc4444; color: #cc4444; font-family: 'Cinzel', serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">
             ${document.fullscreenElement ? 'EXIT FULLSCREEN' : 'ENTER FULLSCREEN'}
           </button>
-          <button id="btn-close-settings" style="padding: 12px 30px; background: transparent; border: 1px solid #cc4444; color: #cc4444; font-family: 'Noto Serif JP', serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">
+          <button id="btn-close-settings" style="padding: 12px 30px; background: transparent; border: 1px solid #cc4444; color: #cc4444; font-family: 'Cinzel', serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">
             CLOSE
           </button>
         </div>

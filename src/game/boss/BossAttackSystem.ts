@@ -30,6 +30,10 @@ export class BossAttackSystem {
     return this.currentAttack !== null;
   }
 
+  public get currentConfig(): BossAttackConfig | null {
+    return this.currentAttack;
+  }
+
   public get currentAttackId(): string | null {
     return this.currentAttack?.id ?? null;
   }

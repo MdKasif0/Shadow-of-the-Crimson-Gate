@@ -9,7 +9,7 @@ export class DashSystem {
   private dashTimer: number = 0;
   private cooldownTimer: number = 0;
   
-  private dashDuration: number = 0.15;
+  private dashDuration: number = 0.18;
   private dashCooldown: number = 0.6;
   private dashSpeed: number = 18.0;
   

@@ -94,7 +94,6 @@ export class AudioZoneManager {
       this.inCombat = false;
       this.inBoss = false;
       this.state = AudioState.EXPLORATION;
-      AudioManager.playMusic(AudioId.MUSIC_EXPLORATION, 2.0);
     });
 
     EventBus.on('gameStateChanged', (data: { current: string }) => {
@@ -112,6 +111,7 @@ export class AudioZoneManager {
     if (this.currentZoneId === zoneId) return;
     const oldZoneId = this.currentZoneId;
     this.currentZoneId = zoneId;
+    AudioManager.setZoneReverb(zoneId);
 
     this.transitionAmbience(oldZoneId, zoneId);
   }
@@ -150,10 +150,6 @@ export class AudioZoneManager {
       }
     }
 
-    // If exploring, trigger exploration music in background
-    if (!this.inCombat && !this.inBoss && this.state === AudioState.EXPLORATION) {
-      AudioManager.playMusic(AudioId.MUSIC_EXPLORATION, 3.0);
-    }
   }
 
   public update(dt: number): void {

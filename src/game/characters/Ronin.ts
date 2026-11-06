@@ -11,10 +11,23 @@ import { ATTACK_DATA } from '../combat/AttackData';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
 import { DashSystem } from '../combat/DashSystem';
 import { GAME_CONFIG } from '../GameConfig';
-import { applyRimLight } from '../utils/RimLight';
+import { applyRimLight, CharacterGlow } from '../utils/RimLight';
+import { EventBus } from '../core/EventBus';
 
 /** How far away an enemy can be and still pull the player's swing towards it. */
 const AIM_ASSIST_RANGE = 6.5;
+/** Half-width of the cone in front of the camera that counts as aiming at an enemy. */
+const AIM_ASSIST_CONE = 1.05;
+/** Enemies this close get swung at wherever the camera is pointing. */
+const AIM_ASSIST_POINT_BLANK = 2.6;
+const LOCK_AIM_RANGE = 12;
+
+export const MAX_FOCUS = 100;
+const PERFECT_DODGE_FOCUS = 30;
+/** How long after starting a dash an incoming hit still counts as dodged. */
+const DODGE_WINDOW_SECONDS = 0.3;
+const PERFECT_DODGE_COOLDOWN = 0.6;
+const FINISHER_INVULNERABILITY = 0.95;
 
 export class Ronin {
   public root: THREE.Group;
@@ -34,6 +47,13 @@ export class Ronin {
   public damageMultiplier: number = 1;
   /** Positions of living enemies, used to turn swings towards the nearest one. */
   public aimTargets: THREE.Vector3[] = [];
+  /** When locked on, the player keeps facing this while moving. */
+  public lockTarget: THREE.Vector3 | null = null;
+  public focus: number = 0;
+  public glow: CharacterGlow;
+
+  private dodgeWindowTimer: number = 0;
+  private perfectDodgeCooldown: number = 0;
 
   private velocity: THREE.Vector3 = new THREE.Vector3();
   private hurtTimer: number = 0;
@@ -71,7 +91,7 @@ export class Ronin {
     this.root = new THREE.Group();
     this.root.name = 'PlayerRonin';
     this.root.add(this.rig.root);
-    applyRimLight(this.root, 0x9fc4ff, 0.75);
+    this.glow = applyRimLight(this.root, 0x9fc4ff, 0.75);
   }
 
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
@@ -111,6 +131,35 @@ export class Ronin {
     this.combat['comboWindowActive'] = false;
     this.dashSystem.isDashing = false;
     this.dashSystem['cooldownTimer'] = 0;
+    this.lockTarget = null;
+    this.dodgeWindowTimer = 0;
+    this.setFocus(0);
+  }
+
+  public addFocus(amount: number): void {
+    this.setFocus(this.focus + amount);
+  }
+
+  private setFocus(value: number): void {
+    const next = THREE.MathUtils.clamp(value, 0, MAX_FOCUS);
+    if (next === this.focus && value !== 0) return;
+    this.focus = next;
+    EventBus.emit('focusChanged', { value: next, max: MAX_FOCUS });
+  }
+
+  /**
+   * Called when an attack would land. If the player has just dashed, the hit
+   * misses and they're rewarded. Returns true if the hit should be ignored.
+   */
+  public tryPerfectDodge(): boolean {
+    if (this.dodgeWindowTimer <= 0) return false;
+
+    if (this.perfectDodgeCooldown <= 0) {
+      this.perfectDodgeCooldown = PERFECT_DODGE_COOLDOWN;
+      this.addFocus(PERFECT_DODGE_FOCUS);
+      EventBus.emit('perfectDodge', { position: this.root.position.clone() });
+    }
+    return true;
   }
 
   public update(dt: number, inputManager: InputManager, collisionSystem: any, hitboxSystem?: any, vfx?: any): void {
@@ -118,6 +167,9 @@ export class Ronin {
     if (this.state.invulnerabilityTimer > 0) {
       this.state.invulnerabilityTimer -= dt;
     }
+    if (this.dodgeWindowTimer > 0) this.dodgeWindowTimer -= dt;
+    if (this.perfectDodgeCooldown > 0) this.perfectDodgeCooldown -= dt;
+    this.glow.update(dt);
 
     if (this.state.movement === MovementState.DEAD) {
       // Just collapse and slide
@@ -140,15 +192,29 @@ export class Ronin {
 
     // Process combat inputs
     if (this.isControlsEnabled) {
-      if (inputManager.isAttackPressed() && this.state.movement !== MovementState.HURT) {
+      const canAct = this.state.movement !== MovementState.HURT;
+
+      if (inputManager.isActionJustPressed('finisher') && canAct && this.focus >= MAX_FOCUS) {
+        this.setFocus(0);
+        this.aimAttack(inputManager);
+        this.combat.startSpecial('ATTACK_FINISHER');
+        this.state.invulnerabilityTimer = FINISHER_INVULNERABILITY;
+        EventBus.emit('finisherStarted', {});
+      } else if (inputManager.isHeavyPressed() && canAct) {
+        this.aimAttack(inputManager);
+        this.combat.registerHeavyInput();
+      } else if (inputManager.isAttackPressed() && canAct) {
         this.aimAttack(inputManager);
         this.combat.registerAttackInput();
       }
 
       // Process Dash
-      if (inputManager.isPressed('Space')) {
+      if (inputManager.isAction('dash')) {
         const inputMoveDir = inputManager.getMovementDirection();
-        this.dashSystem.tryDash(inputMoveDir, this.currentRotation);
+        if (this.dashSystem.tryDash(inputMoveDir, this.currentRotation)) {
+          this.dodgeWindowTimer = DODGE_WINDOW_SECONDS;
+          this.state.invulnerabilityTimer = Math.max(this.state.invulnerabilityTimer, DODGE_WINDOW_SECONDS);
+        }
       }
     }
 
@@ -175,7 +241,7 @@ export class Ronin {
       if (dashMove) intendedMove.copy(dashMove);
       // Also instantly snap rotation to dash dir
       this.targetRotation = Math.atan2(this.dashSystem.dashDirection.x, this.dashSystem.dashDirection.z);
-      this.playWalk(); // Need a dash animation, but walk sped up works
+      this.animator.setState(AnimState.DASH);
       if (vfx && Math.random() > 0.5) vfx.spawnDash(this.root.position, this.targetRotation);
     } else if (isAttacking) {
       // During an attack, standard movement is ignored.
@@ -195,8 +261,7 @@ export class Ronin {
                
                // Spawn Slash VFX exactly once per attack
                if (vfx) {
-                 const typeNum = parseInt(this.state.currentAttackId.replace('ATTACK_', '')) || 1;
-                 vfx.spawnSlash(this.root.position, forward, typeNum);
+                 vfx.spawnSlash(this.root.position, forward, attackDef.slashType);
                }
             }
 
@@ -205,9 +270,15 @@ export class Ronin {
               damage: Math.round(attackDef.damage * this.damageMultiplier),
               position: this.root.position.clone(),
               direction: forward,
-              range: this.katana.getRange(),
+              range: this.katana.getRange() * (attackDef.rangeScale ?? 1),
               hitAngle: this.katana.getHitAngle(),
-              knockback: 10
+              knockback: attackDef.knockback ?? 10,
+              hitboxType: attackDef.isRadial ? 'RADIAL' : 'ARC',
+              stagger: attackDef.stagger,
+              focusGain: attackDef.focusGain,
+              hitStop: attackDef.hitStop,
+              shake: attackDef.shake,
+              isHeavy: attackDef.slashType >= 3,
             });
           }
         }
@@ -258,6 +329,11 @@ export class Ronin {
       this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);
     }
 
+    // Locked on: keep facing the target, except when dashing
+    if (this.lockTarget && this.state.movement !== MovementState.DASH && !isAttacking) {
+      this.targetRotation = Math.atan2(this.lockTarget.x - this.root.position.x, this.lockTarget.z - this.root.position.z);
+    }
+
     // Smooth rotation interpolation
     let diff = this.targetRotation - this.currentRotation;
     while (diff < -Math.PI) diff += Math.PI * 2;
@@ -289,14 +365,28 @@ export class Ronin {
     this.animator.update(dt * animSpeedMultiplier);
   }
 
-  /** Swing at the nearest enemy, otherwise where the player is heading or the camera is looking. */
+  /**
+   * Aims a swing. A locked target comes first; then the nearest enemy roughly where
+   * the camera is pointing, or right next to the player; then the camera's own direction.
+   */
   private aimAttack(inputManager: InputManager): void {
     const position = this.root.position;
+    const aimYaw = inputManager.cameraYaw + Math.PI;
+
+    if (this.lockTarget && position.distanceTo(this.lockTarget) < LOCK_AIM_RANGE) {
+      this.targetRotation = Math.atan2(this.lockTarget.x - position.x, this.lockTarget.z - position.z);
+      return;
+    }
+
     let nearest: THREE.Vector3 | null = null;
     let nearestDistSq = AIM_ASSIST_RANGE * AIM_ASSIST_RANGE;
     for (const target of this.aimTargets) {
       const distSq = position.distanceToSquared(target);
-      if (distSq < nearestDistSq) {
+      if (distSq >= nearestDistSq) continue;
+
+      const toTarget = Math.atan2(target.x - position.x, target.z - position.z);
+      const offAim = Math.abs(Math.atan2(Math.sin(toTarget - aimYaw), Math.cos(toTarget - aimYaw)));
+      if (offAim < AIM_ASSIST_CONE || distSq < AIM_ASSIST_POINT_BLANK * AIM_ASSIST_POINT_BLANK) {
         nearest = target;
         nearestDistSq = distSq;
       }
@@ -307,10 +397,11 @@ export class Ronin {
       return;
     }
 
+    // With the mouse captured, the camera is the aim. Otherwise follow the movement keys.
     const moveDir = inputManager.getMovementDirection();
-    this.targetRotation = moveDir.lengthSq() > 0
+    this.targetRotation = !inputManager.isPointerLocked && moveDir.lengthSq() > 0
       ? Math.atan2(moveDir.x, moveDir.z)
-      : inputManager.cameraYaw + Math.PI;
+      : aimYaw;
   }
 
   public playIdle(): void {

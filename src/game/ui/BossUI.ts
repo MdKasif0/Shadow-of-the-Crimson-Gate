@@ -14,6 +14,7 @@ export class BossUI {
   // Health Bar
   private healthContainer!: HTMLElement;
   private healthFill!: HTMLElement;
+  private healthGhost!: HTMLElement;
   private healthLabel!: HTMLElement;
 
   private isVisible: boolean = false;
@@ -85,21 +86,26 @@ export class BossUI {
 
     // Track
     const track = document.createElement('div');
+    track.className = 'hud-bar hud-bar--boss';
     track.style.width = '100%';
-    track.style.height = '8px';
-    track.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
-    track.style.border = '1px solid #444';
-    track.style.position = 'relative';
+
+    this.healthGhost = document.createElement('div');
+    this.healthGhost.className = 'hud-bar__ghost';
+    track.appendChild(this.healthGhost);
 
     // Fill
     this.healthFill = document.createElement('div');
-    this.healthFill.style.width = '100%';
-    this.healthFill.style.height = '100%';
+    this.healthFill.className = 'hud-bar__fill';
     this.healthFill.style.backgroundColor = '#cc2222';
-    this.healthFill.style.transition = 'width 0.3s ease-out, background-color 0.5s';
-    this.healthFill.style.boxShadow = '0 0 10px #ff0000';
-    
     track.appendChild(this.healthFill);
+
+    // Notches where the boss changes phase, so the player can see what's coming
+    for (const threshold of [70, 35]) {
+      const tick = document.createElement('div');
+      tick.className = 'hud-bar__tick';
+      tick.style.left = `${threshold}%`;
+      track.appendChild(tick);
+    }
     this.healthContainer.appendChild(track);
     this.container.appendChild(this.healthContainer);
   }
@@ -137,6 +143,7 @@ export class BossUI {
     
     const pct = Math.max(0, (data.current / data.max) * 100);
     this.healthFill.style.width = `${pct}%`;
+    this.healthGhost.style.width = `${pct}%`;
     
     // Change color based on phase
     if (data.phase === BossPhaseId.PHASE_2) {
@@ -169,8 +176,9 @@ export class BossUI {
     this.hideHealthBar();
     this.titleContainer.style.opacity = '0';
     this.healthFill.style.width = '100%';
+    this.healthGhost.style.width = '100%';
     this.healthFill.style.backgroundColor = '#cc2222';
-    this.healthFill.style.boxShadow = '0 0 10px #ff0000';
+    this.healthFill.style.boxShadow = '';
   }
 
   public dispose(): void {

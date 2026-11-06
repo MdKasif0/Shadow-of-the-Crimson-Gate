@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { applyRimLight } from '../utils/RimLight';
+import { applyRimLight, CharacterGlow } from '../utils/RimLight';
+import { AttackShape } from '../vfx/AttackTelegraph';
+import { GAME_CONFIG } from '../GameConfig';
 import { Enemy } from './Enemy';
 import { EnemyState } from './EnemyState';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
@@ -22,6 +24,8 @@ export class Tengu implements Enemy {
   public state: EnemyState = EnemyState.IDLE;
   public config: EnemyConfig = TENGU_CONFIG;
 
+  public glow: CharacterGlow;
+  private staggerSeconds: number = 0;
   private rig: CharacterRig;
   private animator: TenguAnimator;
   private ai: EnemyAI;
@@ -49,7 +53,7 @@ export class Tengu implements Enemy {
 
     this.rig = EnemyFactory.createTengu();
     this.root.add(this.rig.root);
-    applyRimLight(this.root, 0xe88048, 0.5);
+    this.glow = applyRimLight(this.root, 0xe88048, 0.5, { uniqueMaterials: true });
 
     this.animator = new TenguAnimator(this.rig);
     this.ai = new EnemyAI(this.config);
@@ -59,8 +63,22 @@ export class Tengu implements Enemy {
     this.health.onDeath(this.onDeath.bind(this));
   }
 
-  public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
+  public get isStaggered(): boolean {
+    return this.state === EnemyState.HURT && this.staggerSeconds > 0 && !this.health.isDead;
+  }
+
+  public get attackWarning(): number {
+    if (this.state !== EnemyState.ATTACK || this.stateTimer >= this.config.attackWindup) return 0;
+    return this.stateTimer / this.config.attackWindup;
+  }
+
+  public get attackShape(): AttackShape {
+    return { range: this.config.attackRange, angle: 0.12 };
+  }
+
+  public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number, staggerSeconds: number = 0): void {
     if (this.health.isDead) return;
+    this.staggerSeconds = staggerSeconds;
 
     const effectiveKnockback = knockbackPower * (1 - this.config.knockbackResistance);
     this.velocity.copy(knockbackDir).multiplyScalar(effectiveKnockback);
@@ -100,6 +118,7 @@ export class Tengu implements Enemy {
 
   public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any, projectileSystem?: ProjectileSystem, allEnemies?: Enemy[]): void {
     this.stateTimer += dt;
+    this.glow.update(dt);
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     
     this.animator.update(dt);
@@ -133,7 +152,7 @@ export class Tengu implements Enemy {
 
     if (this.state === EnemyState.HURT) {
       this.applyVelocity(dt, collisionSystem);
-      if (this.stateTimer > this.config.hurtDuration) {
+      if (this.stateTimer > this.config.hurtDuration + this.staggerSeconds) {
         this.setState(EnemyState.IDLE);
       }
       return;
@@ -166,7 +185,7 @@ export class Tengu implements Enemy {
     
     if (this.state !== decision.state) {
       if (decision.state === EnemyState.ATTACK) {
-        AudioManager.play(AudioId.TENGU_ATTACK, { pitchMin: 0.95, pitchMax: 1.05 });
+        AudioManager.play(AudioId.TENGU_ATTACK, { position: this.root.position, pitchMin: 0.95, pitchMax: 1.05 });
       }
       this.setState(decision.state);
     }
@@ -176,7 +195,7 @@ export class Tengu implements Enemy {
     if (this.wingFlapTimer <= 0) {
       this.wingFlapTimer = 1.2 + Math.random() * 0.8;
       if (this.root.position.distanceTo(playerPos) < 20) {
-        AudioManager.playRandom([AudioId.TENGU_WING_FLAP_01, AudioId.TENGU_WING_FLAP_02], {
+        AudioManager.playRandom([AudioId.TENGU_WING_FLAP_01, AudioId.TENGU_WING_FLAP_02], { position: this.root.position,
           volume: 0.25,
           pitchMin: 0.95,
           pitchMax: 1.05
@@ -214,7 +233,7 @@ export class Tengu implements Enemy {
     if (this.stateTimer >= activeStart && this.stateTimer <= activeEnd) {
       if (this.stateTimer - dt < activeStart && projectileSystem) {
         // Fire projectile sound
-        AudioManager.play(AudioId.TENGU_PROJECTILE, { pitchMin: 0.95, pitchMax: 1.05 });
+        AudioManager.play(AudioId.TENGU_PROJECTILE, { position: this.root.position, pitchMin: 0.95, pitchMax: 1.05 });
 
         // Fire projectile
         const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.root.rotation.y);
@@ -258,7 +277,7 @@ export class Tengu implements Enemy {
       );
       this.root.position.add(resolvedMove);
       
-      const bounds = { MIN_X: -28, MAX_X: 28, MIN_Z: -28, MAX_Z: 28 };
+      const bounds = GAME_CONFIG.WORLD.BOUNDS;
       this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, bounds.MIN_X, bounds.MAX_X);
       this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);
     }

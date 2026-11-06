@@ -4,6 +4,8 @@ import { HitboxSystem } from '../combat/HitboxSystem';
 import { VFXManager } from '../vfx/VFXManager';
 import { BossState } from './BossState';
 import { BossPhaseId } from './BossPhase';
+import { CharacterGlow } from '../utils/RimLight';
+import { AttackShape } from '../vfx/AttackTelegraph';
 
 /**
  * Boss — Entity interface for major boss characters.
@@ -16,6 +18,10 @@ export interface Boss {
   health: HealthComponent;
   state: BossState;
   phase: BossPhaseId;
+  glow: CharacterGlow;
+  isStaggered: boolean;
+  attackWarning: number;
+  attackShape: AttackShape;
 
   update(
     dt: number,

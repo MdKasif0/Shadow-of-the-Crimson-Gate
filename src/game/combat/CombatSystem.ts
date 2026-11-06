@@ -12,6 +12,7 @@ export class CombatSystem {
   private comboWindowActive: boolean = false;
   private currentAttackDef: AttackDefinition | null = null;
   private comboIndex: number = 0;
+  private queuedAttackId: string | null = null;
 
   constructor(state: PlayerState) {
     this.state = state;
@@ -27,6 +28,22 @@ export class CombatSystem {
     }
   }
 
+  /** Starts a heavy attack now, or queues it during a combo's window. */
+  public registerHeavyInput(): void {
+    if (this.state.combatPhase === CombatPhase.NONE) {
+      this.comboIndex = 2;
+      this.startAttack('ATTACK_HEAVY');
+    } else if (this.comboWindowActive) {
+      this.queuedAttackId = 'ATTACK_HEAVY';
+    }
+  }
+
+  /** Starts immediately, cancelling whatever the player was doing. */
+  public startSpecial(attackId: string): void {
+    this.comboIndex = 2;
+    this.startAttack(attackId);
+  }
+
   private startAttack(attackId: string): void {
     this.currentAttackDef = ATTACK_DATA[attackId];
     if (!this.currentAttackDef) return;
@@ -37,6 +54,7 @@ export class CombatSystem {
     this.state.combatPhase = CombatPhase.WINDUP;
     this.attackTimer = 0;
     this.inputBuffer = false;
+    this.queuedAttackId = null;
     this.comboWindowActive = false;
 
     this.events.emitAttackStarted(attackId);
@@ -73,6 +91,11 @@ export class CombatSystem {
           this.events.emitComboWindowOpened();
         }
 
+        if (this.comboWindowActive && this.queuedAttackId) {
+          this.startAttack(this.queuedAttackId);
+          return;
+        }
+
         // Process buffered input if combo window is open
         if (this.comboWindowActive && this.inputBuffer && this.currentAttackDef.nextAttackId) {
           this.startAttack(this.currentAttackDef.nextAttackId);
@@ -95,6 +118,7 @@ export class CombatSystem {
     this.state.currentAttackId = null;
     this.currentAttackDef = null;
     this.inputBuffer = false;
+    this.queuedAttackId = null;
     this.comboWindowActive = false;
   }
 }

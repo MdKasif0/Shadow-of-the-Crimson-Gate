@@ -7,14 +7,14 @@ export class GameOverUI {
 
   constructor() {
     this.overlay = document.createElement('div');
-    this.overlay.className = 'game-over-overlay';
+    this.overlay.className = 'game-over-overlay game-overlay-enter';
     Object.assign(this.overlay.style, {
       position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
       backgroundColor: 'rgba(20, 0, 0, 0.95)', zIndex: '2000',
       display: 'none', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       opacity: '0', transition: 'opacity 3s ease',
-      color: '#fff', fontFamily: "'Noto Serif JP', serif",
+      color: '#fff', fontFamily: "'Cinzel', serif",
     });
 
     this.render();

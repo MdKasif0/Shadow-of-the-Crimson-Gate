@@ -56,7 +56,7 @@ export class DialogueBox {
     // Speaker Name
     this.speakerEl = document.createElement('div');
     Object.assign(this.speakerEl.style, {
-      color: '#cc4444', fontFamily: "'Noto Serif JP', serif, monospace",
+      color: '#cc4444', fontFamily: "'Cinzel', serif",
       fontSize: '14px', letterSpacing: '4px', textTransform: 'uppercase',
       marginBottom: '12px', fontWeight: '700',
     });
@@ -64,15 +64,15 @@ export class DialogueBox {
     // Text
     this.textEl = document.createElement('div');
     Object.assign(this.textEl.style, {
-      color: '#d0ccc0', fontFamily: "'Noto Serif JP', serif, monospace",
-      fontSize: '18px', lineHeight: '1.7', letterSpacing: '0.5px',
+      color: '#d8d4c8', fontFamily: "'Inter', sans-serif",
+      fontSize: '17px', lineHeight: '1.7', letterSpacing: '0.5px',
       minHeight: '60px',
     });
 
     // Continue Indicator
     this.continueEl = document.createElement('div');
     Object.assign(this.continueEl.style, {
-      color: '#888', fontFamily: 'monospace', fontSize: '12px',
+      color: '#888', fontFamily: "'Inter', sans-serif", fontSize: '12px',
       textAlign: 'right', marginTop: '12px', opacity: '0',
       transition: 'opacity 0.3s', letterSpacing: '2px',
     });
@@ -123,9 +123,11 @@ export class DialogueBox {
     if (choices && choices.length > 0) {
       this.choicesEl.style.display = 'block';
       choices.forEach((choice, index) => {
-        const btn = document.createElement('div');
+        const btn = document.createElement('button');
+        btn.type = 'button';
         Object.assign(btn.style, {
-          color: '#aaa', fontFamily: 'monospace', fontSize: '14px',
+          display: 'block', width: '100%', textAlign: 'left', background: 'transparent',
+          color: '#aaa', fontFamily: "'Inter', sans-serif", fontSize: '14px',
           padding: '8px 16px', marginBottom: '4px', cursor: 'pointer',
           border: '1px solid rgba(120,30,30,0.3)', borderRadius: '2px',
           transition: 'all 0.2s', letterSpacing: '1px', pointerEvents: 'auto',
@@ -137,7 +139,8 @@ export class DialogueBox {
           btn.style.borderColor = 'rgba(200,50,50,0.6)';
         });
         btn.addEventListener('mouseleave', () => { btn.style.color = '#aaa'; btn.style.borderColor = 'rgba(120,30,30,0.3)'; });
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (event) => {
+          event.stopPropagation(); // Otherwise this click would also count as advancing the dialogue
           AudioManager.playUISelect();
           if (this.onChoiceSelect) this.onChoiceSelect(index);
         });

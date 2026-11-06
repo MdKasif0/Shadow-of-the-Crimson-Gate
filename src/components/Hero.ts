@@ -115,42 +115,28 @@ import { SaveManager } from '../game/save/SaveManager';
 import { GameStateManager } from '../game/state/GameStateManager';
 import { GameState } from '../game/state/GameState';
 import { SettingsMenu } from '../game/ui/SettingsMenu';
+import { ControlsScreen } from '../game/ui/ControlsScreen';
 import { EventBus } from '../game/core/EventBus';
 
-// ─── Navigation HTML ─────────────────────────────────────────────────────────
+// ─── Menu HTML ───────────────────────────────────────────────────────────────
 
-function buildNavHTML(): string {
-  const saveManager = SaveManager.getInstance();
-  const hasSave = saveManager.hasSave();
+function buildMenuHTML(): string {
+  const hasSave = SaveManager.getInstance().hasSave();
+  const items = [
+    { id: 'nav-continue', label: 'Continue', disabled: !hasSave },
+    { id: 'nav-new-game', label: 'New Game', disabled: false },
+    { id: 'nav-controls', label: 'Controls', disabled: false },
+    { id: 'nav-settings', label: 'Settings', disabled: false },
+  ];
 
   return `
-    <div class="hero-nav-wrapper">
-      <nav class="hero-nav" aria-label="Main navigation">
-        <button class="hero-nav__emblem" id="hero-emblem" type="button" aria-label="Home">
-          <div class="hero-nav__emblem-inner"></div>
+    <nav class="hero-menu" aria-label="Main menu">
+      ${items.map((item, index) => `
+        <button class="hero-menu__item" id="${item.id}" type="button" style="--i: ${index}" ${item.disabled ? 'disabled' : ''}>
+          <span class="hero-menu__mark" aria-hidden="true"></span>${item.label}
         </button>
-
-        <div class="hero-nav__links" id="nav-links">
-          <button class="hero-nav__link" id="nav-continue" ${hasSave ? '' : 'disabled style="opacity: 0.3; cursor: not-allowed;"'}>
-            <span class="hero-nav__link-text">CONTINUE</span>
-          </button>
-          <button class="hero-nav__link" id="nav-new-game">
-            <span class="hero-nav__link-text">NEW GAME</span>
-          </button>
-          <button class="hero-nav__link" id="nav-settings">
-            <span class="hero-nav__link-text">SETTINGS</span>
-          </button>
-        </div>
-
-        <button class="hero-nav__toggle" id="nav-toggle" type="button"
-                aria-label="Toggle navigation menu" aria-expanded="false">
-          <span class="hero-nav__bar" aria-hidden="true"></span>
-          <span class="hero-nav__bar" aria-hidden="true"></span>
-          <span class="hero-nav__bar" aria-hidden="true"></span>
-        </button>
-      </nav>
-      <div class="hero-nav__atmospheric-gradient" aria-hidden="true"></div>
-    </div>
+      `).join('')}
+    </nav>
   `;
 }
 
@@ -189,8 +175,6 @@ export function renderHero(container: HTMLElement): () => void {
   section.setAttribute('aria-label', `${GAME_TITLE} hero section`);
 
   section.innerHTML = `
-    ${buildNavHTML()}
-
     <!-- Background: wrapper for ken-burns, inner for parallax -->
     <div class="hero__bg-wrap" aria-hidden="true">
       <div class="hero__bg" id="hero-bg"></div>
@@ -213,13 +197,14 @@ export function renderHero(container: HTMLElement): () => void {
     <div class="hero__content">
       ${buildTitleHTML()}
       <p class="hero__subtitle">${HERO_SUBTITLE}</p>
+      ${buildMenuHTML()}
     </div>
 
     <!-- Bottom atmospheric text -->
     <p class="hero__tagline">${HERO_TAGLINE}</p>
 
     <!-- Ambient audio and toggle (bottom-left) -->
-    <audio id="hero-audio" src="/assets/audio/music/main_theme.wav" loop preload="auto" autoplay></audio>
+    <audio id="hero-audio" src="/assets/audio/music/main_theme.m4a" loop preload="auto" autoplay></audio>
     <button class="hero__audio-toggle" id="hero-audio-toggle" type="button" aria-label="Toggle audio" aria-pressed="false">
       <svg class="hero__audio-icon hero__audio-icon--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -344,8 +329,24 @@ export function renderHero(container: HTMLElement): () => void {
   const btnContinue = section.querySelector('#nav-continue') as HTMLButtonElement;
   const btnNewGame = section.querySelector('#nav-new-game') as HTMLButtonElement;
   const btnSettings = section.querySelector('#nav-settings') as HTMLButtonElement;
+  const btnControls = section.querySelector('#nav-controls') as HTMLButtonElement;
 
-  [btnContinue, btnNewGame, btnSettings].forEach(btn => {
+  btnControls.addEventListener('click', () => {
+    AudioManager.playUISelect();
+    new ControlsScreen(() => {});
+  }, { signal });
+
+  // Up and down arrows walk through the menu
+  section.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const items = Array.from(section.querySelectorAll<HTMLButtonElement>('.hero-menu__item:not([disabled])'));
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    items[(current + step + items.length) % items.length]?.focus();
+    event.preventDefault();
+  }, { signal });
+
+  [btnContinue, btnNewGame, btnControls, btnSettings].forEach(btn => {
     if (btn) {
       btn.addEventListener('mouseenter', () => AudioManager.playUIHover());
     }
@@ -410,27 +411,6 @@ export function renderHero(container: HTMLElement): () => void {
 
     rafId = requestAnimationFrame(animateParallax);
   }
-
-  // ── Mobile Navigation Toggle ──
-
-  const toggleButton = section.querySelector('#nav-toggle') as HTMLButtonElement;
-  const navLinks = section.querySelector('#nav-links') as HTMLElement;
-
-  toggleButton.addEventListener('click', () => {
-    const isOpen = navLinks.classList.toggle('hero-nav__links--open');
-    toggleButton.classList.toggle('hero-nav__toggle--open', isOpen);
-    toggleButton.setAttribute('aria-expanded', String(isOpen));
-  }, { signal });
-
-  // Close mobile menu when a link inside is clicked
-  navLinks.addEventListener('click', (e: Event) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('.hero-nav__link') || target.closest('.hero-nav__cta')) {
-      navLinks.classList.remove('hero-nav__links--open');
-      toggleButton.classList.remove('hero-nav__toggle--open');
-      toggleButton.setAttribute('aria-expanded', 'false');
-    }
-  }, { signal });
 
   // ── Cleanup ──
 

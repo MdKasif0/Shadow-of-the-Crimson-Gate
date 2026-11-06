@@ -17,6 +17,12 @@ export interface Hitbox {
   hitAngle: number; // e.g. Math.PI / 2 for a 90 degree front cone
   knockback: number;
   hitboxType?: 'ARC' | 'RADIAL' | 'CONTINUOUS';
+  // Player attacks only
+  stagger?: number;
+  focusGain?: number;
+  hitStop?: number;
+  shake?: number;
+  isHeavy?: boolean;
 }
 
 export interface HitEvent {

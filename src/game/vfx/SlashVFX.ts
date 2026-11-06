@@ -1,83 +1,149 @@
 import * as THREE from 'three';
 
-const ARC_HALF_ANGLE = 1.25;
-const INNER_RADIUS = 0.75;
-const OUTER_RADIUS = 2.3;
+const ARC_HALF_ANGLE = 1.35;
+const INNER_RADIUS = 0.55;
+const OUTER_RADIUS = 2.4;
+const POOL_SIZE = 4;
+
+const SLASH_VERTEX = /* glsl */`
+  varying vec2 vPolar;
+  void main() {
+    vPolar = vec2(atan(position.x, position.z), length(position.xz));
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// A sumi-e brush stroke: dry-brush streaks along the arc, black-crimson ink at
+// the body, white-hot where the blade's edge passes.
+const SLASH_FRAGMENT = /* glsl */`
+  uniform float uProgress;
+  uniform float uOpacity;
+  uniform float uDirection;
+  uniform float uArc;
+  uniform vec3 uInk;
+  uniform vec3 uEdge;
+  varying vec2 vPolar;
+
+  float hash(float n) { return fract(sin(n * 91.3458) * 47453.5453); }
+  float noise(float x) {
+    float i = floor(x), f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(hash(i), hash(i + 1.0), f);
+  }
+
+  void main() {
+    float along = vPolar.x / uArc * uDirection;
+    float across = (vPolar.y - ${INNER_RADIUS.toFixed(2)}) / ${(OUTER_RADIUS - INNER_RADIUS).toFixed(2)};
+
+    // The stroke sweeps across the arc, leaving a tail behind its head
+    float head = -1.15 + uProgress * 2.6;
+    float tail = smoothstep(head - 2.2, head - 0.45, along);
+    float front = 1.0 - smoothstep(head - 0.02, head + 0.06, along);
+
+    // Long, broken bristle marks
+    float bristles = noise(across * 34.0) * 0.7 + noise(across * 11.0 + 4.0) * 0.5;
+    float dryBrush = smoothstep(0.22, 0.72, bristles + (along + 1.0) * 0.14);
+
+    float edges = smoothstep(0.0, 0.3, across) * (1.0 - smoothstep(0.92, 1.0, across));
+    float alpha = tail * front * edges * dryBrush * uOpacity;
+    if (alpha < 0.01) discard;
+
+    float hot = pow(across, 3.0) * smoothstep(head - 0.55, head, along);
+    gl_FragColor = vec4(mix(uInk, uEdge, hot), alpha);
+  }
+`;
+
+interface Slash {
+  mesh: THREE.Mesh;
+  material: THREE.ShaderMaterial;
+  timer: number;
+  duration: number;
+}
 
 /**
- * SlashVFX — A glowing crescent that follows the swing, brightest at the blade's
- * tip. Bright enough for bloom to catch it.
+ * SlashVFX — Blood-ink brush strokes that follow each swing. The white-hot edge
+ * is bright enough for bloom to catch.
  */
 export class SlashVFX {
-  private mesh: THREE.Mesh;
-  private material: THREE.MeshBasicMaterial;
-  private active: boolean = false;
-  private timer: number = 0;
-  private duration: number = 0.17;
+  private slashes: Slash[] = [];
+  private nextIndex = 0;
 
   constructor(scene: THREE.Scene) {
-    const geo = new THREE.RingGeometry(INNER_RADIUS, OUTER_RADIUS, 28, 4, Math.PI / 2 - ARC_HALF_ANGLE, ARC_HALF_ANGLE * 2);
-    geo.rotateX(Math.PI / 2); // Lies flat with its middle facing +Z
+    const arcGeometry = new THREE.RingGeometry(INNER_RADIUS, OUTER_RADIUS, 40, 6, Math.PI / 2 - ARC_HALF_ANGLE, ARC_HALF_ANGLE * 2);
+    arcGeometry.rotateX(Math.PI / 2); // Lies flat with its middle facing +Z
 
-    // Fade from clear at the inner edge and arc ends to full brightness at the outer rim
-    const positions = geo.attributes.position;
-    const colors = new Float32Array(positions.count * 3);
-    for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const z = positions.getZ(i);
-      const radial = (Math.hypot(x, z) - INNER_RADIUS) / (OUTER_RADIUS - INNER_RADIUS);
-      const along = 1 - Math.abs(Math.atan2(x, z)) / ARC_HALF_ANGLE;
-      const value = Math.pow(radial, 2.4) * Math.min(1, along * 3);
-      colors.set([value, value, value], i * 3);
+    const fullCircle = new THREE.RingGeometry(INNER_RADIUS, OUTER_RADIUS, 64, 6);
+    fullCircle.rotateX(Math.PI / 2);
+
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const material = new THREE.ShaderMaterial({
+        vertexShader: SLASH_VERTEX,
+        fragmentShader: SLASH_FRAGMENT,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        uniforms: {
+          uProgress: { value: 0 },
+          uOpacity: { value: 0 },
+          uDirection: { value: 1 },
+          uArc: { value: ARC_HALF_ANGLE },
+          uInk: { value: new THREE.Color(0x18040a) },
+          uEdge: { value: new THREE.Color(3, 3.2, 3.6) },
+        },
+      });
+      const mesh = new THREE.Mesh(arcGeometry, material);
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+      mesh.rotation.order = 'YXZ';
+      mesh.userData.arcGeometry = arcGeometry;
+      mesh.userData.fullGeometry = fullCircle;
+      scene.add(mesh);
+      this.slashes.push({ mesh, material, timer: 0, duration: 1 });
     }
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    this.material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      fog: false,
-    });
-    this.mesh = new THREE.Mesh(geo, this.material);
-    this.mesh.visible = false;
-    this.mesh.rotation.order = 'YXZ';
-    scene.add(this.mesh);
   }
 
   public spawn(position: THREE.Vector3, direction: THREE.Vector3, type: number): void {
-    this.active = true;
-    this.timer = this.duration;
-    this.mesh.visible = true;
-    this.material.opacity = 1.0;
+    const slash = this.slashes[this.nextIndex];
+    this.nextIndex = (this.nextIndex + 1) % POOL_SIZE;
 
-    this.mesh.position.copy(position).addScaledVector(direction, 0.1);
-    this.mesh.position.y = 1.15;
+    const isFinisher = type === 4;
+    slash.mesh.geometry = isFinisher ? slash.mesh.userData.fullGeometry : slash.mesh.userData.arcGeometry;
+    slash.duration = isFinisher ? 0.5 : (type === 3 ? 0.3 : 0.24);
+    slash.timer = slash.duration;
+    slash.mesh.visible = true;
 
-    // The first two swings cut on opposite diagonals; the finisher is a wide flat sweep
+    slash.mesh.position.copy(position).addScaledVector(direction, 0.1);
+    slash.mesh.position.y = 1.15;
+
+    // The first two swings cut on opposite diagonals. Heavier cuts sweep wide, leaning
+    // back a little so the stroke still reads from a low camera. The finisher stays level.
     const tilt = type === 1 ? 0.5 : type === 2 ? -0.5 : 0;
-    this.mesh.rotation.set(0, Math.atan2(direction.x, direction.z), tilt);
+    const lean = type === 3 ? -0.34 : 0;
+    slash.mesh.rotation.set(lean, Math.atan2(direction.x, direction.z), tilt);
+    slash.mesh.scale.setScalar(isFinisher ? 2.5 : type === 3 ? 1.35 : 1);
 
-    if (type === 3) {
-      this.mesh.scale.setScalar(1.4);
-      this.material.color.setRGB(2.4, 1.1, 1.0); // Crimson-hot finisher
-    } else {
-      this.mesh.scale.setScalar(1);
-      this.material.color.setRGB(2.0, 2.2, 2.6);
-    }
+    const uniforms = slash.material.uniforms;
+    uniforms.uDirection.value = type === 2 ? -1 : 1;
+    uniforms.uArc.value = isFinisher ? Math.PI : ARC_HALF_ANGLE;
+    uniforms.uEdge.value.setRGB(...(type >= 3 ? [3.6, 1.3, 0.9] as const : [3, 3.2, 3.6] as const));
+    uniforms.uInk.value.setHex(type >= 3 ? 0x3a0408 : 0x18040a);
+    uniforms.uProgress.value = 0;
+    uniforms.uOpacity.value = 1;
   }
 
   public update(dt: number): void {
-    if (!this.active) return;
-    this.timer -= dt;
-    if (this.timer <= 0) {
-      this.active = false;
-      this.mesh.visible = false;
-    } else {
-      this.material.opacity = this.timer / this.duration;
+    for (const slash of this.slashes) {
+      if (slash.timer <= 0) continue;
+
+      slash.timer -= dt;
+      if (slash.timer <= 0) {
+        slash.mesh.visible = false;
+        continue;
+      }
+
+      const t = 1 - slash.timer / slash.duration;
+      slash.material.uniforms.uProgress.value = Math.min(1, t * 1.7);
+      slash.material.uniforms.uOpacity.value = 1 - Math.max(0, t - 0.55) / 0.45;
     }
   }
 }

@@ -1,6 +1,8 @@
 import { EventBus } from '../core/EventBus';
 import { PauseMenu } from './PauseMenu';
 import { GameOver } from './GameOver';
+import { SettingsManager } from '../settings/SettingsManager';
+import { keyName } from '../settings/KeyBindings';
 
 /**
  * GameHUD — Cinematic HTML overlay composed from PauseMenu and GameOver submodules.
@@ -14,6 +16,9 @@ export class GameHUD {
 
   // DOM Elements
   private playerHealthFill!: HTMLElement;
+  private playerHealthGhost!: HTMLElement;
+  private focusFill!: HTMLElement;
+  private focusPrompt!: HTMLElement;
   private enemyHealthContainer!: HTMLElement;
   private enemyHealthFill!: HTMLElement;
   private enemyNameElement!: HTMLElement;
@@ -75,19 +80,35 @@ export class GameHUD {
     playerName.style.textShadow = '1px 1px 2px black';
     playerUI.appendChild(playerName);
 
+    // Health: a damage "ghost" lags behind the real bar, so the size of each hit is visible
     const playerBarBg = document.createElement('div');
-    playerBarBg.style.width = '200px';
-    playerBarBg.style.height = '6px';
-    playerBarBg.style.background = 'rgba(255, 255, 255, 0.2)';
-    playerBarBg.style.boxShadow = '0 0 4px rgba(0,0,0,0.5)';
+    playerBarBg.className = 'hud-bar hud-bar--health';
+
+    this.playerHealthGhost = document.createElement('div');
+    this.playerHealthGhost.className = 'hud-bar__ghost';
+    playerBarBg.appendChild(this.playerHealthGhost);
 
     this.playerHealthFill = document.createElement('div');
-    this.playerHealthFill.style.width = '100%';
-    this.playerHealthFill.style.height = '100%';
-    this.playerHealthFill.style.background = '#eeeeee';
-    this.playerHealthFill.style.transition = 'width 0.3s ease-out, background 0.3s';
+    this.playerHealthFill.className = 'hud-bar__fill';
     playerBarBg.appendChild(this.playerHealthFill);
     playerUI.appendChild(playerBarBg);
+
+    // Focus: built by landing hits and perfect dodges, spent on the Spirit Cut
+    const focusRow = document.createElement('div');
+    focusRow.className = 'hud-focus';
+
+    const focusBar = document.createElement('div');
+    focusBar.className = 'hud-bar hud-bar--focus';
+    this.focusFill = document.createElement('div');
+    this.focusFill.className = 'hud-bar__fill';
+    this.focusFill.style.width = '0%';
+    focusBar.appendChild(this.focusFill);
+    focusRow.appendChild(focusBar);
+
+    this.focusPrompt = document.createElement('span');
+    this.focusPrompt.className = 'hud-focus__prompt';
+    focusRow.appendChild(this.focusPrompt);
+    playerUI.appendChild(focusRow);
 
     const essenceIndicator = document.createElement('div');
     essenceIndicator.id = 'hud-essence';
@@ -136,14 +157,14 @@ export class GameHUD {
 
     const enemyBarBg = document.createElement('div');
     enemyBarBg.style.width = '300px';
-    enemyBarBg.style.height = '4px';
+    enemyBarBg.style.height = '5px';
     enemyBarBg.style.background = 'rgba(255, 255, 255, 0.2)';
     enemyBarBg.style.boxShadow = '0 0 4px rgba(0,0,0,0.5)';
 
     this.enemyHealthFill = document.createElement('div');
     this.enemyHealthFill.style.width = '100%';
     this.enemyHealthFill.style.height = '100%';
-    this.enemyHealthFill.style.background = '#ff4444';
+    this.enemyHealthFill.style.background = 'linear-gradient(90deg, #7a1515, #e0523a)';
     this.enemyHealthFill.style.transition = 'width 0.3s ease-out';
     enemyBarBg.appendChild(this.enemyHealthFill);
 
@@ -169,13 +190,8 @@ export class GameHUD {
     EventBus.on('playerHealth', (data) => {
       const pct = Math.max(0, (data.current / data.max) * 100);
       this.playerHealthFill.style.width = `${pct}%`;
-      
-      // Color change on low HP
-      if (pct < 30) {
-        this.playerHealthFill.style.background = '#ff4444';
-      } else {
-        this.playerHealthFill.style.background = '#eeeeee';
-      }
+      this.playerHealthGhost.style.width = `${pct}%`;
+      this.playerHealthFill.parentElement?.classList.toggle('hud-bar--danger', pct < 30);
 
       if (data.current < data.max && data.delta < 0) {
         this.vignette.style.boxShadow = 'inset 0 0 100px rgba(255, 0, 0, 0.5)';
@@ -199,6 +215,14 @@ export class GameHUD {
       this.enemyHealthTimeout = setTimeout(() => {
         this.enemyHealthContainer.style.opacity = '0';
       }, 3000);
+    });
+
+    EventBus.on('focusChanged', (data: { value: number; max: number }) => {
+      const isFull = data.value >= data.max;
+      this.focusFill.style.width = `${(data.value / data.max) * 100}%`;
+      this.focusFill.parentElement?.classList.toggle('hud-bar--ready', isFull);
+      const key = keyName(SettingsManager.getInstance().get().keyBindings.finisher);
+      this.focusPrompt.textContent = isFull ? `[${key}] Spirit Cut` : '';
     });
 
     EventBus.on('essenceUpdate', (data: any) => {

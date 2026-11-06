@@ -18,9 +18,10 @@ export class ObjectiveUI {
 
     this.textElement = document.createElement('div');
     this.textElement.style.color = '#fff';
-    this.textElement.style.fontFamily = 'monospace';
-    this.textElement.style.fontSize = '24px';
-    this.textElement.style.letterSpacing = '4px';
+    this.textElement.style.fontFamily = "'Cinzel', serif";
+    this.textElement.style.fontSize = '20px';
+    this.textElement.style.fontWeight = '600';
+    this.textElement.style.letterSpacing = '0.16em';
     this.textElement.style.textShadow = '0 2px 4px rgba(0,0,0,0.8)';
     this.textElement.style.transition = 'all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)';
     this.textElement.style.opacity = '0';
@@ -38,8 +39,8 @@ export class ObjectiveUI {
 
     this.interactElement = document.createElement('div');
     this.interactElement.style.color = '#ddd';
-    this.interactElement.style.fontFamily = 'monospace';
-    this.interactElement.style.fontSize = '16px';
+    this.interactElement.style.fontFamily = "'Inter', sans-serif";
+    this.interactElement.style.fontSize = '14px';
     this.interactElement.style.letterSpacing = '1px';
     this.interactElement.style.textShadow = '0 1px 2px rgba(0,0,0,0.8)';
     this.interactElement.style.marginTop = '120px'; // Push down towards character

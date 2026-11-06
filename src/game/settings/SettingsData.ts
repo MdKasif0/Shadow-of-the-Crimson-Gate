@@ -1,3 +1,5 @@
+import { DEFAULT_KEY_BINDINGS, KeyBindings } from './KeyBindings';
+
 export interface SettingsData {
   masterVolume: number;
   musicVolume: number;
@@ -6,6 +8,7 @@ export interface SettingsData {
   vfxIntensity: QualityLevel;
   graphicsQuality: QualityLevel;
   reduceMotion: boolean;
+  keyBindings: KeyBindings;
 }
 
 export type QualityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -41,5 +44,6 @@ export const DEFAULT_SETTINGS: SettingsData = {
   cameraShake: true,
   vfxIntensity: 'HIGH',
   graphicsQuality: 'HIGH',
-  reduceMotion: false
+  reduceMotion: false,
+  keyBindings: { ...DEFAULT_KEY_BINDINGS }
 };

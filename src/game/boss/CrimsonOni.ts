@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { applyRimLight } from '../utils/RimLight';
+import { applyRimLight, CharacterGlow } from '../utils/RimLight';
+import { AttackShape } from '../vfx/AttackTelegraph';
 import { Boss } from './Boss';
 import { BossState } from './BossState';
 import { BossPhaseId, BossPhaseConfig, CRIMSON_ONI_PHASES, getPhaseForHealth } from './BossPhase';
@@ -28,6 +29,7 @@ export class CrimsonOni implements Boss {
   public state: BossState = BossState.INTRO;
   public phase: BossPhaseId = BossPhaseId.PHASE_1;
 
+  public glow: CharacterGlow;
   private rig: CharacterRig;
   private animator: BossAnimator;
   private ai: BossAI;
@@ -58,7 +60,7 @@ export class CrimsonOni implements Boss {
     // Build procedural geometry
     this.rig = BossFactory.createCrimsonOni();
     this.root.add(this.rig.root);
-    applyRimLight(this.root, 0xff3a14, 0.65);
+    this.glow = applyRimLight(this.root, 0xff3a14, 0.65);
 
     // Systems
     this.animator = new BossAnimator(this.rig);
@@ -73,6 +75,21 @@ export class CrimsonOni implements Boss {
   }
 
   // ─── Public API ──────────────────────────────────────────────────────
+
+  public get isStaggered(): boolean {
+    return this.state === BossState.STAGGER;
+  }
+
+  public get attackWarning(): number {
+    if (this.state !== BossState.ATTACK || this.attackSystem.currentPhase !== BossAttackPhase.WINDUP) return 0;
+    return this.attackSystem.attackProgress;
+  }
+
+  public get attackShape(): AttackShape {
+    const attack = this.attackSystem.currentConfig;
+    if (!attack) return { range: 0, angle: 0 };
+    return { range: attack.range, angle: attack.hitboxType === 'RADIAL' ? Math.PI * 2 : attack.hitAngle };
+  }
 
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
     if (this.health.isDead) return;
@@ -97,6 +114,7 @@ export class CrimsonOni implements Boss {
     if (this.poise <= 0 && this.state !== BossState.STAGGER && this.state !== BossState.DEFEATED && this.state !== BossState.PHASE_TRANSITION) {
       this.poise = 0;
       this.setState(BossState.STAGGER);
+      EventBus.emit('damageNumber', { position: this.root.position.clone().setY(2), text: 'STAGGERED', kind: 'label' });
     }
 
     this.health.takeDamage(mitigatedDamage, 'PLAYER');
@@ -141,6 +159,7 @@ export class CrimsonOni implements Boss {
     vfx?: VFXManager
   ): void {
     this.stateTimer += dt;
+    this.glow.update(dt);
 
     // Update animator
     this.animator.setAttackState(
@@ -253,11 +272,11 @@ export class CrimsonOni implements Boss {
     if (decision.state === BossState.ATTACK && decision.attackId) {
       this.attackSystem.startAttack(decision.attackId);
       if (decision.attackId.includes('SMASH') || decision.attackId.includes('SLAM')) {
-        AudioManager.play(AudioId.BOSS_SMASH);
+        AudioManager.play(AudioId.BOSS_SMASH, { position: this.root.position });
       } else if (decision.attackId.includes('CHARGE')) {
-        AudioManager.play(AudioId.BOSS_CHARGE);
+        AudioManager.play(AudioId.BOSS_CHARGE, { position: this.root.position });
       } else {
-        AudioManager.playBossAttack();
+        AudioManager.playBossAttack(this.root.position);
       }
     }
 
@@ -315,7 +334,7 @@ export class CrimsonOni implements Boss {
     // Only flinch if not currently attacking (boss has hyperarmor during attacks)
     if (this.state !== BossState.ATTACK && this.state !== BossState.PHASE_TRANSITION) {
       this.setState(BossState.HURT);
-      AudioManager.play(AudioId.BOSS_HURT, { cooldownMs: 400 });
+      AudioManager.play(AudioId.BOSS_HURT, { cooldownMs: 400, position: this.root.position });
     }
 
     EventBus.emit('bossHealth', {

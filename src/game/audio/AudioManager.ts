@@ -9,6 +9,21 @@
 import { EventBus } from '../core/EventBus';
 import { AudioId, AudioCategory, AudioPriority, AUDIO_REGISTRY } from './AudioRegistry';
 import { AudioBus, AudioBuses, createAudioBuses } from './AudioBus';
+import { ProceduralScore, ScoreMood } from './ProceduralScore';
+import * as THREE from 'three';
+
+/** What the music should currently be doing. */
+export type MusicMood = 'explore' | 'combat' | 'boss1' | 'boss2' | 'boss3' | 'victory';
+
+/** How much reverb each zone has, from the two synthesised rooms. */
+const ZONE_REVERB: Record<string, { hall: number; open: number }> = {
+  ENTRANCE: { hall: 0, open: 0.1 },
+  COURTYARD: { hall: 0, open: 0.12 },
+  SHRINE: { hall: 0.04, open: 0.12 },
+  FOREST: { hall: 0, open: 0.18 },
+  TEMPLE_APPROACH: { hall: 0.34, open: 0.05 },
+  BOSS_ARENA: { hall: 0.16, open: 0.3 },
+};
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -32,6 +47,7 @@ export interface PlayOptions {
   cooldownMs?: number;   // Minimum ms between plays of same ID
   loop?: boolean;        // Override loop setting
   sliceSeconds?: number; // Play only a random slice this long (for long source recordings)
+  position?: THREE.Vector3; // Play from this point in the world, panned and attenuated
 }
 
 // ─── Audio State ───────────────────────────────────────────────────────────
@@ -79,6 +95,12 @@ export class AudioManager {
   // Audio state
   private static audioState: AudioState = AudioState.MENU;
 
+  private static score: ProceduralScore | null = null;
+  private static currentMood: MusicMood | null = null;
+  private static hallSend: GainNode | null = null;
+  private static openSend: GainNode | null = null;
+  private static listenerForward = new THREE.Vector3();
+
   // ─── Init ──────────────────────────────────────────────────────────────
 
   public static init(): void {
@@ -91,6 +113,8 @@ export class AudioManager {
         this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         this.buses = createAudioBuses(this.ctx);
         this.suspended = false;
+        this.score = new ProceduralScore(this.ctx, this.buses.music.node);
+        this.setupReverb();
 
         // Preload critical assets
         this.preloadEssentials();
@@ -106,6 +130,78 @@ export class AudioManager {
     document.addEventListener('keydown', resume);
 
     this.bindEvents();
+  }
+
+  // ─── Space ─────────────────────────────────────────────────────────────
+
+  /** A synthetic room: decaying noise, darker towards the end like absorbent walls. */
+  private static createImpulse(seconds: number, decay: number): AudioBuffer {
+    const ctx = this.ctx!;
+    const length = Math.floor(ctx.sampleRate * seconds);
+    const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+    for (let channel = 0; channel < 2; channel++) {
+      const data = impulse.getChannelData(channel);
+      let smoothed = 0;
+      for (let i = 0; i < length; i++) {
+        const t = i / length;
+        const damping = 0.08 + (1 - t) * 0.6;
+        smoothed += (Math.random() * 2 - 1 - smoothed) * damping;
+        data[i] = smoothed * Math.pow(1 - t, decay);
+      }
+    }
+    return impulse;
+  }
+
+  private static setupReverb(): void {
+    const ctx = this.ctx!;
+    const buses = this.buses!;
+
+    const addRoom = (seconds: number, decay: number): GainNode => {
+      const send = ctx.createGain();
+      send.gain.value = 0;
+      const convolver = ctx.createConvolver();
+      convolver.buffer = this.createImpulse(seconds, decay);
+      buses.sfx.node.connect(send);
+      send.connect(convolver);
+      convolver.connect(buses.master.node);
+      return send;
+    };
+
+    this.hallSend = addRoom(1.7, 2.6);  // Close wooden walls
+    this.openSend = addRoom(3.0, 3.4);  // Distant echoes across open ground
+  }
+
+  /** Fades to the sound of the room the player has just walked into. */
+  public static setZoneReverb(zoneId: string): void {
+    if (!this.ctx || !this.hallSend || !this.openSend) return;
+    const reverb = ZONE_REVERB[zoneId] ?? ZONE_REVERB.ENTRANCE;
+    const now = this.ctx.currentTime;
+    this.hallSend.gain.setTargetAtTime(reverb.hall, now, 0.5);
+    this.openSend.gain.setTargetAtTime(reverb.open, now, 0.5);
+  }
+
+  /** Keeps 3D sounds positioned relative to the camera. */
+  public static updateListener(camera: THREE.Camera): void {
+    if (!this.ctx) return;
+    const listener = this.ctx.listener;
+    const forward = camera.getWorldDirection(this.listenerForward);
+    const { x, y, z } = camera.position;
+
+    if (listener.positionX) {
+      const now = this.ctx.currentTime;
+      listener.positionX.setValueAtTime(x, now);
+      listener.positionY.setValueAtTime(y, now);
+      listener.positionZ.setValueAtTime(z, now);
+      listener.forwardX.setValueAtTime(forward.x, now);
+      listener.forwardY.setValueAtTime(forward.y, now);
+      listener.forwardZ.setValueAtTime(forward.z, now);
+      listener.upX.setValueAtTime(0, now);
+      listener.upY.setValueAtTime(1, now);
+      listener.upZ.setValueAtTime(0, now);
+    } else {
+      listener.setPosition(x, y, z); // Firefox
+      listener.setOrientation(forward.x, forward.y, forward.z, 0, 1, 0);
+    }
   }
 
   // ─── Bus Accessors ─────────────────────────────────────────────────────
@@ -246,7 +342,21 @@ export class AudioManager {
     gainNode.gain.value = vol;
 
     source.connect(gainNode);
-    gainNode.connect(bus.node);
+
+    if (opts?.position) {
+      const panner = this.ctx.createPanner();
+      panner.panningModel = 'equalpower';
+      panner.distanceModel = 'inverse';
+      panner.refDistance = 7;
+      panner.rolloffFactor = 1.1;
+      panner.positionX.value = opts.position.x;
+      panner.positionY.value = opts.position.y + 1.2;
+      panner.positionZ.value = opts.position.z;
+      gainNode.connect(panner);
+      panner.connect(bus.node);
+    } else {
+      gainNode.connect(bus.node);
+    }
 
     const active: ActiveSource = {
       source, gainNode, id, priority: entry.priority, startTime: this.ctx.currentTime
@@ -322,6 +432,27 @@ export class AudioManager {
 
     this.currentMusic = { source, gainNode, id, priority: entry.priority, startTime: this.ctx.currentTime };
     this.currentMusicId = id;
+  }
+
+  /** Moves the music to a mood, crossfading between recorded tracks and the live score. */
+  public static setMusicMood(mood: MusicMood): void {
+    if (mood === this.currentMood || !this.ctx || !this.score) return;
+    this.currentMood = mood;
+
+    if (mood === 'explore' || mood === 'victory') {
+      this.score.stop(2.2);
+      this.playMusic(mood === 'explore' ? AudioId.MUSIC_EXPLORATION : AudioId.MUSIC_VICTORY, 2.5);
+    } else {
+      this.stopMusic(1.2);
+      this.score.play(mood as ScoreMood, 1.2);
+    }
+  }
+
+  /** Silences all music until the next mood is set. */
+  public static silenceMusic(fadeDuration: number = 1): void {
+    this.currentMood = null;
+    this.score?.stop(fadeDuration);
+    this.stopMusic(fadeDuration);
   }
 
   public static stopMusic(fadeDuration: number = MUSIC_CROSSFADE_DURATION): void {
@@ -430,6 +561,8 @@ export class AudioManager {
     this.activeSources = [];
 
     // Stop music
+    this.currentMood = null;
+    this.score?.stop(0.2);
     if (this.currentMusic) {
       try { this.currentMusic.source.stop(); } catch { /* ok */ }
       this.currentMusic = null;
@@ -511,8 +644,6 @@ export class AudioManager {
 
   public static playBossDefeat(): void {
     this.play(AudioId.BOSS_DEATH);
-    // Transition to victory music after a short delay
-    setTimeout(() => this.playMusic(AudioId.MUSIC_VICTORY), 2000);
   }
 
   // ── Tengu-specific ──
@@ -526,8 +657,8 @@ export class AudioManager {
   }
 
   // ── Boss-specific ──
-  public static playBossAttack(): void {
-    this.play(AudioId.BOSS_ATTACK, { pitchMin: 0.9, pitchMax: 1.0, cooldownMs: 200 });
+  public static playBossAttack(position?: THREE.Vector3): void {
+    this.play(AudioId.BOSS_ATTACK, { pitchMin: 0.9, pitchMax: 1.0, cooldownMs: 200, position });
   }
 
   // ─── Footsteps ─────────────────────────────────────────────────────────
@@ -563,13 +694,8 @@ export class AudioManager {
   // ─── Event Bindings ────────────────────────────────────────────────────
 
   private static bindEvents(): void {
-    EventBus.on('encounterStarted', () => {
-      this.stopMusic(1.0);
-    });
-
     EventBus.on('encounterComplete', () => {
       this.playEncounterComplete();
-      this.playMusic(AudioId.MUSIC_EXPLORATION, 2.0);
     });
 
     EventBus.on('levelUp', () => this.playLevelUp());
@@ -577,7 +703,7 @@ export class AudioManager {
     EventBus.on('enemyDeath', () => this.playEnemyDeath());
 
     EventBus.on('playerDeath', () => {
-      this.stopMusic(1.0);
+      this.silenceMusic(1.0);
       setTimeout(() => this.play(AudioId.SYS_GAME_OVER), 1500);
     });
 
@@ -594,8 +720,7 @@ export class AudioManager {
         this.resume();
       }
       if (data.current === 'MAIN_MENU') {
-        this.stopAll();
-        this.playMusic(AudioId.MUSIC_MAIN_THEME, 2.0);
+        this.stopAll(); // The menu plays its own theme
       }
     });
   }

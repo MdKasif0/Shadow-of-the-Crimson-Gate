@@ -11,13 +11,14 @@ export class PauseMenu {
 
   constructor() {
     this.element = document.createElement('div');
+    this.element.className = 'game-overlay-enter';
     Object.assign(this.element.style, {
       position: 'absolute', inset: '0',
       background: 'rgba(0, 0, 0, 0.75)', zIndex: '20',
       display: 'none', flexDirection: 'column',
       justifyContent: 'center', alignItems: 'center',
       pointerEvents: 'auto', backdropFilter: 'blur(5px)',
-      color: 'white', fontFamily: "'Cinzel', 'Noto Serif JP', serif"
+      color: 'white', fontFamily: "'Cinzel', serif"
     });
 
     this.render();
