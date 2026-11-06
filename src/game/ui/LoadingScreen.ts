@@ -5,7 +5,7 @@ export type LoadReporter = (fraction: number, message?: string) => Promise<void>
 const MAX_WORK_MS = 32;
 const FADE_OUT_MS = 900;
 
-const HERO_IMAGE = '/assets/hero-bg-image.png';
+const HERO_IMAGE = '/assets/hero-gate.webp';
 /** Don't hold the menu back indefinitely on a slow connection. */
 const ASSET_WAIT_LIMIT_MS = 6000;
 

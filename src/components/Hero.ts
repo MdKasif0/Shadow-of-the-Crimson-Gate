@@ -1,124 +1,45 @@
 /**
  * Hero Component
  *
- * Renders the full-viewport cinematic hero section for the landing page.
- *
- * Features:
- *   - Background image with ken-burns (CSS) + mouse parallax (JS)
- *   - Atmospheric overlays (gradient, vignette, bottom fog)
- *   - Floating navigation with mobile hamburger menu
- *   - Staggered title reveal (SHADOW / OF THE / CRIMSON GATE)
- *   - Sakura petal particles + spirit glow particles
- *   - Ambient glow effects
- *   - Play button with cursor-tracking glow
- *   - Cinematic transition on Play click before navigating to /game
+ * The title screen: a painted scene brought to life by HeroAtmosphere, the game's
+ * title, and the main menu. Returns a cleanup function.
  */
 
-import {
-  GAME_TITLE,
-  HERO_SUBTITLE,
-  HERO_TAGLINE,
-  NAV_ITEMS,
-  ROUTES,
-  PARALLAX,
-  PARTICLES,
-  TIMING,
-} from '../utils/constants';
-
-import {
-  OverlayManager,
-  openWorldOverlay,
-  openLoreOverlay,
-  openCharactersOverlay,
-  openMediaOverlay
-} from './Overlays';
+import { GAME_TITLE, HERO_SUBTITLE, ASSETS } from '../utils/constants';
 import { AudioManager } from '../game/audio/AudioManager';
-import { AudioId } from '../game/audio/AudioRegistry';
-
-// ─── Internal Constants ──────────────────────────────────────────────────────
-
-const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-const PREFERS_REDUCED_MOTION = window.matchMedia(
-  '(prefers-reduced-motion: reduce)'
-).matches;
-const ENABLE_PARALLAX = !IS_TOUCH && !PREFERS_REDUCED_MOTION;
-
-// ─── Particle Helpers ────────────────────────────────────────────────────────
-
-/** Creates a single sakura petal element with randomized animation. */
-function createPetal(index: number): HTMLElement {
-  const el = document.createElement('div');
-  const isWhite = Math.random() > 0.6;
-
-  el.className = `hero__petal ${isWhite ? 'hero__petal--white' : 'hero__petal--pink'}`;
-
-  const left = Math.random() * 100;
-  const size = 6 + Math.random() * 9;
-  const duration = 8 + Math.random() * 7;
-  const delay = Math.random() * 14;
-  const drift = -40 + Math.random() * 100;
-  const spin = 360 + Math.random() * 360;
-
-  el.style.left = `${left}%`;
-  el.style.width = `${size}px`;
-  el.style.height = `${size * 0.8}px`;
-  el.style.animationDuration = `${duration}s`;
-  el.style.animationDelay = `${delay}s`;
-  el.style.setProperty('--drift', `${drift}px`);
-  el.style.setProperty('--spin', `${spin}deg`);
-  el.style.transform = `rotate(${index * 37}deg)`;
-
-  return el;
-}
-
-/** Creates a single spirit/glow particle element. */
-function createSpirit(index: number): HTMLElement {
-  const el = document.createElement('div');
-  const isGold = Math.random() > 0.4;
-
-  el.className = `hero__spirit ${isGold ? 'hero__spirit--gold' : 'hero__spirit--teal'}`;
-
-  const left = 15 + Math.random() * 70;
-  const bottom = 10 + Math.random() * 40;
-  const size = 2 + Math.random() * 3;
-  const duration = 10 + Math.random() * 10;
-  const delay = Math.random() * 16;
-  const rise = -(15 + Math.random() * 20);
-  const wander = -15 + Math.random() * 30;
-
-  el.style.left = `${left}%`;
-  el.style.bottom = `${bottom}%`;
-  el.style.width = `${size}px`;
-  el.style.height = `${size}px`;
-  el.style.animationDuration = `${duration}s`;
-  el.style.animationDelay = `${delay}s`;
-  el.style.setProperty('--rise', `${rise}vh`);
-  el.style.setProperty('--wander', `${wander}px`);
-
-  // Stagger initial position for variety
-  void index;
-
-  return el;
-}
-
-// ─── SVG Arrow Icon ──────────────────────────────────────────────────────────
-
-function arrowSVG(className: string = 'hero__cta-arrow'): string {
-  return `<svg class="${className}" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-    stroke-linejoin="round" aria-hidden="true">
-    <path d="M5 12h14M12 5l7 7-7 7"/>
-  </svg>`;
-}
-
 import { SaveManager } from '../game/save/SaveManager';
 import { GameStateManager } from '../game/state/GameStateManager';
 import { GameState } from '../game/state/GameState';
+import { SettingsManager } from '../game/settings/SettingsManager';
 import { SettingsMenu } from '../game/ui/SettingsMenu';
 import { ControlsScreen } from '../game/ui/ControlsScreen';
 import { EventBus } from '../game/core/EventBus';
+import { HeroAtmosphere, IMAGE_HEIGHT, IMAGE_WIDTH, paintEnso } from './HeroAtmosphere';
 
-// ─── Menu HTML ───────────────────────────────────────────────────────────────
+const AUDIO_PREFERENCE_KEY = 'sotcg_audio';
+const MENU_MUSIC_VOLUME = 0.3;
+/** How long the fade to black runs before the game takes over. */
+const LEAVE_DELAY_MS = 520;
+
+const SAKURA_MON = `
+  <svg class="hero__mon" viewBox="0 0 24 24" aria-hidden="true">
+    <g fill="currentColor">
+      ${[0, 72, 144, 216, 288].map(angle => `
+        <path transform="rotate(${angle} 12 12)" d="M12 11.2c-2.9-1.7-3.5-5.1-1.7-7.7L12 5l1.7-1.5c1.8 2.6 1.2 6-1.7 7.7z"/>
+      `).join('')}
+      <circle cx="12" cy="12" r="1.15"/>
+    </g>
+  </svg>
+`;
+
+const SPEAKER_ICON = `
+  <svg class="hero__audio-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path fill="currentColor" d="M11 5.5 6.6 9H3.5v6h3.1l4.4 3.5z"/>
+    <path class="hero__audio-wave" d="M14.6 9.2a4 4 0 0 1 0 5.6"/>
+    <path class="hero__audio-wave" d="M17.2 6.6a7.6 7.6 0 0 1 0 10.8"/>
+    <path class="hero__audio-off" d="m15 9.6 5 4.8M20 9.6l-5 4.8"/>
+  </svg>
+`;
 
 function buildMenuHTML(): string {
   const hasSave = SaveManager.getInstance().hasSave();
@@ -133,292 +54,225 @@ function buildMenuHTML(): string {
     <nav class="hero-menu" aria-label="Main menu">
       ${items.map((item, index) => `
         <button class="hero-menu__item" id="${item.id}" type="button" style="--i: ${index}" ${item.disabled ? 'disabled' : ''}>
-          <span class="hero-menu__mark" aria-hidden="true"></span>${item.label}
+          <span class="hero-menu__mark" aria-hidden="true"><span></span></span>
+          <span class="hero-menu__label">${item.label}</span>
         </button>
       `).join('')}
     </nav>
   `;
 }
 
-// ─── Title Lines ─────────────────────────────────────────────────────────────
-
-/** Splits "Shadow of the Crimson Gate" into cinematic hierarchy lines. */
-function buildTitleHTML(): string {
-  return `
-    <h1 class="hero__title">
-      <span class="hero__title-line hero__title-line--lg">Shadow</span>
-      <span class="hero__title-line hero__title-line--sm">of the</span>
-      <span class="hero__title-line hero__title-line--lg">Crimson Gate</span>
-    </h1>
-  `;
-}
-
-// ─── Main Render ─────────────────────────────────────────────────────────────
-
-/**
- * Renders the cinematic hero section into the given container.
- * Returns a cleanup function to remove listeners and cancel animation frames.
- */
 export function renderHero(container: HTMLElement): () => void {
   const controller = new AbortController();
   const { signal } = controller;
-
-  let rafId: number | null = null;
-  let isTransitioning = false;
-
-  // ── Build DOM ──
+  const isReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    || SettingsManager.getInstance().get().reduceMotion;
 
   const section = document.createElement('section');
-  section.className = 'hero';
+  section.className = isReducedMotion ? 'hero hero--still' : 'hero';
   section.id = 'hero-section';
-  section.setAttribute('role', 'banner');
-  section.setAttribute('aria-label', `${GAME_TITLE} hero section`);
+  section.setAttribute('aria-label', GAME_TITLE);
 
   section.innerHTML = `
-    <!-- Background: wrapper for ken-burns, inner for parallax -->
-    <div class="hero__bg-wrap" aria-hidden="true">
-      <div class="hero__bg" id="hero-bg"></div>
+    <div class="hero__scene" id="hero-scene" aria-hidden="true">
+      <div class="hero__scene-inner">
+        <img class="hero__painting" id="hero-painting" src="${ASSETS.HERO_BG}" alt="" width="${IMAGE_WIDTH}" height="${IMAGE_HEIGHT}" decoding="sync" />
+        <canvas class="hero__light" id="hero-light"></canvas>
+      </div>
     </div>
 
-    <!-- Atmospheric overlays -->
-    <div class="hero__overlay hero__overlay--gradient" aria-hidden="true"></div>
-    <div class="hero__overlay hero__overlay--vignette" aria-hidden="true"></div>
-    <div class="hero__overlay hero__overlay--bottom" aria-hidden="true"></div>
+    <div class="hero__shade" aria-hidden="true"></div>
 
-    <!-- Particles -->
-    <div class="hero__petals" id="hero-petals" aria-hidden="true"></div>
-    <div class="hero__spirits" id="hero-spirits" aria-hidden="true"></div>
+    <div class="hero__front" id="hero-front" aria-hidden="true">
+      <canvas class="hero__particles" id="hero-particles"></canvas>
+    </div>
 
-    <!-- Ambient glow -->
-    <div class="hero__glow hero__glow--warm" aria-hidden="true"></div>
-    <div class="hero__glow hero__glow--cool" aria-hidden="true"></div>
+    <div class="hero__grain" aria-hidden="true"></div>
 
-    <!-- Title content (lower-left) -->
     <div class="hero__content">
-      ${buildTitleHTML()}
-      <p class="hero__subtitle">${HERO_SUBTITLE}</p>
+      <header class="hero__brand">
+        <canvas class="hero__enso" id="hero-enso" aria-hidden="true"></canvas>
+        <h1 class="hero__title" aria-label="${GAME_TITLE}">
+          <span class="hero__title-word hero__title-word--first" aria-hidden="true">Shadow</span>
+          <span class="hero__title-of" aria-hidden="true">
+            <i class="hero__rule hero__rule--left"></i>${SAKURA_MON}<em>of</em>${SAKURA_MON}<em>the</em>${SAKURA_MON}<i class="hero__rule"></i>
+          </span>
+          <span class="hero__title-word hero__title-word--last" aria-hidden="true">Crimson Gate</span>
+        </h1>
+        <p class="hero__subtitle">${HERO_SUBTITLE}</p>
+      </header>
       ${buildMenuHTML()}
     </div>
 
-    <!-- Bottom atmospheric text -->
-    <p class="hero__tagline">${HERO_TAGLINE}</p>
-
-    <!-- Ambient audio and toggle (bottom-left) -->
-    <audio id="hero-audio" src="/assets/audio/music/main_theme.m4a" loop preload="auto" autoplay></audio>
-    <button class="hero__audio-toggle" id="hero-audio-toggle" type="button" aria-label="Toggle audio" aria-pressed="false">
-      <svg class="hero__audio-icon hero__audio-icon--on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-      </svg>
-      <svg class="hero__audio-icon hero__audio-icon--off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-        <line x1="21" y1="9" x2="15" y2="15"></line>
-        <line x1="15" y1="9" x2="21" y2="15"></line>
-      </svg>
+    <audio id="hero-audio" src="/assets/audio/music/main_theme.m4a" loop preload="none"></audio>
+    <button class="hero__audio" id="hero-audio-toggle" type="button" aria-label="Play music" aria-pressed="false" data-state="off">
+      ${SPEAKER_ICON}
     </button>
 
-    <!-- Transition curtain -->
     <div class="hero__curtain" aria-hidden="true"></div>
   `;
 
-  // ── Inject Particles ──
+  container.appendChild(section);
 
-  const petalsContainer = section.querySelector('#hero-petals') as HTMLElement;
-  for (let i = 0; i < PARTICLES.PETAL_COUNT; i++) {
-    petalsContainer.appendChild(createPetal(i));
-  }
+  // ── Atmosphere ──
 
-  const spiritsContainer = section.querySelector('#hero-spirits') as HTMLElement;
-  for (let i = 0; i < PARTICLES.SPIRIT_COUNT; i++) {
-    spiritsContainer.appendChild(createSpirit(i));
-  }
+  const atmosphere = new HeroAtmosphere(
+    section,
+    section.querySelector('#hero-scene') as HTMLElement,
+    section.querySelector('#hero-front') as HTMLElement,
+    section.querySelector('#hero-painting') as HTMLImageElement,
+    section.querySelector('#hero-light') as HTMLCanvasElement,
+    section.querySelector('#hero-particles') as HTMLCanvasElement,
+    isReducedMotion,
+  );
+  atmosphere.start();
+
+  const stopEnso = paintEnso(section.querySelector('#hero-enso') as HTMLCanvasElement, isReducedMotion);
 
   // ── Audio ──
+  // Nothing plays until the player's first interaction, as browsers require.
 
   const audio = section.querySelector('#hero-audio') as HTMLAudioElement;
   const audioToggle = section.querySelector('#hero-audio-toggle') as HTMLButtonElement;
-  const iconOn = audioToggle.querySelector('.hero__audio-icon--on') as HTMLElement;
-  const iconOff = audioToggle.querySelector('.hero__audio-icon--off') as HTMLElement;
+  let isMusicPlaying = false;
+  let fadeTimer: ReturnType<typeof setInterval> | null = null;
 
-  let isPlaying = false;
-  const savedAudioPref = localStorage.getItem('sotcg_audio');
-  const shouldPlay = savedAudioPref !== 'off';
-  audio.volume = 0; // Start at 0 for fade in
-
-  const fadeAudioIn = () => {
-    let vol = 0;
-    audio.volume = vol;
-    const fade = setInterval(() => {
-      if (vol < 0.20) {
-        vol += 0.01;
-        audio.volume = vol;
-      } else {
-        clearInterval(fade);
-      }
-    }, 50);
+  const showAudioState = () => {
+    audioToggle.dataset.state = isMusicPlaying ? 'on' : 'off';
+    audioToggle.setAttribute('aria-pressed', String(isMusicPlaying));
+    audioToggle.setAttribute('aria-label', isMusicPlaying ? 'Mute music' : 'Play music');
   };
 
-  const fadeAudioOut = () => {
-    let vol = audio.volume;
-    const fade = setInterval(() => {
-      if (vol > 0.02) {
-        vol -= 0.02;
-        audio.volume = vol;
-      } else {
-        audio.volume = 0;
-        audio.pause();
-        clearInterval(fade);
-      }
-    }, 50);
-  };
-
-  const playAudio = async () => {
-    if (!shouldPlay) return;
+  const startMusic = async () => {
+    audio.volume = 0;
     try {
       await audio.play();
-      isPlaying = true;
-      iconOn.style.display = 'block';
-      iconOff.style.display = 'none';
-      audioToggle.setAttribute('aria-pressed', 'true');
-      fadeAudioIn();
-    } catch (err) {
-      console.warn('Autoplay blocked. User interaction required to play audio.');
+    } catch {
+      return; // Still blocked; the next interaction tries again
     }
+    isMusicPlaying = true;
+    showAudioState();
+
+    if (fadeTimer) clearInterval(fadeTimer);
+    fadeTimer = setInterval(() => {
+      audio.volume = Math.min(audio.volume + 0.012, MENU_MUSIC_VOLUME);
+      if (audio.volume >= MENU_MUSIC_VOLUME && fadeTimer) clearInterval(fadeTimer);
+    }, 50);
   };
 
-  const toggleAudio = () => {
-    if (isPlaying) {
-      audio.pause();
-      isPlaying = false;
-      iconOn.style.display = 'none';
-      iconOff.style.display = 'block';
-      audioToggle.setAttribute('aria-pressed', 'false');
-      localStorage.setItem('sotcg_audio', 'off');
+  const stopMusic = () => {
+    if (fadeTimer) clearInterval(fadeTimer);
+    audio.pause();
+    isMusicPlaying = false;
+    showAudioState();
+  };
+
+  audioToggle.addEventListener('click', () => {
+    if (isMusicPlaying) {
+      localStorage.setItem(AUDIO_PREFERENCE_KEY, 'off');
+      stopMusic();
     } else {
-      localStorage.setItem('sotcg_audio', 'on');
-      // Reset volume instantly on toggle
-      audio.volume = 0.20;
-      audio.play().then(() => {
-        isPlaying = true;
-        iconOn.style.display = 'block';
-        iconOff.style.display = 'none';
-        audioToggle.setAttribute('aria-pressed', 'true');
-      }).catch(e => console.error(e));
+      localStorage.setItem(AUDIO_PREFERENCE_KEY, 'on');
+      void startMusic();
     }
+  }, { signal });
+
+  const startMusicOnFirstInteraction = (event: Event) => {
+    document.removeEventListener('pointerdown', startMusicOnFirstInteraction);
+    document.removeEventListener('keydown', startMusicOnFirstInteraction);
+    if (audioToggle.contains(event.target as Node)) return; // The toggle's own click decides
+    if (localStorage.getItem(AUDIO_PREFERENCE_KEY) !== 'off') void startMusic();
+  };
+  document.addEventListener('pointerdown', startMusicOnFirstInteraction, { signal });
+  document.addEventListener('keydown', startMusicOnFirstInteraction, { signal });
+
+  // ── Menu ──
+
+  const items = Array.from(section.querySelectorAll<HTMLButtonElement>('.hero-menu__item'));
+  const enabledItems = () => items.filter(item => !item.disabled);
+  let selected: HTMLButtonElement | null = null;
+  let isLeaving = false;
+
+  const select = (item: HTMLButtonElement, playSound: boolean) => {
+    if (item === selected || item.disabled) return;
+    selected?.classList.remove('is-selected');
+    item.classList.add('is-selected');
+    selected = item;
+    if (playSound) AudioManager.playUIHover();
   };
 
-  audioToggle.addEventListener('click', toggleAudio, { signal });
+  // Something is always selected, so the screen always shows what Enter will do
+  select(enabledItems()[0], false);
 
-  // Attempt to autoplay
-  playAudio();
+  const leaveFor = (action: () => void) => {
+    if (isLeaving) return;
+    isLeaving = true;
+    section.classList.add('hero--leaving');
+    AudioManager.playUIConfirm();
 
-  // Play on first interaction if autoplay failed
-  const unlockAudio = () => {
-    if (!isPlaying) {
-      playAudio();
-    }
-    document.removeEventListener('click', unlockAudio);
+    if (isReducedMotion) action();
+    else window.setTimeout(action, LEAVE_DELAY_MS);
   };
-  document.addEventListener('click', unlockAudio, { once: true, signal });
 
-  container.appendChild(section);
+  items.forEach(item => {
+    item.addEventListener('pointerenter', () => select(item, true), { signal });
+    item.addEventListener('focus', () => select(item, true), { signal });
+  });
 
-  // ── Menu Buttons ──
+  section.querySelector('#nav-continue')?.addEventListener('click', () => {
+    const saveManager = SaveManager.getInstance();
+    if (!saveManager.hasSave()) return;
+    leaveFor(() => {
+      EventBus.emit('loadGame', saveManager.getSave());
+      GameStateManager.getInstance().setState(GameState.PLAYING);
+    });
+  }, { signal });
 
-  const btnContinue = section.querySelector('#nav-continue') as HTMLButtonElement;
-  const btnNewGame = section.querySelector('#nav-new-game') as HTMLButtonElement;
-  const btnSettings = section.querySelector('#nav-settings') as HTMLButtonElement;
-  const btnControls = section.querySelector('#nav-controls') as HTMLButtonElement;
+  section.querySelector('#nav-new-game')?.addEventListener('click', () => {
+    leaveFor(() => {
+      const saveManager = SaveManager.getInstance();
+      if (saveManager.hasSave()) saveManager.deleteSave();
+      EventBus.emit('newGame', {});
+      GameStateManager.getInstance().setState(GameState.PLAYING);
+    });
+  }, { signal });
 
-  btnControls.addEventListener('click', () => {
+  section.querySelector('#nav-controls')?.addEventListener('click', () => {
     AudioManager.playUISelect();
     new ControlsScreen(() => {});
   }, { signal });
 
-  // Up and down arrows walk through the menu
-  section.addEventListener('keydown', (event: KeyboardEvent) => {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-    const items = Array.from(section.querySelectorAll<HTMLButtonElement>('.hero-menu__item:not([disabled])'));
-    const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    const step = event.key === 'ArrowDown' ? 1 : -1;
-    items[(current + step + items.length) % items.length]?.focus();
-    event.preventDefault();
+  section.querySelector('#nav-settings')?.addEventListener('click', () => {
+    AudioManager.playUISelect();
+    new SettingsMenu(() => {});
   }, { signal });
 
-  [btnContinue, btnNewGame, btnControls, btnSettings].forEach(btn => {
-    if (btn) {
-      btn.addEventListener('mouseenter', () => AudioManager.playUIHover());
+  // Arrow keys move the selection, and Enter works whether or not anything has focus
+  document.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (isLeaving || !section.isConnected || !selected) return;
+    const isOverlayOpen = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.closest('.hero') === null;
+    if (isOverlayOpen) return;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const available = enabledItems();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      const next = available[(available.indexOf(selected) + step + available.length) % available.length];
+      select(next, true);
+      next.focus({ preventScroll: true });
+      event.preventDefault();
+    } else if (event.key === 'Enter' && !(document.activeElement instanceof HTMLButtonElement)) {
+      selected.click();
+      event.preventDefault();
     }
-  });
-
-  if (btnContinue) {
-    btnContinue.addEventListener('click', () => {
-      AudioManager.playUIConfirm();
-      const saveManager = SaveManager.getInstance();
-      if (saveManager.hasSave()) {
-        EventBus.emit('loadGame', saveManager.getSave());
-        GameStateManager.getInstance().setState(GameState.PLAYING);
-      }
-    });
-  }
-
-  if (btnNewGame) {
-    btnNewGame.addEventListener('click', () => {
-      AudioManager.playUIConfirm();
-      const saveManager = SaveManager.getInstance();
-      if (saveManager.hasSave()) {
-        saveManager.deleteSave();
-      }
-      EventBus.emit('newGame', {});
-      GameStateManager.getInstance().setState(GameState.PLAYING);
-    });
-  }
-
-  if (btnSettings) {
-    btnSettings.addEventListener('click', () => {
-      AudioManager.playUISelect();
-      new SettingsMenu(() => {});
-    });
-  }
-
-  // ── Parallax ──
-
-  const bgElement = section.querySelector('#hero-bg') as HTMLElement;
-
-  if (ENABLE_PARALLAX && bgElement) {
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
-
-    section.addEventListener('mousemove', (e: MouseEvent) => {
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-      targetX = ((e.clientX - cx) / cx) * PARALLAX.STRENGTH_X;
-      targetY = ((e.clientY - cy) / cy) * PARALLAX.STRENGTH_Y;
-    }, { signal });
-
-    const animateParallax = () => {
-      if (!isTransitioning) {
-        currentX += (targetX - currentX) * PARALLAX.LERP;
-        currentY += (targetY - currentY) * PARALLAX.LERP;
-        bgElement.style.transform =
-          `translate3d(${-currentX}px, ${-currentY}px, 0)`;
-      }
-      rafId = requestAnimationFrame(animateParallax);
-    };
-
-    rafId = requestAnimationFrame(animateParallax);
-  }
+  }, { signal });
 
   // ── Cleanup ──
 
   return () => {
     controller.abort();
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
+    atmosphere.destroy();
+    stopEnso();
+    if (fadeTimer) clearInterval(fadeTimer);
+    audio.pause();
   };
 }
