@@ -3,7 +3,6 @@ import { SettingsManager } from '../settings/SettingsManager';
 
 export class ScreenEffectsUI {
   private overlay: HTMLDivElement;
-  private vignette: HTMLDivElement;
 
   constructor() {
     // Container
@@ -22,17 +21,6 @@ export class ScreenEffectsUI {
       transition: 'background-color 0.1s ease-out'
     });
 
-    // Vignette layer
-    this.vignette = document.createElement('div');
-    Object.assign(this.vignette.style, {
-      position: 'absolute',
-      width: '100%',
-      height: '100%',
-      background: 'radial-gradient(circle, transparent 60%, rgba(0, 5, 15, 0.7) 100%)',
-      pointerEvents: 'none'
-    });
-
-    this.overlay.appendChild(this.vignette);
     document.body.appendChild(this.overlay);
 
     this.bindEvents();

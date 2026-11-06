@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyRimLight } from '../utils/RimLight';
 import { Boss } from './Boss';
 import { BossState } from './BossState';
 import { BossPhaseId, BossPhaseConfig, CRIMSON_ONI_PHASES, getPhaseForHealth } from './BossPhase';
@@ -57,6 +58,7 @@ export class CrimsonOni implements Boss {
     // Build procedural geometry
     this.rig = BossFactory.createCrimsonOni();
     this.root.add(this.rig.root);
+    applyRimLight(this.root, 0xff3a14, 0.65);
 
     // Systems
     this.animator = new BossAnimator(this.rig);

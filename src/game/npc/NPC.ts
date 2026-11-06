@@ -2,6 +2,7 @@
 // Runtime NPC entity. Holds a CharacterRig, added to scene.
 
 import * as THREE from 'three';
+import { applyRimLight } from '../utils/RimLight';
 import { CharacterRig } from '../characters/CharacterRig';
 import { NPCFactory } from './NPCFactory';
 import { NPCDef } from './NPCData';
@@ -29,6 +30,7 @@ export class NPC {
     this.root = this.rig.root;
     this.position = new THREE.Vector3(def.position.x, def.position.y, def.position.z);
     this.root.position.copy(this.position);
+    applyRimLight(this.root, 0xffcf8a, 0.6);
   }
 
   /** Get the appropriate dialogue based on story flags */

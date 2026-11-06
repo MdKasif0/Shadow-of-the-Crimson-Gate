@@ -35,37 +35,37 @@ export class WorldStateManager {
     // Modify Courtyard
     if (zone.id === 'COURTYARD') {
       if (flags.courtyardPurified) {
-        finalFogDensity = 0.015; // Lighter fog
-        finalFogColor.setHex(0x0a121e); // Cleaner blue
-        finalAmbientColor.setHex(0xeef5ff); // Cooler, calmer light
+        finalFogDensity = 0.006; // Lighter fog
+        finalFogColor.setHex(0x1e2c48); // Cleaner blue
+        finalAmbientColor.setHex(0x8fa6d0); // Cooler, calmer light
       } else {
-        finalFogColor.setHex(0x2a1010); // Reddish corruption
-        finalAmbientColor.setHex(0xffaaaa);
-        finalAmbientIntensity = 2.5;
+        finalFogColor.setHex(0x331a26); // Reddish corruption
+        finalAmbientColor.setHex(0x7c5468);
+        finalAmbientIntensity = 1.35;
       }
     }
 
     // Modify Forest
     if (zone.id === 'FOREST') {
       if (flags.forestPurified) {
-        finalFogDensity = 0.02;
-        finalFogColor.setHex(0x182633); // Less oppressive, match new ZoneManager forest vibe
-        finalAmbientColor.setHex(0xaaccbb);
-        finalAmbientIntensity = 1.6;
+        finalFogDensity = 0.01;
+        finalFogColor.setHex(0x1a3038); // Less oppressive, match new ZoneManager forest vibe
+        finalAmbientColor.setHex(0x5f8a84);
+        finalAmbientIntensity = 1.25;
       } else {
-        finalFogDensity = 0.025;
-        finalFogColor.setHex(0x2a0d0d); // Dark red, corrupted, but visible
-        finalAmbientColor.setHex(0x995555);
-        finalAmbientIntensity = 2.0;
+        finalFogDensity = 0.014;
+        finalFogColor.setHex(0x2a1418); // Dark red, corrupted, but visible
+        finalAmbientColor.setHex(0x6a4048);
+        finalAmbientIntensity = 1.15;
       }
     }
     
     // Global modifications after campaign completion
     if (flags.completedCampaign) {
       finalFogDensity *= 0.5;
-      finalFogColor.setHex(0x223344); // Dawn colors
-      finalAmbientColor.setHex(0xffeedd); // Morning light
-      finalAmbientIntensity = 3.0;
+      finalFogColor.setHex(0x3a4a60); // Dawn colors
+      finalAmbientColor.setHex(0xc8c0c0); // Morning light
+      finalAmbientIntensity = 1.8;
     }
 
     return { fogDensity: finalFogDensity, fogColor: finalFogColor, ambientColor: finalAmbientColor, ambientIntensity: finalAmbientIntensity };

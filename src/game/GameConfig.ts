@@ -14,6 +14,7 @@ export const GAME_CONFIG = {
   },
 
   PLAYER: {
+    SPAWN_Z: 58,
     SPEED: 4,
     HEIGHT: 1.8,
     COLLISION_RADIUS: 0.4,

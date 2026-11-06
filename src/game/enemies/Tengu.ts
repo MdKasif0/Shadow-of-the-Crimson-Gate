@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyRimLight } from '../utils/RimLight';
 import { Enemy } from './Enemy';
 import { EnemyState } from './EnemyState';
 import { HealthComponent, HealthEventPayload } from '../combat/HealthComponent';
@@ -48,6 +49,7 @@ export class Tengu implements Enemy {
 
     this.rig = EnemyFactory.createTengu();
     this.root.add(this.rig.root);
+    applyRimLight(this.root, 0xe88048, 0.5);
 
     this.animator = new TenguAnimator(this.rig);
     this.ai = new EnemyAI(this.config);

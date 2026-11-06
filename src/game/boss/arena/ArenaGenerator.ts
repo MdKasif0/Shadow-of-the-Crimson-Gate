@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../../utils/MathUtils';
 import { CollisionSystem } from '../../collision/CollisionSystem';
+import { createGlowSprite, WorldLights } from '../../lighting/WorldLights';
 
 export class ArenaGenerator {
   public static readonly CENTER_Z = -115;
@@ -15,12 +16,12 @@ export class ArenaGenerator {
     const center = new THREE.Vector3(0, 0, this.CENTER_Z);
 
     // ─── MATERIALS ───────────────────────────────────────────────────────────
-    const darkStoneMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9, flatShading: true });
-    const lightStoneMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.95, flatShading: true });
-    const dirtMat = new THREE.MeshStandardMaterial({ color: 0x1f1b18, roughness: 1.0 });
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x15100c, roughness: 0.9 });
-    const redPaintMat = new THREE.MeshStandardMaterial({ color: 0x771111, roughness: 0.8 });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x111112, roughness: 0.8, flatShading: true });
+    const darkStoneMat = new THREE.MeshStandardMaterial({ color: 0x3c3a3e, roughness: 0.9, flatShading: true });
+    const lightStoneMat = new THREE.MeshStandardMaterial({ color: 0x524c50, roughness: 0.95, flatShading: true });
+    const dirtMat = new THREE.MeshStandardMaterial({ color: 0x3a312c, roughness: 1.0 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x2c2018, roughness: 0.9 });
+    const redPaintMat = new THREE.MeshStandardMaterial({ color: 0x9a1a1a, roughness: 0.7 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x25262c, roughness: 0.65, flatShading: true });
 
     // Helper to add meshes
     const addMesh = (
@@ -34,7 +35,7 @@ export class ArenaGenerator {
       if (pos) mesh.position.copy(pos);
       if (rot) mesh.rotation.copy(rot);
       mesh.castShadow = true;
-      mesh.receiveShadow = false; // Disable receive shadow to prevent wavy acne
+      mesh.receiveShadow = true;
       parent.add(mesh);
       return mesh;
     };
@@ -42,23 +43,23 @@ export class ArenaGenerator {
     // ─── 1. GROUND & OCTAGONAL PLATFORM ──────────────────────────────────────
     
     // Dirt courtyard base
-    addMesh(group, new THREE.BoxGeometry(this.COURTYARD_SIZE, 0.4, this.COURTYARD_SIZE), dirtMat, new THREE.Vector3(0, -0.4, this.CENTER_Z));
+    addMesh(group, new THREE.BoxGeometry(this.COURTYARD_SIZE, 0.4, this.COURTYARD_SIZE), dirtMat, new THREE.Vector3(0, -0.22, this.CENTER_Z));
 
     // Raised Octagonal Platform (Boss Arena)
     const octagonGeo = new THREE.CylinderGeometry(this.ARENA_RADIUS, this.ARENA_RADIUS, 0.5, 8);
     octagonGeo.rotateY(Math.PI / 8); // Align flat edges to axes
-    const platform = addMesh(group, octagonGeo, darkStoneMat, new THREE.Vector3(0, -0.1, this.CENTER_Z));
+    const platform = addMesh(group, octagonGeo, darkStoneMat, new THREE.Vector3(0, -0.25, this.CENTER_Z));
     platform.receiveShadow = true; // Flat cylinder is safe for shadows
 
     // Inner octagon pattern
     const innerOctGeo = new THREE.CylinderGeometry(this.ARENA_RADIUS * 0.7, this.ARENA_RADIUS * 0.7, 0.52, 8);
     innerOctGeo.rotateY(Math.PI / 8);
-    addMesh(group, innerOctGeo, lightStoneMat, new THREE.Vector3(0, -0.1, this.CENTER_Z));
+    addMesh(group, innerOctGeo, lightStoneMat, new THREE.Vector3(0, -0.25, this.CENTER_Z));
 
     // Center emblem pattern
     const centerOctGeo = new THREE.CylinderGeometry(this.ARENA_RADIUS * 0.3, this.ARENA_RADIUS * 0.3, 0.54, 8);
     centerOctGeo.rotateY(Math.PI / 8);
-    addMesh(group, centerOctGeo, darkStoneMat, new THREE.Vector3(0, -0.1, this.CENTER_Z));
+    addMesh(group, centerOctGeo, darkStoneMat, new THREE.Vector3(0, -0.25, this.CENTER_Z));
 
     // ─── 2. PERIMETER WALLS & FENCES ─────────────────────────────────────────
 
@@ -131,7 +132,7 @@ export class ArenaGenerator {
     gateGrp.position.set(0, 0, this.CENTER_Z + halfSize);
     
     // Gate Base (Flat stone pathway so player can walk through)
-    addMesh(gateGrp, new THREE.BoxGeometry(8, 0.4, 8), darkStoneMat, new THREE.Vector3(0, -0.2, 0));
+    addMesh(gateGrp, new THREE.BoxGeometry(8, 0.4, 8), darkStoneMat, new THREE.Vector3(0, -0.205, 0));
     
     // Pillars
     for(let x of [-3.5, -1.5, 1.5, 3.5]) {
@@ -231,6 +232,14 @@ export class ArenaGenerator {
       rGeo.computeVertexNormals();
       addMesh(pGrp, rGeo, roofMat, new THREE.Vector3(0, 5.3, 0));
       
+      // Braziers burn in each pavilion, ringing the arena with firelight
+      const flameMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff5a20).multiplyScalar(4) });
+      addMesh(pGrp, new THREE.SphereGeometry(0.35, 8, 6), flameMat, new THREE.Vector3(0, 1.75, 0)).castShadow = false;
+      const flameGlow = createGlowSprite(0xff5a20, 4.5, 0.7);
+      flameGlow.position.y = 1.9;
+      pGrp.add(flameGlow);
+      WorldLights.add(x, 2.2, z, 0xff6a2a, 60, 24, 0.22);
+
       group.add(pGrp);
     };
 
@@ -252,7 +261,8 @@ export class ArenaGenerator {
     });
     // Ensure decal is slightly above the platform
     const decal = new THREE.Mesh(new THREE.CylinderGeometry(this.ARENA_RADIUS, this.ARENA_RADIUS, 0.6, 16), this.corruptionMat);
-    decal.position.copy(new THREE.Vector3(0, -0.1, this.CENTER_Z));
+    decal.position.copy(new THREE.Vector3(0, -0.27, this.CENTER_Z));
+    decal.userData.noAO = true;
     group.add(decal);
 
     return group;

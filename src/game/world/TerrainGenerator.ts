@@ -1,127 +1,121 @@
 import * as THREE from 'three';
-import { SeededRandom } from '../utils/MathUtils';
+import { SeededRandom, smoothstep } from '../utils/MathUtils';
 import { noise2D } from '../utils/Noise';
-import { GAME_CONFIG } from '../GameConfig';
-import { smoothstep } from '../utils/MathUtils';
+import { createSurfaceTextures } from '../utils/ProceduralTextures';
+
+const TERRAIN_MIN_X = -130;
+const TERRAIN_MAX_X = 130;
+const TERRAIN_MIN_Z = -250;
+const TERRAIN_MAX_Z = 160;
+
+/** Tiles of the detail texture per world unit. */
+const TEXTURE_SCALE = 0.11;
+
+const color = new THREE.Color();
+const tint = new THREE.Color();
 
 export class TerrainGenerator {
-  public static generate(random: SeededRandom): THREE.Group {
+  /**
+   * Ground height at a point. The playable valley stays at y≈0 because characters
+   * walk on a flat plane, while the land rises into hills beyond it on all sides.
+   */
+  public static heightAt(x: number, z: number): number {
+    const distFromCenter = Math.abs(x);
+    const rolling = noise2D(x * 0.035 + 11, z * 0.035 + 7) * 1.5 + noise2D(x * 0.11 + 3, z * 0.11 + 9) * 0.35;
+
+    // Arena courtyard has its own floor, so the ground stays beneath it
+    if (distFromCenter < 22 && z < -93.5 && z > -136.5) return -0.8;
+
+    // Valley floor only dips, so feet never sink into it
+    const floor = Math.min((rolling - 0.75) * 0.14, 0) - 0.03;
+
+    const sideRise = smoothstep(28, 70, distFromCenter);
+    const backRise = smoothstep(-142, -200, z);
+    const frontRise = smoothstep(62, 110, z);
+    const rise = Math.max(sideRise, backRise, frontRise);
+
+    return floor + rise * (rise * 26 + rolling * 3.5 + noise2D(x * 0.02, z * 0.02) * 7);
+  }
+
+  public static generate(_random: SeededRandom): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Terrain';
 
-    const width = GAME_CONFIG.WORLD.WIDTH;
-    const depth = GAME_CONFIG.WORLD.DEPTH;
-    const segX = 60;
-    const segZ = Math.floor(60 * (depth / 60)); // Scale segments with depth
-
-    const geometry = new THREE.PlaneGeometry(width, depth, segX, segZ);
+    const width = TERRAIN_MAX_X - TERRAIN_MIN_X;
+    const depth = TERRAIN_MAX_Z - TERRAIN_MIN_Z;
+    const geometry = new THREE.PlaneGeometry(width, depth, 165, 260);
     geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, 0, -40); // Align with bounds: -140 to 60
+    geometry.translate((TERRAIN_MIN_X + TERRAIN_MAX_X) / 2, 0, (TERRAIN_MIN_Z + TERRAIN_MAX_Z) / 2);
 
     const positions = geometry.attributes.position;
-    const colors: number[] = [];
-    const color = new THREE.Color();
+    const uvs = geometry.attributes.uv;
+    const colors = new Float32Array(positions.count * 3);
 
     for (let i = 0; i < positions.count; i++) {
       const x = positions.getX(i);
       const z = positions.getZ(i);
-
-      // Noise for height
-      const nx = x * 0.05 + random.next() * 10;
-      const nz = z * 0.05 + random.next() * 10;
-      let height = noise2D(nx, nz) * 2;
-
-      // === ZONE-BASED FLATTEN MASKS ===
-      
-      // Entrance zone (z: 40-60) — flat path
-      if (z > 35) {
-        const flatMask = smoothstep(40, 55, z);
-        if (Math.abs(x) < 6) height *= (1 - flatMask);
-      }
-
-      // Courtyard center (z: 0-40) — keep mostly flat center
-      if (z > -5 && z < 45) {
-        const distFromPath = Math.abs(x);
-        const courtFlatten = smoothstep(3, 20, distFromPath);
-        height *= courtFlatten;
-      }
-
-      // Shrine area (z: -20 to 0) — flat clearing
-      if (z > -25 && z < 5 && Math.abs(x) < 12) {
-        height *= smoothstep(5, 15, Math.abs(x));
-      }
-
-      // Forest path (z: -50 to -20) — rolling but walkable center
-      if (z > -55 && z < -15) {
-        if (Math.abs(x) < 5) {
-          height *= 0.3; // Flatten the path
-        }
-        // Raise sides slightly for enclosed feel
-        if (Math.abs(x) > 15) {
-          height += Math.abs(x) * 0.05;
-        }
-      }
-
-      // Temple approach (z: -80 to -50) — flat for temple
-      if (z < -45 && Math.abs(x) < 16) {
-        height *= smoothstep(-60, -45, z);
-      }
-
+      const height = this.heightAt(x, z);
       positions.setY(i, height);
+      uvs.setXY(i, x * TEXTURE_SCALE, z * TEXTURE_SCALE);
 
-      // === ZONE-BASED VERTEX COLORS ===
-      // Default: dark charcoal
-      color.setHex(0x1a2228);
-      const colorNoise = noise2D(x * 0.2, z * 0.2);
-
-      if (z > 35) {
-        // Entrance: lighter stone
-        color.setHex(0x222a33);
-        color.lerp(new THREE.Color(0x2a353a), Math.abs(colorNoise));
-      } else if (z > -5) {
-        // Courtyard: standard
-        if (colorNoise > 0) {
-          color.lerp(new THREE.Color(0x11161a), colorNoise);
-        } else {
-          color.lerp(new THREE.Color(0x2a353a), -colorNoise);
-        }
-      } else if (z > -25) {
-        // Shrine: slightly mossy/green tint
-        color.setHex(0x1a2520);
-        color.lerp(new THREE.Color(0x15201a), Math.abs(colorNoise));
-      } else if (z > -55) {
-        // Forest: darker, more brown
-        color.setHex(0x151a18);
-        color.lerp(new THREE.Color(0x0f1410), Math.abs(colorNoise));
-      } else {
-        // Temple approach: stone-like
-        color.setHex(0x1e2530);
-        color.lerp(new THREE.Color(0x222830), Math.abs(colorNoise));
-      }
-
-      // Stone path running through center
-      const pathWidth = 2 + noise2D(z * 0.2, 0) * 0.5;
-      if (Math.abs(x) < pathWidth && z < 55 && z > -75) {
-        color.lerp(new THREE.Color(0x333b44), 0.7 + noise2D(x * 0.5, z * 0.5) * 0.3);
-      }
-
-      colors.push(color.r, color.g, color.b);
+      this.groundColor(x, z, height);
+      colors.set([color.r, color.g, color.b], i * 3);
     }
 
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
 
+    const { map, normalMap } = createSurfaceTextures([8, 16, 32, 64, 128], 4711, 5);
     const material = new THREE.MeshStandardMaterial({
+      map,
+      normalMap,
       vertexColors: true,
-      roughness: 0.9,
-      metalness: 0.1,
-      flatShading: true,
+      roughness: 0.96,
+      metalness: 0,
     });
 
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.receiveShadow = false;
+    mesh.name = 'Ground';
+    mesh.receiveShadow = true;
     group.add(mesh);
 
     return group;
+  }
+
+  /** Paints soil, moss and dirt per zone into the shared `color`. */
+  private static groundColor(x: number, z: number, height: number): void {
+    const patch = noise2D(x * 0.09 + 40, z * 0.09 - 12);
+    const fine = noise2D(x * 0.4, z * 0.4);
+
+    if (z > -5) {
+      color.setHex(0x3d4a35); // Courtyard moss
+      color.lerp(tint.setHex(0x4a3f3a), THREE.MathUtils.clamp(patch + 0.3, 0, 1));
+    } else if (z > -22) {
+      color.setHex(0x34493c); // Shrine clearing
+      color.lerp(tint.setHex(0x3d3a33), THREE.MathUtils.clamp(patch + 0.2, 0, 1));
+    } else if (z > -55) {
+      color.setHex(0x213029); // Forest floor
+      color.lerp(tint.setHex(0x2b2520), THREE.MathUtils.clamp(patch + 0.4, 0, 1));
+    } else {
+      color.setHex(0x3a3238); // Blighted temple ground
+      color.lerp(tint.setHex(0x34262a), THREE.MathUtils.clamp(patch + 0.3, 0, 1));
+    }
+    color.multiplyScalar(0.92 + fine * 0.16);
+
+    // Worn dirt either side of the stone path
+    const pathDist = Math.abs(x - TerrainGenerator.pathOffset(z));
+    if (z < 60 && z > -92) {
+      color.lerp(tint.setHex(0x4f463c), (1 - smoothstep(2, 5.5, pathDist)) * 0.75);
+    }
+
+    // Hills fall away to darker, cooler tones
+    color.lerp(tint.setHex(0x1b2428), smoothstep(1, 16, height) * 0.8);
+  }
+
+  /** The gentle curve of the stone path, shared with PathGenerator. */
+  public static pathOffset(z: number): number {
+    // Runs straight where it passes through gates, which sit at x=0
+    const gateFade = smoothstep(52, 44, z) * smoothstep(-48, -38, z);
+    return Math.sin(z * 0.09) * 1.1 * gateFade;
   }
 }

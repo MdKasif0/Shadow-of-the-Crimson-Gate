@@ -1,152 +1,85 @@
 import * as THREE from 'three';
 import { SeededRandom } from '../utils/MathUtils';
-import { GAME_CONFIG } from '../GameConfig';
 import { CollisionSystem } from '../collision/CollisionSystem';
+import { GAME_CONFIG } from '../GameConfig';
+import { TerrainGenerator } from './TerrainGenerator';
+import { buildCedar, buildDeadTree, buildSakura } from './FoliageBuilder';
+
+/** Large sakura placed by hand to frame the walk through the courtyard. */
+const HERO_SAKURA = [
+  { x: -11, z: 38 }, { x: 12, z: 33 },
+  { x: -13, z: 11 }, { x: 11, z: 7 },
+  { x: -10, z: -4 }, { x: 13, z: -14 },
+];
 
 export class TreeGenerator {
   public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Trees';
 
-    const treeCount = 80; // Increased for expanded world
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2a1a1a, roughness: 0.9 });
-    
-    // Foliage instancing setup
-    const foliageGeo = new THREE.DodecahedronGeometry(1.2, 0); // low poly cluster
-    // Slightly squash it
-    foliageGeo.scale(1, 0.7, 1);
-    foliageGeo.computeVertexNormals();
-
-    const foliageMat = new THREE.MeshStandardMaterial({ 
-      color: 0xffaacc, 
-      roughness: 0.6,
-      transparent: true,
-      opacity: 0.9,
-    });
-    
-    // We might have ~15 clusters per tree
-    const maxFoliage = treeCount * 18;
-    const foliageInstanced = new THREE.InstancedMesh(foliageGeo, foliageMat, maxFoliage);
-    foliageInstanced.castShadow = true;
-    let foliageIndex = 0;
-    const dummy = new THREE.Object3D();
-
     const bounds = GAME_CONFIG.WORLD.BOUNDS;
 
-    let placed = 0;
-    while (placed < treeCount) {
-      // Favor placing more trees in the forest zone (-50 to -20)
-      const isForest = random.next() > 0.6;
-      const x = random.range(bounds.MIN_X - 10, bounds.MAX_X + 10);
-      const z = isForest 
-        ? random.range(-50, -20)
-        : random.range(bounds.MIN_Z - 10, bounds.MAX_Z + 10);
-      
-      const distFromCenter = Math.abs(x);
-      
-      // Keep main path clear
-      if (distFromCenter < 5) continue;
-      
-      // Keep temple clear
-      if (z < -45 && distFromCenter < 18) continue;
-      
-      // Keep courtyard center clear
-      if (z > 0 && z < 40 && distFromCenter < 12) continue;
-
-      // Keep entrance clear
-      if (z > 50 && distFromCenter < 8) continue;
-
-      const tree = new THREE.Group();
-      tree.position.set(x, 0, z);
-
-      // Height and thickness variation
-      const height = random.range(5, 9);
-      const radiusBottom = random.range(0.4, 0.6);
-      const radiusTop = radiusBottom * 0.4;
-      
-      const trunkGeo = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, 6);
-      trunkGeo.translate(0, height / 2, 0);
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.castShadow = true;
-      trunk.receiveShadow = true;
-      
-      // Add slight lean
-      trunk.rotation.x = (random.next() - 0.5) * 0.2;
-      trunk.rotation.z = (random.next() - 0.5) * 0.2;
-      trunk.rotation.y = random.next() * Math.PI * 2;
-      tree.add(trunk);
-
-      // Generate branches and foliage
-      const branchCount = Math.floor(random.range(3, 6));
-      for (let b = 0; b < branchCount; b++) {
-        const bHeight = height * random.range(0.4, 0.9);
-        const bLength = random.range(2, 4);
-        
-        const branchGeo = new THREE.CylinderGeometry(radiusTop * 0.4, radiusTop * 0.8, bLength, 5);
-        branchGeo.translate(0, bLength / 2, 0);
-        const branch = new THREE.Mesh(branchGeo, trunkMat);
-        branch.castShadow = true;
-        
-        branch.position.y = bHeight;
-        branch.rotation.x = random.range(0.4, 1.2);
-        branch.rotation.y = (b / branchCount) * Math.PI * 2 + random.next() * 0.5;
-        
-        trunk.add(branch);
-
-        // Add 2-3 foliage clusters per branch
-        const clusterCount = Math.floor(random.range(2, 4));
-        for (let c = 0; c < clusterCount; c++) {
-          if (foliageIndex < maxFoliage) {
-            // Calculate absolute position of foliage
-            dummy.position.set(0, bLength * random.range(0.6, 1.1), 0);
-            
-            // Jitter cluster position
-            dummy.position.x += (random.next() - 0.5) * 1.5;
-            dummy.position.y += (random.next() - 0.5) * 1.0;
-            dummy.position.z += (random.next() - 0.5) * 1.5;
-            
-            const scale = random.range(1.2, 2.2);
-            dummy.scale.set(scale, scale, scale);
-            
-            dummy.rotation.set(random.next(), random.next(), random.next());
-            
-            // Apply transformations
-            branch.updateMatrixWorld();
-            dummy.applyMatrix4(branch.matrixWorld);
-            
-            foliageInstanced.setMatrixAt(foliageIndex, dummy.matrix);
-            
-            // Color variation (some darker rose, some pale)
-            const colorVariant = new THREE.Color(0xffaacc);
-            if (random.next() > 0.7) colorVariant.setHex(0xff7799);
-            else if (random.next() > 0.8) colorVariant.setHex(0xffffff);
-            foliageInstanced.setColorAt(foliageIndex, colorVariant);
-            
-            foliageIndex++;
-          }
-        }
-      }
-      
-      // Top foliage cluster
-      if (foliageIndex < maxFoliage) {
-        dummy.position.set(0, height, 0);
-        const scale = random.range(2.0, 3.0);
-        dummy.scale.set(scale, scale, scale);
-        trunk.updateMatrixWorld();
-        dummy.applyMatrix4(trunk.matrixWorld);
-        foliageInstanced.setMatrixAt(foliageIndex, dummy.matrix);
-        foliageInstanced.setColorAt(foliageIndex, new THREE.Color(0xffaacc));
-        foliageIndex++;
-      }
-
+    const place = (tree: THREE.Group, x: number, z: number) => {
+      tree.position.set(x, TerrainGenerator.heightAt(x, z) - 0.1, z);
+      tree.rotation.y = random.next() * Math.PI * 2;
       group.add(tree);
+      if (Math.abs(x) <= bounds.MAX_X + 1) {
+        collisionSystem.addSphere(new THREE.Vector3(x, 0, z), 0.55);
+      }
+    };
+
+    for (const spot of HERO_SAKURA) {
+      place(buildSakura(random, 1.25, true), spot.x, spot.z);
+    }
+
+    // A dense stand of cedars close around the path makes the forest feel enclosed
+    for (let i = 0; i < 70; i++) {
+      const side = random.next() > 0.5 ? 1 : -1;
+      const x = side * random.range(7.5, 30);
+      const z = random.range(-53, -21);
+      place(random.next() > 0.12 ? buildCedar(random, random.range(0.85, 1.3)) : buildDeadTree(random, 1.1), x, z);
+    }
+
+    const treeCount = 125;
+    let placed = 0;
+    let attempts = 0;
+    while (placed < treeCount && attempts++ < 3000) {
+      // Half the trees line the playable valley; the rest thicken the hills beyond it
+      const onHills = random.next() > 0.5;
+      const side = random.next() > 0.5 ? 1 : -1;
+      const x = side * (onHills ? random.range(30, 72) : random.range(9, 30));
+      const z = random.range(-180, 100);
+
+      if (!this.isClear(x, z)) continue;
+
+      const scale = random.range(0.85, 1.25);
+      let tree: THREE.Group;
+      if (z > -22) {
+        tree = random.next() > 0.18 ? buildSakura(random, scale) : buildCedar(random, scale);
+      } else if (z > -55) {
+        tree = random.next() > 0.14 ? buildCedar(random, scale * 1.1) : buildDeadTree(random, scale);
+      } else {
+        tree = random.next() > 0.45 ? buildDeadTree(random, scale * 1.2) : buildCedar(random, scale);
+      }
+
+      place(tree, x, z);
       placed++;
     }
 
-    foliageInstanced.instanceMatrix.needsUpdate = true;
-    if (foliageInstanced.instanceColor) foliageInstanced.instanceColor.needsUpdate = true;
-    
-    group.add(foliageInstanced);
     return group;
+  }
+
+  private static isClear(x: number, z: number): boolean {
+    const distFromCenter = Math.abs(x);
+
+    // Temple and boss arena
+    if (z < -50 && z > -80 && distFromCenter < 18) return false;
+    if (z < -86 && z > -144 && distFromCenter < 30) return false;
+
+    // Courtyard fighting space, and the shrines at either side
+    if (z > 0 && z < 40 && distFromCenter < 15) return false;
+
+    // Forest path needs a wider gap than the trunk, as canopies spread
+    return distFromCenter > 9;
   }
 }

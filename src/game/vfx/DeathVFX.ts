@@ -9,7 +9,7 @@ export class DeathVFX {
   private spiritPool: ParticlePool;
 
   constructor(scene: THREE.Scene) {
-    const spiritGeo = new THREE.PlaneGeometry(0.3, 0.3);
+    const spiritGeo = new THREE.OctahedronGeometry(0.12); // Solid, so it's visible from every angle
     const spiritMat = new THREE.MeshBasicMaterial({
       color: 0x88ffff,
       transparent: true,

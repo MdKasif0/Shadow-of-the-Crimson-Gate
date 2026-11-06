@@ -105,8 +105,16 @@ export class EncounterTelegraphVFX {
   }
 
   private createRing(radius: number): THREE.Mesh {
-    const geometry = new THREE.RingGeometry(radius - 0.1, radius, 32);
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    // A faint crimson ward on the ground, felt more than seen
+    const geometry = new THREE.RingGeometry(radius - 0.22, radius, 128);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xc42020,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.2,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
     const ring = new THREE.Mesh(geometry, material);
     ring.rotation.x = Math.PI / 2;
     return ring;

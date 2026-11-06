@@ -3,13 +3,24 @@ import * as THREE from 'three';
 // ─── Input Manager ───────────────────────────────────────────────────────────
 // Centralized keyboard + mouse input tracking.
 
+const UP = new THREE.Vector3(0, 1, 0);
+
 export class InputManager {
   public keys: Record<string, boolean> = {};
   public mouseDown: boolean = false;
   public mouseJustPressed: boolean = false;
   private _mouseWasDown: boolean = false;
 
+  /** Yaw of the camera. Movement keys are relative to where the camera is facing. */
+  public cameraYaw: number = 0;
+  private _lookX: number = 0;
+  private _lookY: number = 0;
+  private _rightMouseDown: boolean = false;
+
   constructor() {
+    this._onMouseMove = this._onMouseMove.bind(this);
+    window.addEventListener('mousemove', this._onMouseMove);
+
     this._onKeyDown = this._onKeyDown.bind(this);
     this._onKeyUp = this._onKeyUp.bind(this);
     this._onMouseDown = this._onMouseDown.bind(this);
@@ -58,8 +69,29 @@ export class InputManager {
 
     if (dir.lengthSq() > 0) {
       dir.normalize();
+      dir.applyAxisAngle(UP, this.cameraYaw);
     }
     return dir;
+  }
+
+  /** Returns the mouse movement since the last call. */
+  public consumeLook(): { x: number; y: number } {
+    const look = { x: this._lookX, y: this._lookY };
+    this._lookX = 0;
+    this._lookY = 0;
+    return look;
+  }
+
+  public get isPointerLocked(): boolean {
+    return document.pointerLockElement !== null;
+  }
+
+  private _onMouseMove(e: MouseEvent): void {
+    // The mouse steers the camera when captured, or while the right button is held
+    if (this.isPointerLocked || this._rightMouseDown) {
+      this._lookX += e.movementX;
+      this._lookY += e.movementY;
+    }
   }
 
   private _onKeyDown(e: KeyboardEvent): void {
@@ -72,14 +104,17 @@ export class InputManager {
   private _onKeyUp(e: KeyboardEvent): void { this.keys[e.code] = false; }
   private _onMouseDown(e: MouseEvent): void {
     if (e.button === 0) { this.mouseDown = true; e.preventDefault(); }
+    if (e.button === 2) this._rightMouseDown = true;
   }
   private _onMouseUp(e: MouseEvent): void {
     if (e.button === 0) this.mouseDown = false;
+    if (e.button === 2) this._rightMouseDown = false;
   }
-  private _onBlur(): void { this.keys = {}; this.mouseDown = false; }
+  private _onBlur(): void { this.keys = {}; this.mouseDown = false; this._rightMouseDown = false; }
   private _onContextMenu(e: Event): void { e.preventDefault(); }
 
   public dispose(): void {
+    window.removeEventListener('mousemove', this._onMouseMove);
     window.removeEventListener('keydown', this._onKeyDown);
     window.removeEventListener('keyup', this._onKeyUp);
     window.removeEventListener('mousedown', this._onMouseDown);
