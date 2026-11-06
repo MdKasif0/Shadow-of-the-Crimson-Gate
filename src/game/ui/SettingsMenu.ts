@@ -16,8 +16,9 @@ export class SettingsMenu {
       color: '#fff', fontFamily: "'Cinzel', serif",
     });
 
-    this.render();
+    // render() looks its controls up in the document, so the overlay has to be in it first
     document.body.appendChild(this.overlay);
+    this.render();
   }
 
   private render(): void {

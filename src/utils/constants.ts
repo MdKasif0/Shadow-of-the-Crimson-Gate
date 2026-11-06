@@ -9,9 +9,8 @@ import type { NavItem } from '../types/index';
 
 export const GAME_TITLE = 'Shadow of the Crimson Gate';
 export const HERO_SUBTITLE = 'A Japanese Fantasy Action Adventure';
-export const HERO_TAGLINE = 'A World of Spirits Awaits';
 export const GAME_DESCRIPTION =
-  'A cinematic Japanese fantasy 2D action game set in a world of yokai, spirits, and ancient mysteries.';
+  'A cinematic Japanese fantasy action game set in a world of yokai, spirits, and ancient mysteries.';
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
 // ─── Assets ──────────────────────────────────────────────────────────────────
 
 export const ASSETS = {
-  HERO_BG: '/assets/hero-bg-image.png',
+  HERO_BG: '/assets/hero-gate.webp',
 } as const;
 
 // ─── Design Tokens: Colors ───────────────────────────────────────────────────
@@ -82,24 +81,4 @@ export const TIMING = {
   KEN_BURNS_DURATION: '25s',
   /** Play click transition duration in ms */
   PLAY_TRANSITION: 500,
-} as const;
-
-// ─── Parallax ────────────────────────────────────────────────────────────────
-
-export const PARALLAX = {
-  /** Max pixel offset on the X axis */
-  STRENGTH_X: 8,
-  /** Max pixel offset on the Y axis (less than X to feel natural) */
-  STRENGTH_Y: 5,
-  /** Interpolation smoothing factor (0–1, lower = smoother) */
-  LERP: 0.05,
-} as const;
-
-// ─── Particles ───────────────────────────────────────────────────────────────
-
-export const PARTICLES = {
-  /** Number of sakura petal elements */
-  PETAL_COUNT: 14,
-  /** Number of spirit/glow particle elements */
-  SPIRIT_COUNT: 7,
 } as const;
