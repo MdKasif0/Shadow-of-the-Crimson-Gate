@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { EventBus } from '../core/EventBus';
+import { SettingsManager } from '../settings/SettingsManager';
+import { GRAPHICS_PRESETS, SettingsData } from '../settings/SettingsData';
 
 /**
  * LightingSystem — Manages all scene lights.
@@ -20,9 +23,6 @@ export class LightingSystem {
     // Main directional (moonlight)
     this.directional = new THREE.DirectionalLight(0xaaccff, 3.5); // Softer, bluish key light
     this.directional.position.set(20, 40, 30);
-    this.directional.castShadow = true;
-    this.directional.shadow.mapSize.width = 2048;
-    this.directional.shadow.mapSize.height = 2048;
     this.directional.shadow.camera.near = 0.5;
     this.directional.shadow.camera.far = 250;
     const d = 160; 
@@ -38,6 +38,25 @@ export class LightingSystem {
     this.moonLight.position.set(-50, 100, -50);
     this.moonLight.castShadow = false;
     scene.add(this.moonLight);
+
+    this.applyGraphicsQuality(SettingsManager.getInstance().get().graphicsQuality);
+    EventBus.on('settingsChanged', (settings: SettingsData) => {
+      this.applyGraphicsQuality(settings.graphicsQuality);
+    });
+  }
+
+  /** A shadow map size of 0 turns shadows off. */
+  private applyGraphicsQuality(quality: SettingsData['graphicsQuality']): void {
+    const size = GRAPHICS_PRESETS[quality].shadowMapSize;
+    const shadow = this.directional.shadow;
+
+    this.directional.castShadow = size > 0;
+    if (size > 0 && shadow.mapSize.x !== size) {
+      shadow.mapSize.set(size, size);
+      // The renderer rebuilds the map at the new size on the next frame
+      shadow.map?.dispose();
+      shadow.map = null;
+    }
   }
 
   public update(dt: number, targetColor?: THREE.Color, targetIntensity?: number): void {

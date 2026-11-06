@@ -119,7 +119,7 @@ export class GameHUD {
     // 3. Enemy Health (Top Center, Hidden by default)
     this.enemyHealthContainer = document.createElement('div');
     this.enemyHealthContainer.style.position = 'absolute';
-    this.enemyHealthContainer.style.top = '40px';
+    this.enemyHealthContainer.style.top = '100px'; // Below the objective text
     this.enemyHealthContainer.style.left = '50%';
     this.enemyHealthContainer.style.transform = 'translateX(-50%)';
     this.enemyHealthContainer.style.textAlign = 'center';
@@ -158,6 +158,12 @@ export class GameHUD {
   }
 
   private enemyHealthTimeout: any;
+  private isBossBarVisible: boolean = false;
+
+  private hideEnemyHealth(): void {
+    clearTimeout(this.enemyHealthTimeout);
+    this.enemyHealthContainer.style.opacity = '0';
+  }
 
   private bindEvents() {
     EventBus.on('playerHealth', (data) => {
@@ -180,6 +186,8 @@ export class GameHUD {
     });
 
     EventBus.on('enemyHealth', (data: any) => {
+      if (this.isBossBarVisible) return; // The boss bar occupies this slot
+
       const pct = Math.max(0, (data.current / data.max) * 100);
       this.enemyHealthFill.style.width = `${pct}%`;
       if (data.name) {
@@ -219,17 +227,24 @@ export class GameHUD {
       }
     });
 
-    EventBus.on('encounterStarted', () => {
-      this.enemyHealthContainer.style.opacity = '1';
+    // Updates the level label without the level-up fanfare (new game / load)
+    EventBus.on('levelSync', (data: { level: number }) => {
+      const el = document.getElementById('hud-level');
+      if (el) el.innerText = `LV.${data.level}`;
+    });
+
+    EventBus.on('bossBarVisibility', (data: { visible: boolean }) => {
+      this.isBossBarVisible = data.visible;
+      if (data.visible) this.hideEnemyHealth();
     });
 
     EventBus.on('encounterComplete', () => {
-      this.enemyHealthContainer.style.opacity = '0';
+      this.hideEnemyHealth();
       this.gameOver.showPurified();
     });
 
-    EventBus.on('playerDeath', () => {
-      this.gameOver.showDefeated();
+    EventBus.on('playerRespawned', () => {
+      this.hideEnemyHealth();
     });
 
     window.addEventListener('keydown', this.handleKeyDown);

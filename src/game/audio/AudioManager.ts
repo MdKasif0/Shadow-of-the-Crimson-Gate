@@ -31,6 +31,7 @@ export interface PlayOptions {
   pitchMax?: number;     // Max playback rate (e.g. 1.04)
   cooldownMs?: number;   // Minimum ms between plays of same ID
   loop?: boolean;        // Override loop setting
+  sliceSeconds?: number; // Play only a random slice this long (for long source recordings)
 }
 
 // ─── Audio State ───────────────────────────────────────────────────────────
@@ -191,7 +192,7 @@ export class AudioManager {
       AudioId.SWORD_HIT_01, AudioId.SWORD_HIT_02,
       AudioId.PLAYER_DASH,
       AudioId.UI_HOVER, AudioId.UI_SELECT, AudioId.UI_CONFIRM,
-      AudioId.FOOTSTEP_STONE_01, AudioId.FOOTSTEP_STONE_02,
+      AudioId.FOOTSTEP_STONE_02,
       AudioId.FOOTSTEP_GRASS_01, AudioId.FOOTSTEP_GRASS_02,
     ];
     for (const id of essentials) {
@@ -251,7 +252,19 @@ export class AudioManager {
       source, gainNode, id, priority: entry.priority, startTime: this.ctx.currentTime
     };
 
-    source.start();
+    if (opts?.sliceSeconds) {
+      const slice = Math.min(opts.sliceSeconds, buffer.duration);
+      const offset = Math.random() * (buffer.duration - slice);
+      const now = this.ctx.currentTime;
+      const fade = Math.min(0.05, slice / 2); // Avoids clicks at the cut points
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(vol, now + fade);
+      gainNode.gain.setValueAtTime(vol, now + slice - fade);
+      gainNode.gain.linearRampToValueAtTime(0, now + slice);
+      source.start(0, offset, slice);
+    } else {
+      source.start();
+    }
 
     if (!source.loop) {
       source.onended = () => {
@@ -520,12 +533,12 @@ export class AudioManager {
   // ─── Footsteps ─────────────────────────────────────────────────────────
 
   public static playFootstep(surface: 'stone' | 'grass' = 'stone'): void {
+    // The footstep files are long walking recordings, so each step plays a short slice
+    const opts = { pitchMin: 0.96, pitchMax: 1.04, cooldownMs: 250, sliceSeconds: 0.4 };
     if (surface === 'grass') {
-      this.playRandom([AudioId.FOOTSTEP_GRASS_01, AudioId.FOOTSTEP_GRASS_02],
-        { pitchMin: 0.96, pitchMax: 1.04, cooldownMs: 250 });
+      this.playRandom([AudioId.FOOTSTEP_GRASS_01, AudioId.FOOTSTEP_GRASS_02], opts);
     } else {
-      this.playRandom([AudioId.FOOTSTEP_STONE_01, AudioId.FOOTSTEP_STONE_02],
-        { pitchMin: 0.96, pitchMax: 1.04, cooldownMs: 250 });
+      this.play(AudioId.FOOTSTEP_STONE_02, opts);
     }
   }
 

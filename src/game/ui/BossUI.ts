@@ -123,11 +123,13 @@ export class BossUI {
     this.isVisible = true;
     this.healthLabel.innerText = name.toUpperCase();
     this.healthContainer.style.opacity = '1';
+    EventBus.emit('bossBarVisibility', { visible: true });
   }
 
   public hideHealthBar(): void {
     this.isVisible = false;
     this.healthContainer.style.opacity = '0';
+    EventBus.emit('bossBarVisibility', { visible: false });
   }
 
   private onBossHealth(data: { current: number; max: number; phase: BossPhaseId }): void {

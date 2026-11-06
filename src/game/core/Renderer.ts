@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { EventBus } from './EventBus';
+import { SettingsManager } from '../settings/SettingsManager';
+import { GRAPHICS_PRESETS, SettingsData } from '../settings/SettingsData';
 
 export class Renderer {
   public webgl: THREE.WebGLRenderer;
@@ -16,16 +19,24 @@ export class Renderer {
     this.webgl.toneMapping = THREE.ACESFilmicToneMapping;
     this.webgl.toneMappingExposure = 1.0;
     
-    // Cap pixel ratio to 2 for performance
-    const pixelRatio = Math.min(window.devicePixelRatio, 2);
-    this.webgl.setPixelRatio(pixelRatio);
-    
+    // Pixel ratio cap comes from the Graphics Quality setting
+    this.applyGraphicsQuality(SettingsManager.getInstance().get().graphicsQuality);
+
     // Shadow maps
     this.webgl.shadowMap.enabled = true;
-    this.webgl.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.webgl.shadowMap.type = THREE.PCFShadowMap;
 
     this.container.appendChild(this.webgl.domElement);
     this.resize();
+
+    EventBus.on('settingsChanged', (settings: SettingsData) => {
+      this.applyGraphicsQuality(settings.graphicsQuality);
+    });
+  }
+
+  private applyGraphicsQuality(quality: SettingsData['graphicsQuality']): void {
+    const maxPixelRatio = GRAPHICS_PRESETS[quality].maxPixelRatio;
+    this.webgl.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
   }
 
   public resize(): void {

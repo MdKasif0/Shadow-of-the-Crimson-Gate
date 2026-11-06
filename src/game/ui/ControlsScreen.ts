@@ -20,7 +20,6 @@ export class ControlsScreen {
       { key: 'Space', action: 'Dash' },
       { key: 'E', action: 'Interact' },
       { key: 'Escape', action: 'Pause' },
-      { key: 'R', action: 'Reset (Dev)' },
     ];
 
     const rows = controls.map(c => `

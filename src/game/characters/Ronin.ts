@@ -27,7 +27,8 @@ export class Ronin {
   private katana: Katana;
   
   public isControlsEnabled: boolean = true;
-  
+  public damageMultiplier: number = 1;
+
   private velocity: THREE.Vector3 = new THREE.Vector3();
   private hurtTimer: number = 0;
   private footstepDistance: number = 0;
@@ -180,7 +181,8 @@ export class Ronin {
 
           if (hitboxSystem) {
             // Reset memory on the very first frame of ACTIVE
-            if (this.combat['attackTimer'] <= dt) {
+            // (CombatSystem zeroes the timer on that frame; by the next one it equals dt)
+            if (this.combat['attackTimer'] === 0) {
                hitboxSystem.resetAttackMemory('PLAYER');
                
                // Spawn Slash VFX exactly once per attack
@@ -192,7 +194,7 @@ export class Ronin {
 
             hitboxSystem.addActiveHitbox({
               ownerId: 'PLAYER',
-              damage: attackDef.damage,
+              damage: Math.round(attackDef.damage * this.damageMultiplier),
               position: this.root.position.clone(),
               direction: forward,
               range: this.katana.getRange(),

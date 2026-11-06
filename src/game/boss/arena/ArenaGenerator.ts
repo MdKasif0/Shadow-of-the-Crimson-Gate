@@ -258,6 +258,12 @@ export class ArenaGenerator {
     return group;
   }
 
+  public static resetCorruption(): void {
+    if (this.corruptionMat) {
+      this.corruptionMat.opacity = 0;
+    }
+  }
+
   public static purifyArena(dt: number): void {
     if (this.corruptionMat) {
       // Fade out corruption

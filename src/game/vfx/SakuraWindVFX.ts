@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { CameraController } from '../camera/CameraController';
+import { SettingsManager } from '../settings/SettingsManager';
+import { VFX_DENSITY } from '../settings/SettingsData';
 
 export class SakuraWindVFX {
   private scene: THREE.Scene;
@@ -47,6 +49,11 @@ export class SakuraWindVFX {
   }
 
   public update(dt: number): void {
+    // Drifting petals cross the whole screen, so Reduce Motion hides them
+    const { reduceMotion } = SettingsManager.getInstance().get();
+    this.particleSystem.visible = !reduceMotion;
+    if (reduceMotion) return;
+
     this.gustTimer -= dt;
     
     if (this.gustTimer <= 0 && !this.isGusting) {
@@ -76,7 +83,8 @@ export class SakuraWindVFX {
     const camPos = this.camera.camera.position;
 
     // Spawn 20-30 particles upwind
-    const spawnCount = Math.floor(Math.random() * 10) + 20;
+    const density = VFX_DENSITY[SettingsManager.getInstance().get().vfxIntensity];
+    const spawnCount = Math.floor((Math.random() * 10 + 20) * density);
     
     for (let i = 0; i < spawnCount; i++) {
       // Spawn upwind so they cross the screen
