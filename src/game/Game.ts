@@ -36,7 +36,6 @@ export class ThreeGame {
 
   private captureHint: HTMLDivElement | null = null;
   private isInDialogue: boolean = false;
-  private isIntroDone: boolean = false;
   private hasUsedMouseLook: boolean = false;
   private lastDt: number = 0;
 
@@ -119,28 +118,21 @@ export class ThreeGame {
         gsm.setState(GameState.PAUSED);
       }
       if (!isLocked) isReleasingOnPurpose = false;
-      this.updateCaptureHint();
     });
 
     EventBus.on('gameStateChanged', (data: { current: GameState; previous: GameState | null }) => {
-      if (data.current === GameState.PLAYING && data.previous === GameState.PAUSED) capture();
-      else if (data.current !== GameState.PLAYING) release();
-      this.updateCaptureHint();
+      // Arriving from a menu button click, which browsers accept as a reason to capture
+      if (data.current === GameState.PLAYING) capture();
+      else release();
     });
 
     EventBus.on(StoryEvents.DIALOGUE_START, () => {
       this.isInDialogue = true;
       release(); // Dialogue choices are clicked with the cursor
-      this.updateCaptureHint();
     });
     EventBus.on(StoryEvents.DIALOGUE_END, () => {
       this.isInDialogue = false;
       capture();
-      this.updateCaptureHint();
-    });
-    EventBus.on(StoryEvents.INTRO_COMPLETE, () => {
-      this.isIntroDone = true;
-      this.updateCaptureHint();
     });
 
     this.captureHint = document.createElement('div');
@@ -157,11 +149,12 @@ export class ThreeGame {
   private updateCaptureHint(): void {
     if (!this.captureHint) return;
     const shouldShow = GameStateManager.getInstance().getState() === GameState.PLAYING
-      && this.isIntroDone
+      && !this.gameScene.isStoryIntroRunning
       && !this.isInDialogue
       && !document.pointerLockElement
       && !this.hasUsedMouseLook;
-    this.captureHint.style.opacity = shouldShow ? '1' : '0';
+    const opacity = shouldShow ? '1' : '0';
+    if (this.captureHint.style.opacity !== opacity) this.captureHint.style.opacity = opacity;
   }
 
   private update(dt: number): void {
@@ -174,12 +167,10 @@ export class ThreeGame {
     const isActive = state === GameState.PLAYING || state === GameState.BOSS;
     if (isActive && !this.isInDialogue && !this.cameraController.isSequencePlaying) {
       this.cameraController.look(look.x, look.y);
-      if ((look.x !== 0 || look.y !== 0) && !this.hasUsedMouseLook) {
-        this.hasUsedMouseLook = true;
-        this.updateCaptureHint();
-      }
+      if (look.x !== 0 || look.y !== 0) this.hasUsedMouseLook = true;
     }
     this.input.cameraYaw = this.cameraController.yaw;
+    this.updateCaptureHint();
 
     // Handle Escape for pause toggle
     if (state === GameState.PLAYING && this.input.isPressed('Escape')) {
@@ -213,6 +204,8 @@ export class ThreeGame {
   }
 
   private render(): void {
+    // The opaque main menu covers the game, so there's nothing to draw
+    if (GameStateManager.getInstance().getState() === GameState.MAIN_MENU) return;
     this.renderer.render(this.gameScene.scene, this.cameraController.camera, this.lastDt);
   }
 

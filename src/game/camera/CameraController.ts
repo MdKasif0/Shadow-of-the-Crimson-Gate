@@ -12,6 +12,7 @@ const MIN_PITCH = -0.1; // Just under eye level, looking slightly up
 const MAX_PITCH = 1.3;  // Nearly overhead
 
 const MAX_FOCUS_SHIFT = 2;
+const DASH_KICK_DECAY = 3;
 const LOOK_SENSITIVITY = 0.0024;
 const BLEND_OUT_SECONDS = 1.3;
 
@@ -193,12 +194,12 @@ export class CameraController {
 
   private followFov(): number {
     if (SettingsManager.getInstance().get().reduceMotion) return BASE_FOV;
-    this.dashKick = Math.max(0, this.dashKick - 0.05);
     return BASE_FOV + (this.isSprinting ? 6 : 0) + this.dashKick * 7 - this.combatWeight * 3;
   }
 
   private updateFollow(target: THREE.Vector3, dt: number): void {
     this.updateAutoAim(target, dt);
+    this.dashKick = Math.max(0, this.dashKick - dt * DASH_KICK_DECAY);
 
     // Lead slightly in the direction of travel, so more of what's ahead is visible
     const leadAmount = this.dialogueFocus ? 0 : (this.isSprinting ? 2.2 : 1.2);

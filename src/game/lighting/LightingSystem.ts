@@ -116,6 +116,11 @@ export class LightingSystem {
     this.activeSlots = preset.lampLights;
     this.pool.forEach((slot, i) => {
       slot.light.visible = i < this.activeSlots;
+      if (!slot.light.visible) {
+        // Release its lamp, or assignLamps would think that lamp is already lit
+        slot.source = null;
+        slot.light.intensity = 0;
+      }
     });
     this.poolTimer = 0;
   }

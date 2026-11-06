@@ -60,6 +60,7 @@ import { WorldStateManager } from '../state/WorldStateManager';
 
 /** Enemies this close pull the camera's framing towards them. */
 const COMBAT_FRAMING_RANGE = 12;
+const BOSS_FRAMING_RANGE = 40;
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -106,6 +107,7 @@ export class GameScene {
   private bossIsDefeatedSequence: boolean = false;
   private purificationTimer: number = 0;
   private hasBossIntroPlayed: boolean = false;
+  private hasSeenBossIntro: boolean = false;
   private isCinematicActive: boolean = false;
   private hasShownTitle: boolean = false;
 
@@ -251,10 +253,7 @@ export class GameScene {
       if (saveData.chapter) this.storyManager.state.currentChapter = saveData.chapter;
       if (saveData.objective) this.objectiveManager.setObjective(saveData.objective);
       
-      if (this.playerProgress.crimsonOniDefeated && !saveData.storyFlags?.completedCampaign && this.boss) {
-        this.scene.remove(this.boss.root);
-        this.boss = null;
-      }
+      this.resetBossEncounter();
       
       this.encounterManager.resetAll(this.scene);
       this.encounterManager.clearAll();
@@ -268,6 +267,7 @@ export class GameScene {
     
     EventBus.on('newGame', () => {
       this.playerProgress.wipe();
+      this.hasSeenBossIntro = false;
       this.playerStats = new PlayerStats(1);
       this.applyPlayerStats();
       EventBus.emit('essenceUpdate', { amount: 0, added: 0 });
@@ -387,6 +387,10 @@ export class GameScene {
     }, 100);
   }
 
+  public get isStoryIntroRunning(): boolean {
+    return this.storyManager.isIntroRunning;
+  }
+
   public initEnvironment(renderer: THREE.WebGLRenderer): void {
     this.lighting.buildEnvironment(renderer, this.scene);
     // Compile shaders now, rather than stalling the first gameplay frames
@@ -435,7 +439,8 @@ export class GameScene {
       }
     }
 
-    const isFightingBoss = this.boss !== null && this.hasBossIntroPlayed && !this.isCinematicActive && !this.boss.health.isDead;
+    const isFightingBoss = this.boss !== null && this.hasBossIntroPlayed && !this.isCinematicActive && !this.boss.health.isDead
+      && this.boss.root.position.distanceToSquared(playerPos) < BOSS_FRAMING_RANGE * BOSS_FRAMING_RANGE;
     if (isFightingBoss) aimTargets.push(this.boss!.root.position);
 
     this.player.aimTargets = aimTargets;
@@ -597,18 +602,25 @@ export class GameScene {
     // Trigger Cinematic Intro
     if (this.boss && this.player.root.position.z < -85 && !this.hasBossIntroPlayed) {
       this.hasBossIntroPlayed = true;
-      this.isCinematicActive = true;
-      this.hasShownTitle = false;
-      this.player.isControlsEnabled = false;
-      
-      AudioManager.playBossIntro();
-      this.boss.startIntro();
-      this.bossIntroCamera.start(this.boss.root.position, this.player.root.position);
+
+      if (this.hasSeenBossIntro) {
+        // Retrying from the arena checkpoint goes straight back into the fight
+        this.boss.endIntro();
+        this.bossUI.showHealthBar('Crimson Oni');
+        AudioManager.playBossPhase(1);
+      } else {
+        this.hasSeenBossIntro = true;
+        this.isCinematicActive = true;
+        this.hasShownTitle = false;
+        this.player.isControlsEnabled = false;
+
+        AudioManager.playBossIntro();
+        this.boss.startIntro();
+        this.bossIntroCamera.start(this.boss.root.position, this.player.root.position);
+      }
     }
 
     if (this.isCinematicActive && this.boss) {
-      this.bossIntroCamera.update(dt, this.player.root.position, this.boss.root.position);
-      
       if (this.bossIntroCamera.isHolding && !this.hasShownTitle) {
         this.chapterUI.hide();
         this.bossUI.showCinematicTitle('Crimson Oni', 2500);

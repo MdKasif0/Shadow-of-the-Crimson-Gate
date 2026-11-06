@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { StoryFlags } from '../story/StoryFlag';
 import { WorldStateManager } from '../state/WorldStateManager';
+import { EventBus } from '../core/EventBus';
 
 export interface ZoneConfig {
   id: string;
@@ -73,6 +74,7 @@ export class ZoneManager {
     // Track zone changes
     if (zone.id !== this.currentZoneId) {
       this.currentZoneId = zone.id;
+      EventBus.emit('zoneChanged', { zoneId: zone.id });
     }
 
     const worldState = WorldStateManager.getInstance();

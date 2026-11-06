@@ -16,14 +16,15 @@ export interface GraphicsPreset {
   shadowMapSize: number;
   /** How many nearby lamps cast real light. */
   lampLights: number;
+  msaaSamples: number;
   bloom: boolean;
   ambientOcclusion: boolean;
 }
 
 export const GRAPHICS_PRESETS: Record<QualityLevel, GraphicsPreset> = {
-  LOW: { maxPixelRatio: 1, shadowMapSize: 0, lampLights: 2, bloom: false, ambientOcclusion: false },
-  MEDIUM: { maxPixelRatio: 1.25, shadowMapSize: 1024, lampLights: 4, bloom: true, ambientOcclusion: false },
-  HIGH: { maxPixelRatio: 1.5, shadowMapSize: 2048, lampLights: 6, bloom: true, ambientOcclusion: true }
+  LOW: { maxPixelRatio: 1, shadowMapSize: 0, lampLights: 2, msaaSamples: 0, bloom: false, ambientOcclusion: false },
+  MEDIUM: { maxPixelRatio: 1.25, shadowMapSize: 1024, lampLights: 4, msaaSamples: 4, bloom: true, ambientOcclusion: false },
+  HIGH: { maxPixelRatio: 1.5, shadowMapSize: 2048, lampLights: 6, msaaSamples: 4, bloom: true, ambientOcclusion: true }
 };
 
 /** Fraction of particles kept per VFX Density level. */

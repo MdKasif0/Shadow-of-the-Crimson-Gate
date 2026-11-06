@@ -78,6 +78,7 @@ export class Renderer {
   private secondsSinceAdapt: number = 0;
   private adaptivePixelRatio: number = 1;
   private isAOReduced: boolean = false;
+  private appliedQuality: SettingsData['graphicsQuality'];
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -94,13 +95,18 @@ export class Renderer {
     this.webgl.shadowMap.enabled = true;
     this.webgl.shadowMap.type = THREE.PCFShadowMap;
 
-    this.applyPixelRatio(SettingsManager.getInstance().get().graphicsQuality);
+    this.appliedQuality = SettingsManager.getInstance().get().graphicsQuality;
+    this.applyPixelRatio(this.appliedQuality);
 
     this.container.appendChild(this.webgl.domElement);
     this.resize();
 
     EventBus.on('settingsChanged', (settings: SettingsData) => {
-      this.applyPixelRatio(settings.graphicsQuality);
+      // Other settings, like volume, mustn't undo automatic quality scaling
+      if (settings.graphicsQuality !== this.appliedQuality) {
+        this.appliedQuality = settings.graphicsQuality;
+        this.applyPixelRatio(settings.graphicsQuality);
+      }
       this.applyPasses();
     });
   }
@@ -122,6 +128,12 @@ export class Renderer {
     const preset = GRAPHICS_PRESETS[graphicsQuality];
     if (this.bloomPass) this.bloomPass.enabled = preset.bloom;
     if (this.aoPass) this.aoPass.enabled = preset.ambientOcclusion && !this.isAOReduced;
+    if (this.composer && this.composer.renderTarget1.samples !== preset.msaaSamples) {
+      for (const target of [this.composer.renderTarget1, this.composer.renderTarget2]) {
+        target.samples = preset.msaaSamples;
+        target.dispose(); // Rebuilt with the new sample count on next use
+      }
+    }
     if (this.gradePass) this.gradePass.uniforms.uGrain.value = reduceMotion ? 0 : 0.035;
   }
 
@@ -129,7 +141,7 @@ export class Renderer {
     const size = this.webgl.getDrawingBufferSize(new THREE.Vector2());
     const target = new THREE.WebGLRenderTarget(size.x, size.y, {
       type: THREE.HalfFloatType, // Keeps values above 1.0, so lanterns and the moon can bloom
-      samples: 4,
+      samples: GRAPHICS_PRESETS[SettingsManager.getInstance().get().graphicsQuality].msaaSamples,
     });
 
     const composer = new EffectComposer(this.webgl, target);

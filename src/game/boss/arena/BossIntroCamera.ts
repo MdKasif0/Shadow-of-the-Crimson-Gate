@@ -63,7 +63,4 @@ export class BossIntroCamera {
       this.isRunning = false;
     });
   }
-
-  /** The sequence runs inside CameraController. Kept so GameScene's call stays simple. */
-  public update(_dt: number, _playerPos: THREE.Vector3, _bossPos: THREE.Vector3): void {}
 }
