@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CharacterRig } from './CharacterRig';
 import { CharacterAnimator, AnimState } from './CharacterAnimator';
-import { CharacterFactory } from './CharacterFactory';
+import { CharacterFactory, RoninModel } from './CharacterFactory';
 import { PlayerState, CombatPhase, MovementState } from '../combat/PlayerState';
 import { CombatSystem } from '../combat/CombatSystem';
 import { Katana } from '../combat/Katana';
@@ -28,10 +28,15 @@ const PERFECT_DODGE_FOCUS = 30;
 const DODGE_WINDOW_SECONDS = 0.3;
 const PERFECT_DODGE_COOLDOWN = 0.6;
 const FINISHER_INVULNERABILITY = 0.95;
+/** How long the sword stays out after the last swing. */
+const SWORD_DRAWN_SECONDS = 3;
 
 export class Ronin {
   public root: THREE.Group;
   private rig: CharacterRig;
+  private model: RoninModel;
+  private swordDrawnTimer: number = 0;
+  private lastPosition: THREE.Vector3 = new THREE.Vector3();
   private animator: CharacterAnimator;
 
   private targetRotation: number = 0;
@@ -69,12 +74,13 @@ export class Ronin {
     this.health.onDeath(this.onDeath.bind(this));
 
     // 1. Generate procedural rig and mesh
-    this.rig = CharacterFactory.createRonin();
-    
+    this.model = CharacterFactory.createRonin();
+    this.rig = this.model.rig;
+
     // Attach Weapon
     this.katana = new Katana();
     this.katana.attachTo(this.rig.weaponSlot);
-    this.katana.attachSheathTo(this.rig.sheathSlot);
+    this.setSwordDrawn(false);
 
     this.combat.events.addListener({
       onAttackStarted: (attackId) => {
@@ -91,7 +97,29 @@ export class Ronin {
     this.root = new THREE.Group();
     this.root.name = 'PlayerRonin';
     this.root.add(this.rig.root);
-    this.glow = applyRimLight(this.root, 0x9fc4ff, 0.75);
+    this.glow = applyRimLight(this.root, 0x9fc4ff, 0.26);
+  }
+
+  /** The sword stays in its scabbard until a fight calls for it. */
+  private setSwordDrawn(isDrawn: boolean): void {
+    this.katana.mesh.visible = isDrawn;
+    this.model.sheathedHilt.visible = !isDrawn;
+  }
+
+  private updateAppearance(dt: number): void {
+    if (this.state.combatPhase !== CombatPhase.NONE) this.swordDrawnTimer = SWORD_DRAWN_SECONDS;
+    else this.swordDrawnTimer = Math.max(0, this.swordDrawnTimer - dt);
+    this.setSwordDrawn(this.swordDrawnTimer > 0);
+
+    const speed = dt > 0 ? this.root.position.distanceTo(this.lastPosition) / dt : 0;
+    this.lastPosition.copy(this.root.position);
+    const movement = Math.min(speed, 16);
+    this.model.cape.update(dt, movement);
+
+    // The ponytail trails behind, with a little sway of its own
+    const time = performance.now() * 0.001;
+    this.model.ponytail.rotation.x = -Math.min(movement * 0.035, 0.45) + Math.sin(time * 1.6) * 0.03;
+    this.model.ponytail.rotation.z = Math.sin(time * 1.1) * 0.03;
   }
 
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
@@ -363,6 +391,7 @@ export class Ronin {
     // Update internal animation
     const animSpeedMultiplier = (isRunning && inputMoveDir.lengthSq() > 0 && !isAttacking) ? 1.5 : 1.0;
     this.animator.update(dt * animSpeedMultiplier);
+    this.updateAppearance(dt);
   }
 
   /**

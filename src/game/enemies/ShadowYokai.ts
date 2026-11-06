@@ -57,7 +57,7 @@ export class ShadowYokai implements Enemy {
 
     this.rig = EnemyFactory.createShadowYokai();
     this.root.add(this.rig.root);
-    this.glow = applyRimLight(this.root, 0x6a78d8, 0.45, { uniqueMaterials: true });
+    this.glow = applyRimLight(this.root, 0x6a78d8, 0.22, { uniqueMaterials: true });
 
     this.animator = new ShadowYokaiAnimator(this.rig);
     this.ai = new EnemyAI(this.config);

@@ -60,7 +60,7 @@ export class CrimsonOni implements Boss {
     // Build procedural geometry
     this.rig = BossFactory.createCrimsonOni();
     this.root.add(this.rig.root);
-    this.glow = applyRimLight(this.root, 0xff3a14, 0.65);
+    this.glow = applyRimLight(this.root, 0xff3a14, 0.28);
 
     // Systems
     this.animator = new BossAnimator(this.rig);

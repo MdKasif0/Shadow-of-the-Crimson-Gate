@@ -52,7 +52,7 @@ export class BasicYokai implements Enemy {
 
     this.rig = EnemyFactory.createBasicYokai();
     this.root.add(this.rig.root);
-    this.glow = applyRimLight(this.root, 0xa860e0, 0.5, { uniqueMaterials: true });
+    this.glow = applyRimLight(this.root, 0xa860e0, 0.2, { uniqueMaterials: true });
 
     this.animator = new EnemyAnimator(this.rig);
     this.ai = new EnemyAI(this.config);

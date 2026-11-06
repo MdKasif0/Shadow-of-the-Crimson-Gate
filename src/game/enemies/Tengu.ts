@@ -53,7 +53,7 @@ export class Tengu implements Enemy {
 
     this.rig = EnemyFactory.createTengu();
     this.root.add(this.rig.root);
-    this.glow = applyRimLight(this.root, 0xe88048, 0.5, { uniqueMaterials: true });
+    this.glow = applyRimLight(this.root, 0xe88048, 0.2, { uniqueMaterials: true });
 
     this.animator = new TenguAnimator(this.rig);
     this.ai = new EnemyAI(this.config);
