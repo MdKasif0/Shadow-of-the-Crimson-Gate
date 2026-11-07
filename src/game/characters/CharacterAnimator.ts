@@ -19,6 +19,9 @@ export class CharacterAnimator {
   private idleWeight: number = 1;
   private attackWeight: number = 0;
   private dashWeight: number = 0;
+  private guardWeight: number = 0;
+  /** Holding the sword across the body to block. */
+  public isGuarding: boolean = false;
 
   // Attack state for procedural animation
   private currentAttackId: string | null = null;
@@ -60,6 +63,25 @@ export class CharacterAnimator {
     this.applyAttack(this.attackWeight);
     this.applyDash(this.dashWeight);
     this.applyFinisherSpin();
+    // The guard turns the wrist; let it settle back once the guard drops
+    if (!isAttacking) this.rig.rightHand.rotation.y = lerp(this.rig.rightHand.rotation.y, 0, Math.min(1, dt * 15));
+    this.guardWeight = lerp(this.guardWeight, this.isGuarding ? 1 : 0, Math.min(1, dt * 22));
+    this.applyGuard(this.guardWeight);
+  }
+
+  /** The blade raised across the body, edge out, weight sunk low. */
+  private applyGuard(weight: number): void {
+    if (weight <= 0.01) return;
+    const rig = this.rig;
+    rig.rightUpperArm.rotation.x = lerp(rig.rightUpperArm.rotation.x, -1.15, weight);
+    rig.rightUpperArm.rotation.z = lerp(rig.rightUpperArm.rotation.z, 0.35, weight);
+    rig.rightLowerArm.rotation.x = lerp(rig.rightLowerArm.rotation.x, -1.25, weight);
+    rig.rightHand.rotation.y = lerp(rig.rightHand.rotation.y, 1.2, weight);
+    rig.leftUpperArm.rotation.x = lerp(rig.leftUpperArm.rotation.x, -0.9, weight);
+    rig.leftUpperArm.rotation.z = lerp(rig.leftUpperArm.rotation.z, -0.4, weight);
+    rig.leftLowerArm.rotation.x = lerp(rig.leftLowerArm.rotation.x, -1.3, weight);
+    rig.spine.rotation.x = lerp(rig.spine.rotation.x, 0.12, weight);
+    rig.pelvis.position.y = lerp(rig.pelvis.position.y, 0.93, weight);
   }
 
   /** A low, committed lunge: body leaning hard forward, arms swept back, one knee driving. */
@@ -87,7 +109,7 @@ export class CharacterAnimator {
 
   /** The finisher spins the whole body through a full circle as it cuts. */
   private applyFinisherSpin(): void {
-    const isSpinning = this.currentAttackId === 'ATTACK_FINISHER' && this.currentCombatPhase === CombatPhase.ACTIVE;
+    const isSpinning = (this.currentAttackId === 'ATTACK_FINISHER' || this.currentAttackId === 'ATTACK_WHIRL') && this.currentCombatPhase === CombatPhase.ACTIVE;
     this.rig.root.rotation.y = isSpinning ? this.attackProgress * Math.PI * 2 : 0;
   }
 
@@ -175,9 +197,11 @@ export class CharacterAnimator {
     let wristX = 0, wristY = 0;
 
     // The heavy shares the combo finisher's overhead cut. The Spirit Cut swings wide while spinning.
-    const pose = this.currentAttackId === 'ATTACK_HEAVY' ? 'ATTACK_3'
-      : this.currentAttackId === 'ATTACK_FINISHER' ? 'ATTACK_1'
-      : this.currentAttackId;
+    const POSES: Record<string, string> = {
+      ATTACK_HEAVY: 'ATTACK_3', ATTACK_FINISHER: 'ATTACK_1', ATTACK_WHIRL: 'ATTACK_1',
+      ATTACK_4: 'ATTACK_2', ATTACK_DASH: 'ATTACK_3', ATTACK_WAVE: 'ATTACK_1', ATTACK_EXECUTE: 'ATTACK_3',
+    };
+    const pose = POSES[this.currentAttackId] ?? this.currentAttackId;
 
     if (pose === 'ATTACK_1') {
       // Right-to-left horizontal slash

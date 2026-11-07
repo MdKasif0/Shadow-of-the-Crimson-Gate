@@ -23,6 +23,10 @@ export interface Hitbox {
   hitStop?: number;
   shake?: number;
   isHeavy?: boolean;
+  /** Multiplies how much this wears down an enemy's guard. */
+  posture?: number;
+  /** The swing after a parry or perfect dodge. */
+  isCounter?: boolean;
 }
 
 export interface HitEvent {

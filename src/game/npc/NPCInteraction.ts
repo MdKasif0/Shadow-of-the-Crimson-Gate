@@ -27,7 +27,8 @@ export class NPCInteraction implements Interactable {
     this.onInteractCallback();
   }
 
+  /** Characters who aren't in the scene right now can't be spoken to. */
   public canInteract(): boolean {
-    return true;
+    return this.npc.root.visible;
   }
 }

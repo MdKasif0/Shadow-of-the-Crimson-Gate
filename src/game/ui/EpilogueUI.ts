@@ -1,10 +1,13 @@
 import { GameStateManager } from '../state/GameStateManager';
 import { GameState } from '../state/GameState';
 import { EventBus } from '../core/EventBus';
+import { endingFor } from '../story/Endings';
+import { StoryFlags } from '../story/StoryFlag';
 
 export class EpilogueUI {
   private overlay: HTMLDivElement;
   private content: HTMLDivElement;
+  private flags: StoryFlags | null = null;
 
   constructor() {
     this.overlay = document.createElement('div');
@@ -28,7 +31,8 @@ export class EpilogueUI {
     this.overlay.appendChild(this.content);
     document.body.appendChild(this.overlay);
 
-    EventBus.on('epilogueSequenceStart', () => {
+    EventBus.on('epilogueSequenceStart', (data: { flags?: StoryFlags }) => {
+      this.flags = data?.flags ?? null;
       // 5 seconds after boss death
       this.overlay.style.display = 'flex';
       // Fade to black slowly
@@ -49,13 +53,19 @@ export class EpilogueUI {
   }
 
   private renderText(): void {
+    const ending = this.flags ? endingFor(this.flags) : null;
     this.content.innerHTML = `
-      <h1 style="font-size: 5vw; letter-spacing: 0.2em; text-align: center; text-shadow: 0 0 20px rgba(255,255,255,0.2);">
+      <h1 style="font-size: clamp(28px, 5vw, 72px); letter-spacing: 0.2em; text-align: center; text-shadow: 0 0 20px rgba(255,255,255,0.2); margin: 0;">
         SHADOW OF THE<br/>CRIMSON GATE
       </h1>
-      <h2 style="font-size: 2vw; letter-spacing: 0.5em; color: #88bbff; margin-top: 40px; text-shadow: 0 0 10px rgba(136,187,255,0.4);">
-        THE END
-      </h2>
+      ${ending ? `
+        <h2 style="font-size: clamp(14px, 1.6vw, 24px); letter-spacing: 0.4em; color: ${ending.accent}; margin: 24px 0 0; text-align: center; text-shadow: 0 0 10px ${ending.accent}66;">
+          ${ending.title.toUpperCase()}
+        </h2>
+        <p style="max-width: 640px; margin: 0; padding: 0 24px; font-family: var(--font-ui, sans-serif); font-size: clamp(14px, 1.1vw, 17px); line-height: 1.8; color: #d8d2c4; text-align: center;">
+          ${ending.text}
+        </p>` : ''}
+      <p style="font-size: 12px; letter-spacing: 0.5em; color: #888; margin: 8px 0 0;">THE END</p>
     `;
     // Trigger fade in
     setTimeout(() => {

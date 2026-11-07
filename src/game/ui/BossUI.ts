@@ -39,6 +39,10 @@ export class BossUI {
     document.body.appendChild(this.container);
 
     EventBus.on('bossHealth', this.onBossHealth.bind(this));
+    EventBus.on('bossPosture', (data: { fraction: number }) => {
+      this.postureFill.style.transform = `scaleX(${Math.min(1, Math.max(0, data.fraction))})`;
+      this.postureFill.parentElement?.classList.toggle('hud-posture--broken', data.fraction >= 1);
+    });
     EventBus.on('bossDeath', this.onBossDeath.bind(this));
   }
 
@@ -107,8 +111,21 @@ export class BossUI {
       track.appendChild(tick);
     }
     this.healthContainer.appendChild(track);
+
+    const posture = document.createElement('div');
+    posture.className = 'hud-posture hud-posture--boss';
+    this.postureFill = document.createElement('div');
+    this.postureFill.className = 'hud-posture__fill';
+    posture.appendChild(this.postureFill);
+    this.healthContainer.appendChild(posture);
+
     this.container.appendChild(this.healthContainer);
   }
+
+  /**
+   * Triggers the cinematic title sequence.
+   */
+  private postureFill!: HTMLElement;
 
   /**
    * Triggers the cinematic title sequence.
@@ -174,6 +191,7 @@ export class BossUI {
 
   public reset(): void {
     this.hideHealthBar();
+    this.postureFill.style.transform = 'scaleX(0)';
     this.titleContainer.style.opacity = '0';
     this.healthFill.style.width = '100%';
     this.healthGhost.style.width = '100%';

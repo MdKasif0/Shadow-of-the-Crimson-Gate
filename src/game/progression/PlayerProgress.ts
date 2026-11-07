@@ -1,42 +1,29 @@
 import { EventBus } from '../core/EventBus';
 
+/** Spirit Essence, the currency spent at shrines, and which fights are done. */
 export class PlayerProgress {
   public spiritEssence: number = 0;
-  public level: number = 1;
   public clearedEncounters: Set<string> = new Set();
   public crimsonOniDefeated: boolean = false;
-  
-  private levelThresholds = [0, 50, 120];
-
-  constructor() {
-    // Initialized from SaveManager during load
-  }
 
   public initFromSave(data: any): void {
-    if (data.spiritEssence) this.spiritEssence = data.spiritEssence;
-    if (data.level) this.level = data.level;
-    if (data.clearedEncounters) this.clearedEncounters = new Set(data.clearedEncounters);
-    if (data.crimsonOniDefeated) this.crimsonOniDefeated = data.crimsonOniDefeated;
+    this.spiritEssence = data.spiritEssence ?? 0;
+    this.clearedEncounters = new Set(data.clearedEncounters ?? []);
+    this.crimsonOniDefeated = !!data.crimsonOniDefeated;
   }
 
   public addEssence(amount: number): void {
+    if (amount <= 0) return;
     this.spiritEssence += amount;
     EventBus.emit('essenceUpdate', { amount: this.spiritEssence, added: amount });
-    
-    if (this.checkLevelUp()) {
-      EventBus.emit('levelUp', { level: this.level });
-    }
-    EventBus.emit('requestSave', {});
   }
 
-  public checkLevelUp(): boolean {
-    if (this.level >= this.levelThresholds.length) return false;
-    
-    if (this.spiritEssence >= this.levelThresholds[this.level]) {
-      this.level++;
-      return true;
-    }
-    return false;
+  /** Takes essence away, for spending or for losing it on death. Returns what was taken. */
+  public removeEssence(amount: number): number {
+    const taken = Math.min(amount, this.spiritEssence);
+    this.spiritEssence -= taken;
+    EventBus.emit('essenceUpdate', { amount: this.spiritEssence, added: -taken });
+    return taken;
   }
 
   public completeEncounter(id: string): void {
@@ -50,7 +37,6 @@ export class PlayerProgress {
 
   public wipe(): void {
     this.spiritEssence = 0;
-    this.level = 1;
     this.clearedEncounters.clear();
     this.crimsonOniDefeated = false;
   }

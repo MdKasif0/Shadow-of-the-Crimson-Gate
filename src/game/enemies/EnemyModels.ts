@@ -10,8 +10,8 @@ import { ArtJoints, ModelSheet, poseFromArt, ReferenceModel } from '../character
  * always 0.25 above the spine. Overall size then comes from scaling the root.
  */
 
-const sheet = (textures: string, centerX: number, groundY: number, pixelsPerUnit: number, brightness: number): ModelSheet => ({
-  textures, centerX, groundY, pixelsPerUnit, brightness, imageWidth: 1024, imageHeight: 1536, separateAlpha: true,
+const sheet = (textures: string, centerX: number, groundY: number, pixelsPerUnit: number, brightness: number, fallbackColor: number): ModelSheet => ({
+  textures, centerX, groundY, pixelsPerUnit, brightness, fallbackColor, imageWidth: 1024, imageHeight: 1536, separateAlpha: true,
 });
 
 const glowing = (color: number, intensity: number) => new THREE.MeshStandardMaterial({
@@ -26,7 +26,7 @@ function finishRig(model: ReferenceModel, rig: CharacterRig, scale: number): Cha
 
 // ─── Basic Yokai ─────────────────────────────────────────────────────────────
 
-const YOKAI_SHEET = sheet('/assets/characters/yokai/yokai', 480, 1440, 740, 1.7);
+const YOKAI_SHEET = sheet('/assets/characters/yokai/yokai', 480, 1440, 740, 1.7, 0x1c2030);
 
 const YOKAI_JOINTS: ArtJoints = {
   pelvisY: 1.0,
@@ -107,7 +107,7 @@ export function buildBasicYokai(): CharacterRig {
 
 // ─── Shadow Yokai ────────────────────────────────────────────────────────────
 
-const SHADOW_SHEET = sheet('/assets/characters/shadow-yokai/shadow', 480, 1450, 633, 2.1);
+const SHADOW_SHEET = sheet('/assets/characters/shadow-yokai/shadow', 480, 1450, 633, 2.1, 0x0c0d11);
 
 const SHADOW_JOINTS: ArtJoints = {
   pelvisY: 1.2,
@@ -177,7 +177,7 @@ export function buildShadowYokai(): CharacterRig {
 
 // ─── Tengu ───────────────────────────────────────────────────────────────────
 
-const TENGU_SHEET = sheet('/assets/characters/tengu/tengu', 505, 1440, 620, 1.6);
+const TENGU_SHEET = sheet('/assets/characters/tengu/tengu', 505, 1440, 620, 1.6, 0x2a1614);
 
 const TENGU_JOINTS: ArtJoints = {
   pelvisY: 1.1,
@@ -275,7 +275,7 @@ export function buildTengu(): CharacterRig {
 
 // ─── Crimson Oni ─────────────────────────────────────────────────────────────
 
-const ONI_SHEET = sheet('/assets/boss/crimson-oni/oni', 510, 1470, 670, 1.45);
+const ONI_SHEET = sheet('/assets/boss/crimson-oni/oni', 510, 1470, 670, 1.45, 0x4a1210);
 
 const ONI_JOINTS: ArtJoints = {
   pelvisY: 1.0,

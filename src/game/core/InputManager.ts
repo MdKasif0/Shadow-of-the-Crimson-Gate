@@ -19,6 +19,8 @@ const GAMEPAD_BUTTONS: Partial<Record<GameAction, number>> = {
   lockOn: 4,   // LB
   finisher: 5, // RB
   sprint: 7,   // RT
+  block: 6,    // LT
+  spiritWave: 11, // Right stick click
 };
 const GAMEPAD_START = 9;
 const DPAD_UP = 12;
@@ -26,7 +28,7 @@ const DPAD_DOWN = 13;
 const BUTTON_CONFIRM = 0;
 const BUTTON_CANCEL = 1;
 
-const ALL_ACTIONS: GameAction[] = ['moveForward', 'moveBack', 'moveLeft', 'moveRight', 'attack', 'heavy', 'dash', 'sprint', 'lockOn', 'finisher', 'interact'];
+const ALL_ACTIONS: GameAction[] = ['moveForward', 'moveBack', 'moveLeft', 'moveRight', 'attack', 'heavy', 'dash', 'sprint', 'lockOn', 'finisher', 'interact', 'block', 'spiritWave'];
 
 export class InputManager {
   public keys: Record<string, boolean> = {};

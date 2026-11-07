@@ -32,24 +32,27 @@ export class StoryManager {
       this.state.setFlag('crimsonOniDefeated', true);
       this.completeCurrentObjective();
       this.advanceToChapter(ChapterId.EPILOGUE);
+    });
 
-      // Start the 30 second Epilogue sequence
+    // The epilogue waits for the choice made at the Crimson Heart
+    EventBus.on('endingChosen', () => {
       setTimeout(() => {
         this.state.setFlag('endingStarted', true);
-        EventBus.emit('epilogueSequenceStart', {});
-      }, 5000); // 5 seconds after death, start the epilogue visuals
-      
+        EventBus.emit('epilogueSequenceStart', { flags: { ...this.state.flags } });
+      }, 2500);
+
       setTimeout(() => {
         this.state.setFlag('completedCampaign', true);
         EventBus.emit('requestSave', {});
         EventBus.emit('epilogueSequenceEnd', {});
-      }, 35000); // 35 seconds total
+      }, 32500);
     });
 
     // Listen for shrine activation
     EventBus.on('shrineActivated', () => {
+      const isFirstTime = !this.state.getFlag('shrineActivated');
       this.state.setFlag('shrineActivated', true);
-      if (this.state.currentChapter === ChapterId.CHAPTER_3) {
+      if (isFirstTime && this.state.currentChapter === ChapterId.CHAPTER_3) {
         this.completeCurrentObjective();
         this.setObjective({
           id: 'obj_find_source',
@@ -62,8 +65,8 @@ export class StoryManager {
     });
 
     // Listen for dialogue end — set metShrineKeeper flag
-    EventBus.on(StoryEvents.DIALOGUE_END, () => {
-      if (!this.state.getFlag('metShrineKeeper')) {
+    EventBus.on(StoryEvents.DIALOGUE_END, (data: { speakerId?: string | null }) => {
+      if (data?.speakerId === 'shrine_keeper' && !this.state.getFlag('metShrineKeeper')) {
         this.state.setFlag('metShrineKeeper', true);
         // After first NPC talk, set the courtyard objective
         this.setObjective({
@@ -178,7 +181,8 @@ export class StoryManager {
   }
 
   private onEncounterComplete(encounterId: string): void {
-    if (encounterId.includes('courtyard')) {
+    // Resting brings enemies back; a second win doesn't move the story again
+    if (encounterId.includes('courtyard') && !this.state.getFlag('courtyardPurified')) {
       this.state.setFlag('courtyardPurified', true);
       this.completeCurrentObjective();
       this.setObjective({
@@ -188,7 +192,7 @@ export class StoryManager {
         zoneId: 'FOREST',
         isComplete: false,
       });
-    } else if (encounterId === 'enc_forest_2') {
+    } else if (encounterId === 'enc_forest_2' && !this.state.getFlag('forestPurified')) {
       this.state.setFlag('forestPurified', true);
       this.completeCurrentObjective();
     }

@@ -110,14 +110,21 @@ export class CrimsonOni implements Boss {
       poiseDamage *= 1.5;
     }
 
-    this.poise -= poiseDamage;
+    this.applyPostureDamage(poiseDamage);
+    this.health.takeDamage(mitigatedDamage, 'PLAYER');
+  }
+
+  /** Wears down the boss's poise. Parries and heavy blows do this fastest. */
+  public applyPostureDamage(amount: number): void {
+    if (this.health.isDead) return;
+    this.poise -= amount;
+    EventBus.emit('bossPosture', { fraction: 1 - Math.max(0, this.poise) / this.MAX_POISE });
     if (this.poise <= 0 && this.state !== BossState.STAGGER && this.state !== BossState.DEFEATED && this.state !== BossState.PHASE_TRANSITION) {
       this.poise = 0;
       this.setState(BossState.STAGGER);
       EventBus.emit('damageNumber', { position: this.root.position.clone().setY(2), text: 'STAGGERED', kind: 'label' });
     }
 
-    this.health.takeDamage(mitigatedDamage, 'PLAYER');
   }
 
   public reset(position: THREE.Vector3): void {

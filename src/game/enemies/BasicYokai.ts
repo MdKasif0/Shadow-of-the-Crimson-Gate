@@ -10,6 +10,8 @@ import { EnemyAnimator } from './EnemyAnimator';
 import { EnemyFactory } from './EnemyFactory';
 import { HitboxSystem } from '../combat/HitboxSystem';
 import { EnemyAI } from './EnemyAI';
+import { EnemyOptions, EnemyTraits } from './EnemyTraits';
+import { EventBus } from '../core/EventBus';
 import { BASIC_YOKAI_CONFIG, EnemyConfig } from './EnemyConfig';
 import { AttackRole } from '../combat/AttackDirector';
 import { AudioManager } from '../audio/AudioManager';
@@ -24,6 +26,7 @@ export class BasicYokai implements Enemy {
   public config: EnemyConfig = BASIC_YOKAI_CONFIG;
 
   public glow: CharacterGlow;
+  public traits: EnemyTraits;
   private staggerSeconds: number = 0;
   private rig: CharacterRig;
   private animator: EnemyAnimator;
@@ -45,13 +48,16 @@ export class BasicYokai implements Enemy {
     this.homePosition = pos.clone();
   }
 
-  constructor(id: string) {
+  constructor(id: string, options: EnemyOptions = {}) {
     this.id = id;
+    this.config = EnemyTraits.adjustConfig(this.config, options);
+    this.traits = new EnemyTraits('Basic Yokai', this.config, options);
     this.root = new THREE.Group();
     this.root.name = `BasicYokai_${id}`;
 
     this.rig = EnemyFactory.createBasicYokai();
     this.root.add(this.rig.root);
+    this.traits.dress(this.rig);
     this.glow = applyRimLight(this.root, 0xa860e0, 0.2, { uniqueMaterials: true });
 
     this.animator = new EnemyAnimator(this.rig);
@@ -63,7 +69,7 @@ export class BasicYokai implements Enemy {
   }
 
   public get isStaggered(): boolean {
-    return this.state === EnemyState.HURT && this.staggerSeconds > 0 && !this.health.isDead;
+    return this.state === EnemyState.HURT && (this.staggerSeconds > 0 || this.traits.posture.isBroken) && !this.health.isDead;
   }
 
   public get attackWarning(): number {
@@ -71,8 +77,21 @@ export class BasicYokai implements Enemy {
     return this.stateTimer / this.config.attackWindup;
   }
 
+  private get isSlamming(): boolean {
+    return this.traits.isElite && this.traits.isEnraged;
+  }
+
   public get attackShape(): AttackShape {
-    return { range: this.config.attackRange, angle: Math.PI / 2 };
+    return this.isSlamming
+      ? { range: this.config.attackRange * 1.35, angle: Math.PI * 2 }
+      : { range: this.config.attackRange, angle: Math.PI / 2 };
+  }
+
+  /** Leaves the enemy reeling, open to an execution. */
+  public breakGuard(seconds: number): void {
+    if (this.health.isDead) return;
+    this.staggerSeconds = seconds;
+    this.setState(EnemyState.HURT);
   }
 
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number, staggerSeconds: number = 0): void {
@@ -88,6 +107,7 @@ export class BasicYokai implements Enemy {
 
   private onDamageTaken(event: HealthEventPayload): void {
     if (this.health.isDead) return;
+    if (this.traits.isElite && this.health.currentHealth <= this.health.maxHealth * 0.5) this.traits.enrage(this.id);
     this.setState(EnemyState.HURT);
   }
 
@@ -105,7 +125,8 @@ export class BasicYokai implements Enemy {
     this.setState(EnemyState.IDLE);
     this.root.rotation.set(0, 0, 0);
     this.root.scale.setScalar(1);
-    this.root.visible = true;
+    this.traits.reset();
+    this.root.visible = !this.traits.isHidden;
     this.ai.resetStrafe();
   }
 
@@ -118,6 +139,20 @@ export class BasicYokai implements Enemy {
 
   public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any, projectileSystem?: any, allEnemies?: Enemy[]): void {
     this.stateTimer += dt;
+    this.traits.posture.update(dt);
+    if (this.traits.isHidden && !this.health.isDead) {
+      const ambushAt = this.traits.tryAmbush(this.root.position, playerPos);
+      if (!ambushAt) {
+        this.root.visible = false;
+        return;
+      }
+      this.root.position.copy(ambushAt);
+      this.root.rotation.y = Math.atan2(playerPos.x - ambushAt.x, playerPos.z - ambushAt.z);
+      this.root.visible = true;
+      this.attackCooldown = 0;
+      this.setState(EnemyState.ATTACK);
+      EventBus.emit('enemyAmbush', { position: ambushAt.clone() });
+    }
     this.glow.update(dt);
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     this.animator.update(dt);
@@ -179,6 +214,8 @@ export class BasicYokai implements Enemy {
       }
     }
 
+    this.traits.updateSummoning(dt, this.root.position, this.root.rotation.y);
+
     // ─── AI Decision ───
     const decision = this.ai.decide(this.root.position, playerPos, this.attackCooldown, this.state, dt, this.role, this.homePosition);
     
@@ -204,7 +241,7 @@ export class BasicYokai implements Enemy {
     }
 
     if (this.state === EnemyState.WALK || this.state === EnemyState.STRAFE || this.state === EnemyState.RETREAT) {
-      this.velocity.copy(decision.moveDirection).multiplyScalar(this.config.movementSpeed);
+      this.velocity.copy(decision.moveDirection).multiplyScalar(this.config.movementSpeed * (this.traits.isEnraged ? 1.25 : 1));
     } else {
       this.velocity.set(0, 0, 0);
     }
@@ -231,8 +268,11 @@ export class BasicYokai implements Enemy {
     const totalTime = attackWindup + attackActive + attackRecovery;
 
     if (this.stateTimer >= activeStart && this.stateTimer <= activeEnd) {
+      // An enraged elite brings its arms down in a slam that hits all around it
+      const isSlam = this.isSlamming;
       if (this.stateTimer - dt < activeStart) {
         hitboxSystem.resetAttackMemory(this.id);
+        if (isSlam) EventBus.emit('eliteSlam', { position: this.root.position.clone() });
       }
 
       const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.root.rotation.y);
@@ -241,8 +281,9 @@ export class BasicYokai implements Enemy {
         damage: damage,
         position: this.root.position.clone(),
         direction: forward,
-        range: this.config.attackRange,
+        range: this.config.attackRange * (isSlam ? 1.35 : 1),
         hitAngle: Math.PI / 2, // Wide swing
+        hitboxType: isSlam ? 'RADIAL' : 'ARC',
         knockback: knockback
       });
       
@@ -254,7 +295,7 @@ export class BasicYokai implements Enemy {
 
     if (this.stateTimer >= totalTime) {
       this.setState(EnemyState.IDLE);
-      this.attackCooldown = this.config.attackCooldownMin + Math.random() * (this.config.attackCooldownMax - this.config.attackCooldownMin);
+      this.attackCooldown = (this.config.attackCooldownMin + Math.random() * (this.config.attackCooldownMax - this.config.attackCooldownMin)) * (this.traits.isEnraged ? 0.6 : 1);
     }
   }
 

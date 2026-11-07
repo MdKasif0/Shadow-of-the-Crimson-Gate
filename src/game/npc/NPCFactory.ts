@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { CharacterRig } from '../characters/CharacterRig';
+import { CharacterFactory } from '../characters/CharacterFactory';
 
 // ─── Shrine Keeper Materials ────────────────────────────────────────────────
 const robeMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 1.0 }); // Dark cloth
@@ -116,9 +117,48 @@ export class NPCFactory {
     return rig;
   }
 
+  /**
+   * Akane: another ronin, built like the player's own model but in her own
+   * colours, so she reads as a rival rather than a reflection.
+   */
+  public static createRival(isWounded: boolean): CharacterRig {
+    const { rig, sheathedHilt } = CharacterFactory.createRonin();
+    const tint = new THREE.Color(0xb0605a);
+    const copies = new Map<THREE.Material, THREE.Material>();
+    rig.root.traverse(object => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+      let copy = copies.get(mesh.material);
+      if (!copy) {
+        copy = mesh.material.clone();
+        const standard = copy as THREE.MeshStandardMaterial;
+        if (standard.color) standard.color.multiply(tint);
+        copies.set(mesh.material, copy);
+      }
+      mesh.material = copy;
+    });
+    sheathedHilt.visible = true;
+    rig.root.scale.setScalar(0.96);
+
+    if (isWounded) {
+      // Sitting slumped against nothing, sword arm hanging
+      rig.pelvis.position.y = 0.42;
+      rig.leftUpperLeg.rotation.x = -1.45;
+      rig.rightUpperLeg.rotation.x = -1.3;
+      rig.leftLowerLeg.rotation.x = 1.2;
+      rig.rightLowerLeg.rotation.x = 1.4;
+      rig.spine.rotation.x = 0.35;
+      rig.head.rotation.x = 0.3;
+      rig.rightUpperArm.rotation.z = -0.25;
+    }
+    return rig;
+  }
+
   public static create(modelType: string): CharacterRig {
     switch (modelType) {
       case 'SHRINE_KEEPER': return NPCFactory.createShrineKeeper();
+      case 'RIVAL': return NPCFactory.createRival(false);
+      case 'RIVAL_WOUNDED': return NPCFactory.createRival(true);
       default:
         console.warn(`Unknown NPC model type: ${modelType}. Using Shrine Keeper.`);
         return NPCFactory.createShrineKeeper();

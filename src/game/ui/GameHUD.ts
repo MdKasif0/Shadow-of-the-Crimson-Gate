@@ -22,6 +22,9 @@ export class GameHUD {
   private enemyHealthContainer!: HTMLElement;
   private enemyHealthFill!: HTMLElement;
   private enemyNameElement!: HTMLElement;
+  private enemyPostureFill!: HTMLElement;
+  private executePrompt!: HTMLElement;
+  private noticeStack!: HTMLElement;
   private vignette!: HTMLElement;
 
   constructor(containerId: string) {
@@ -169,7 +172,26 @@ export class GameHUD {
     enemyBarBg.appendChild(this.enemyHealthFill);
 
     this.enemyHealthContainer.appendChild(enemyBarBg);
+
+    // Posture: fills as the guard is worn down, and flares when it breaks
+    const posture = document.createElement('div');
+    posture.className = 'hud-posture';
+    this.enemyPostureFill = document.createElement('div');
+    this.enemyPostureFill.className = 'hud-posture__fill';
+    posture.appendChild(this.enemyPostureFill);
+    this.enemyHealthContainer.appendChild(posture);
     this.container.appendChild(this.enemyHealthContainer);
+
+    // Execution prompt, shown while a broken enemy is in reach
+    this.executePrompt = document.createElement('div');
+    this.executePrompt.className = 'hud-execute';
+    this.container.appendChild(this.executePrompt);
+
+    // Notices: techniques learned, charms found, essence dropped and recovered
+    this.noticeStack = document.createElement('div');
+    this.noticeStack.className = 'hud-notices';
+    this.noticeStack.setAttribute('aria-live', 'polite');
+    this.container.appendChild(this.noticeStack);
 
     // 4. Game Over overlay
     this.container.appendChild(this.gameOver.element);
@@ -206,6 +228,9 @@ export class GameHUD {
 
       const pct = Math.max(0, (data.current / data.max) * 100);
       this.enemyHealthFill.style.width = `${pct}%`;
+      const posture = data.isBroken ? 1 : (data.posture ?? 0);
+      this.enemyPostureFill.style.transform = `scaleX(${posture})`;
+      this.enemyPostureFill.parentElement?.classList.toggle('hud-posture--broken', !!data.isBroken);
       if (data.name) {
         this.enemyNameElement.innerText = data.name;
       }
@@ -257,6 +282,14 @@ export class GameHUD {
       if (el) el.innerText = `LV.${data.level}`;
     });
 
+    EventBus.on('executePrompt', (data: { visible: boolean }) => {
+      const key = keyName(SettingsManager.getInstance().get().keyBindings.finisher);
+      this.executePrompt.innerHTML = `<kbd>${key}</kbd> Execute`;
+      this.executePrompt.classList.toggle('hud-execute--visible', data.visible);
+    });
+
+    EventBus.on('notice', (data: { title: string; text: string }) => this.showNotice(data.title, data.text));
+
     EventBus.on('bossBarVisibility', (data: { visible: boolean }) => {
       this.isBossBarVisible = data.visible;
       if (data.visible) this.hideEnemyHealth();
@@ -272,6 +305,21 @@ export class GameHUD {
     });
 
     window.addEventListener('keydown', this.handleKeyDown);
+  }
+
+  private showNotice(title: string, text: string): void {
+    const notice = document.createElement('div');
+    notice.className = 'hud-notice';
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const body = document.createElement('span');
+    body.textContent = text;
+    notice.append(heading, body);
+    this.noticeStack.appendChild(notice);
+    // Only the latest few stay on screen
+    while (this.noticeStack.children.length > 3) this.noticeStack.firstElementChild?.remove();
+    setTimeout(() => notice.classList.add('hud-notice--leaving'), 5600);
+    setTimeout(() => notice.remove(), 6200);
   }
 
   private handleKeyDown = (e: KeyboardEvent) => {

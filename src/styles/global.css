@@ -380,3 +380,390 @@ input:focus-visible {
   box-shadow: 0 0 14px rgba(139, 26, 26, 0.35);
   transform: scale(1.02);
 }
+
+/* ── Guard posture ───────────────────────────────────────────────────── */
+
+.hud-posture {
+  width: 300px;
+  height: 3px;
+  margin: 5px auto 0;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.hud-posture--boss {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.hud-posture__fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #8a6a2a, #e8c56a);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.2s ease-out;
+}
+
+.hud-posture--broken .hud-posture__fill {
+  background: #fff3c8;
+  box-shadow: 0 0 12px #ffd77a;
+  animation: postureBroken 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes postureBroken {
+  from { opacity: 1; }
+  to { opacity: 0.45; }
+}
+
+/* ── Execution prompt ────────────────────────────────────────────────── */
+
+.hud-execute {
+  position: absolute;
+  left: 50%;
+  bottom: 24%;
+  transform: translate(-50%, 8px);
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #ffe2a0;
+  text-shadow: 0 0 14px rgba(255, 170, 60, 0.75), 0 2px 4px #000;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+.hud-execute--visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.hud-execute kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-right: 0.6em;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 226, 160, 0.7);
+  border-radius: 3px;
+  font: inherit;
+  letter-spacing: 0;
+}
+
+/* ── Notices ─────────────────────────────────────────────────────────── */
+
+.hud-notices {
+  position: absolute;
+  top: 140px;
+  right: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(340px, calc(100vw - 64px));
+  pointer-events: none;
+}
+
+.hud-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px 12px 18px;
+  border-left: 2px solid #c9a24a;
+  background: linear-gradient(90deg, rgba(10, 12, 14, 0.86), rgba(10, 12, 14, 0.55));
+  animation: noticeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.hud-notice strong {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: #f0d79a;
+}
+
+.hud-notice span {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #d8d2c4;
+}
+
+.hud-notice--leaving {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+@keyframes noticeIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Shrine menu ─────────────────────────────────────────────────────── */
+
+.shrine-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(ellipse at 50% 40%, rgba(40, 24, 10, 0.72), rgba(4, 5, 6, 0.92) 70%);
+  backdrop-filter: blur(6px);
+  color: #e9dec8;
+  font-family: 'Cinzel', serif;
+}
+
+.shrine-menu__panel {
+  display: flex;
+  flex-direction: column;
+  width: min(1040px, 100%);
+  max-height: calc(100dvh - 48px);
+  border: 1px solid rgba(185, 154, 98, 0.35);
+  background: linear-gradient(180deg, rgba(14, 16, 18, 0.96), rgba(8, 10, 11, 0.98));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+
+.shrine-menu__header {
+  padding: 26px 32px 14px;
+  text-align: center;
+  border-bottom: 1px solid rgba(185, 154, 98, 0.18);
+}
+
+.shrine-menu__eyebrow {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.45em;
+  color: #b99a62;
+  text-transform: uppercase;
+}
+
+.shrine-menu__header h2 {
+  margin: 8px 0 6px;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.shrine-menu__note {
+  margin: 0 auto;
+  max-width: 560px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: rgba(233, 222, 200, 0.62);
+}
+
+.shrine-menu__essence {
+  margin: 12px 0 0;
+  font-size: 20px;
+  color: #8fe6ff;
+  text-shadow: 0 0 12px rgba(127, 232, 255, 0.4);
+}
+
+.shrine-menu__essence span {
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: rgba(143, 230, 255, 0.7);
+  text-transform: uppercase;
+}
+
+.shrine-menu__tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 32px 0;
+}
+
+.shrine-menu__tabs button {
+  padding: 10px 22px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: rgba(233, 222, 200, 0.55);
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.shrine-menu__tabs button span {
+  margin-left: 8px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: rgba(185, 154, 98, 0.8);
+}
+
+.shrine-menu__tabs button[aria-selected='true'],
+.shrine-menu__tabs button:hover,
+.shrine-menu__tabs button:focus-visible {
+  color: #f6eedd;
+  border-bottom-color: #c9a24a;
+  outline: none;
+}
+
+.shrine-menu__body {
+  overflow-y: auto;
+  padding: 20px 28px;
+}
+
+.shrine-paths {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.shrine-path {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.shrine-path h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.24em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.shrine-path--blade h3 { color: #e8a48a; }
+.shrine-path--spirit h3 { color: #8fe6ff; }
+.shrine-path--shadow h3 { color: #c4b0ff; }
+
+.shrine-path > p {
+  margin: 4px 0 14px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-align: center;
+  color: rgba(233, 222, 200, 0.5);
+}
+
+.shrine-path__link {
+  display: block;
+  width: 1px;
+  height: 12px;
+  margin: 0 auto;
+  background: rgba(185, 154, 98, 0.4);
+}
+
+.shrine-skill,
+.shrine-charm {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(185, 154, 98, 0.22);
+  background: rgba(255, 255, 255, 0.025);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.shrine-skill:hover,
+.shrine-skill:focus-visible,
+.shrine-charm:hover,
+.shrine-charm:focus-visible {
+  border-color: rgba(220, 188, 130, 0.8);
+  background: rgba(185, 154, 98, 0.08);
+  outline: none;
+}
+
+.shrine-skill__name,
+.shrine-charm__name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.shrine-skill__desc,
+.shrine-charm__desc,
+.shrine-charm__origin {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(233, 222, 200, 0.7);
+}
+
+.shrine-charm__origin {
+  font-style: italic;
+  color: rgba(185, 154, 98, 0.75);
+}
+
+.shrine-skill__cost,
+.shrine-charm__state {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: #8fe6ff;
+}
+
+.shrine-skill--owned {
+  border-color: rgba(201, 162, 74, 0.7);
+  background: linear-gradient(90deg, rgba(201, 162, 74, 0.16), rgba(201, 162, 74, 0.04));
+  cursor: default;
+}
+
+.shrine-skill--owned .shrine-skill__cost { color: #e8c56a; }
+
+.shrine-skill--locked,
+.shrine-skill--short {
+  opacity: 0.55;
+}
+
+.shrine-skill--locked { cursor: not-allowed; }
+.shrine-skill--locked .shrine-skill__cost,
+.shrine-skill--short .shrine-skill__cost { color: rgba(233, 222, 200, 0.6); }
+
+.shrine-skill--refused {
+  animation: skillRefused 0.35s ease;
+}
+
+@keyframes skillRefused {
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.shrine-charms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.shrine-charm--worn {
+  border-color: #c9a24a;
+  background: linear-gradient(180deg, rgba(201, 162, 74, 0.16), rgba(201, 162, 74, 0.03));
+}
+
+.shrine-charm--worn .shrine-charm__state { color: #e8c56a; }
+
+.shrine-charm--unknown {
+  place-content: center;
+  min-height: 108px;
+  border-style: dashed;
+  cursor: default;
+  opacity: 0.4;
+  text-align: center;
+}
+
+.shrine-menu__footer {
+  display: flex;
+  justify-content: center;
+  padding: 14px 28px 22px;
+  border-top: 1px solid rgba(185, 154, 98, 0.18);
+}
+
+.shrine-menu__leave {
+  margin: 0;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.75rem;
+}
+
+.shrine-menu__leave span {
+  margin-left: 10px;
+  opacity: 0.55;
+}
+
+@media (max-width: 760px) {
+  .shrine-paths { grid-template-columns: 1fr; }
+  .shrine-menu__header h2 { font-size: 22px; }
+}

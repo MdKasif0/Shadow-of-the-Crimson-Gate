@@ -7,7 +7,7 @@ const RESERVED_KEYS = ['Escape', 'Tab', 'F5', 'F11', 'F12', 'MetaLeft', 'MetaRig
 
 const GAMEPAD_LEGEND = [
   ['Left Stick', 'Move'], ['Right Stick', 'Camera'], ['X / Square', 'Light Attack'], ['Y / Triangle', 'Heavy Attack'],
-  ['A / Cross', 'Dash'], ['B / Circle', 'Interact'], ['LB', 'Lock On'], ['RB', 'Spirit Cut'], ['RT', 'Sprint'], ['Start', 'Pause'],
+  ['A / Cross', 'Dash'], ['B / Circle', 'Interact'], ['LB', 'Lock On'], ['RB', 'Spirit Cut / Execution'], ['LT', 'Block / Parry'], ['RT', 'Sprint'], ['R3', 'Spirit Wave'], ['Start', 'Pause'],
 ];
 
 const BUTTON_STYLE = 'min-width: 122px; padding: 7px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(196,163,90,0.4); color: #e8d9b4; font-family: Inter, sans-serif; font-size: 13px; letter-spacing: 0.04em; cursor: pointer; border-radius: 2px;';
