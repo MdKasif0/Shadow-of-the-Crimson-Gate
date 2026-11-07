@@ -33,6 +33,11 @@ export class NPC {
     applyRimLight(this.root, 0xffcf8a, 0.6);
   }
 
+  /** Whether the character is in the world, given the story so far. */
+  public isPresent(flags: StoryFlags): boolean {
+    return this.def.isPresent ? this.def.isPresent(flags) : true;
+  }
+
   /** Get the appropriate dialogue based on story flags */
   public getDialogue(flags: StoryFlags): DialogueNode[] {
     for (const d of this.def.dialogues) {

@@ -11,6 +11,8 @@ export class DialogueManager {
   private nodes: Map<string, DialogueNode> = new Map();
   private currentNode: DialogueNode | null = null;
   private _isActive: boolean = false;
+  /** Who is speaking, so listeners know which conversation ended. */
+  private speakerId: string | null = null;
 
   constructor() {
     this.box = new DialogueBox();
@@ -21,8 +23,9 @@ export class DialogueManager {
     return this._isActive;
   }
 
-  public startDialogue(nodes: DialogueNode[]): void {
+  public startDialogue(nodes: DialogueNode[], speakerId: string | null = null): void {
     if (this._isActive) return;
+    this.speakerId = speakerId;
 
     this.nodes.clear();
     for (const node of nodes) {
@@ -30,7 +33,7 @@ export class DialogueManager {
     }
 
     this._isActive = true;
-    EventBus.emit(StoryEvents.DIALOGUE_START, {});
+    EventBus.emit(StoryEvents.DIALOGUE_START, { speakerId });
 
     // Start from the first node
     const first = nodes[0];
@@ -68,6 +71,7 @@ export class DialogueManager {
     if (!this.currentNode?.choices) return;
 
     const choice = this.currentNode.choices[index];
+    if (choice?.effect) EventBus.emit('dialogueEffect', { effect: choice.effect, speakerId: this.speakerId });
     if (choice) {
       const nextNode = this.nodes.get(choice.nextNodeId);
       if (nextNode) {
@@ -85,7 +89,9 @@ export class DialogueManager {
     this.nodes.clear();
     this.box.hide();
 
-    EventBus.emit(StoryEvents.DIALOGUE_END, {});
+    const speakerId = this.speakerId;
+    this.speakerId = null;
+    EventBus.emit(StoryEvents.DIALOGUE_END, { speakerId });
   }
 
   public dispose(): void {

@@ -1,7 +1,7 @@
 export type GameAction =
   | 'moveForward' | 'moveBack' | 'moveLeft' | 'moveRight'
   | 'attack' | 'heavy' | 'dash' | 'sprint'
-  | 'lockOn' | 'finisher' | 'interact';
+  | 'lockOn' | 'finisher' | 'interact' | 'block' | 'spiritWave';
 
 export type KeyBindings = Record<GameAction, string>;
 
@@ -17,6 +17,8 @@ export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   lockOn: 'KeyQ',
   finisher: 'KeyR',
   interact: 'KeyE',
+  block: 'KeyF',
+  spiritWave: 'KeyC',
 };
 
 /** Rebindable actions in display order, with any fixed mouse alternative. */
@@ -30,7 +32,9 @@ export const ACTION_LABELS: { action: GameAction; label: string; mouse?: string 
   { action: 'dash', label: 'Dash / Dodge' },
   { action: 'sprint', label: 'Sprint' },
   { action: 'lockOn', label: 'Lock On' },
-  { action: 'finisher', label: 'Spirit Cut (full focus)' },
+  { action: 'block', label: 'Block / Parry' },
+  { action: 'finisher', label: 'Spirit Cut / Execution' },
+  { action: 'spiritWave', label: 'Spirit Wave' },
   { action: 'interact', label: 'Interact' },
 ];
 

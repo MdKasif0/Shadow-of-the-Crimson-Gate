@@ -27,6 +27,8 @@ export interface ModelSheet {
   pixelsPerUnit: number;
   /** Cut-out shapes come from a separate `_alpha` texture, rather than the colour's alpha channel. */
   separateAlpha?: boolean;
+  /** Flat colour to use if the colour texture is missing. */
+  fallbackColor?: number;
   /** Lifts the art's dark values so the character reads in dark scenes. */
   brightness?: number;
 }
@@ -131,9 +133,37 @@ type StrandPoints = [number, number, number][];
 const textureLoader = new THREE.TextureLoader();
 const materialSets = new Map<string, Record<PartMaterial, THREE.MeshStandardMaterial>>();
 
-function loadTexture(url: string, isColor: boolean): THREE.Texture {
-  const texture = textureLoader.load(url);
-  if (isColor) texture.colorSpace = THREE.SRGBColorSpace;
+type TextureKind = 'color' | 'normal' | 'orm' | 'alpha';
+
+/** What each kind of texture falls back to when its file is missing. */
+const FALLBACK_PIXELS: Record<Exclude<TextureKind, 'color'>, string> = {
+  normal: 'rgb(128, 128, 255)',
+  // Barely metallic, fairly rough
+  orm: 'rgb(20, 215, 0)',
+  // Fully cut away, so cut-out cloth disappears rather than showing as rectangles
+  alpha: 'rgb(0, 0, 0)',
+};
+
+function solidImage(color: string): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, 1, 1);
+  return canvas;
+}
+
+/**
+ * Loads one of a character's textures. If the file is missing, the same texture
+ * object is filled with a flat fallback, so every material sharing it (including
+ * per-enemy copies made before the load failed) picks that up.
+ */
+function loadTexture(url: string, kind: TextureKind, fallbackColor: number): THREE.Texture {
+  const texture = textureLoader.load(url, undefined, undefined, () => {
+    (texture as THREE.Texture<unknown>).image = solidImage(kind === 'color' ? `#${fallbackColor.toString(16).padStart(6, '0')}` : FALLBACK_PIXELS[kind]);
+    texture.needsUpdate = true;
+  });
+  if (kind === 'color') texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
   return texture;
 }
@@ -142,9 +172,10 @@ function materialsFor(sheet: ModelSheet): Record<PartMaterial, THREE.MeshStandar
   const existing = materialSets.get(sheet.textures);
   if (existing) return existing;
 
-  const map = loadTexture(`${sheet.textures}_color.webp`, true);
-  const normalMap = loadTexture(`${sheet.textures}_normal.webp`, false);
-  const orm = loadTexture(`${sheet.textures}_orm.webp`, false);
+  const fallback = sheet.fallbackColor ?? 0x2a2a2e;
+  const map = loadTexture(`${sheet.textures}_color.webp`, 'color', fallback);
+  const normalMap = loadTexture(`${sheet.textures}_normal.webp`, 'normal', fallback);
+  const orm = loadTexture(`${sheet.textures}_orm.webp`, 'orm', fallback);
   const tint = new THREE.Color().setScalar(sheet.brightness ?? 1);
 
   const set = {
@@ -155,7 +186,7 @@ function materialsFor(sheet: ModelSheet): Record<PartMaterial, THREE.MeshStandar
     cloth: new THREE.MeshStandardMaterial({
       map, normalMap, color: tint, roughness: 0.92, metalness: 0,
       side: THREE.DoubleSide, alphaTest: 0.5,
-      alphaMap: sheet.separateAlpha ? loadTexture(`${sheet.textures}_alpha.webp`, false) : null,
+      alphaMap: sheet.separateAlpha ? loadTexture(`${sheet.textures}_alpha.webp`, 'alpha', fallback) : null,
     }),
     hair: new THREE.MeshStandardMaterial({
       color: 0x0a0a0c, roughness: 0.46, metalness: 0.1, side: THREE.DoubleSide,

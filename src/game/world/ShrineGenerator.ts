@@ -106,6 +106,20 @@ export class ShrineGenerator {
       new THREE.Vector3(5, 5, 5)
     ));
 
+    // A wayside shrine before the temple, the last place to rest before the gate
+    const waysideShrine = createShrine();
+    waysideShrine.position.set(-12, 0, -52);
+    waysideShrine.rotation.y = Math.PI / 3;
+    group.add(waysideShrine);
+    WorldLights.add(-12, 2.3, -49, 0xffb060, 26, 13);
+    const waysideGlow = createGlowSprite(0xffc070, 1.8, 0.45);
+    waysideGlow.position.set(-12, 4.2, -52);
+    group.add(waysideGlow);
+    collisionSystem.addBox(new THREE.Box3().setFromCenterAndSize(
+      new THREE.Vector3(-12, 2, -52),
+      new THREE.Vector3(4, 4, 4)
+    ));
+
     return group;
   }
 }

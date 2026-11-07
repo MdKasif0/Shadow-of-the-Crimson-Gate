@@ -139,6 +139,13 @@ export class ThreeGame {
       capture();
     });
 
+    // Shrine menus are clicked with the cursor too, and hold the game still
+    EventBus.on('overlayMenu', (data: { open: boolean }) => {
+      this.isInDialogue = data.open;
+      if (data.open) release();
+      else capture();
+    });
+
     this.captureHint = document.createElement('div');
     this.captureHint.textContent = 'Click to control the camera  ·  Or hold right mouse and drag';
     Object.assign(this.captureHint.style, {

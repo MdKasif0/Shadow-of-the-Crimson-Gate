@@ -1,29 +1,17 @@
+import { BuildModifiers } from './PlayerBuild';
+
+const BASE_HEALTH = 100;
+const BASE_DASH_COOLDOWN = 0.6;
+
+/** The Ronin's numbers, worked out from the skills and charms chosen. */
 export class PlayerStats {
-  public maxHealth: number = 100;
+  public maxHealth: number = BASE_HEALTH;
   public attackPower: number = 1.0;
-  public dashCooldown: number = 0.6;
-  public movementSpeed: number = 4.0;
+  public dashCooldown: number = BASE_DASH_COOLDOWN;
 
-  constructor(level: number) {
-    this.applyLevel(level);
-  }
-
-  public applyLevel(level: number): void {
-    // Reset to base
-    this.maxHealth = 100;
-    this.attackPower = 1.0;
-    this.dashCooldown = 0.6;
-    this.movementSpeed = 4.0;
-
-    // Apply modest bonuses
-    if (level >= 2) {
-      this.maxHealth += 10;
-      this.attackPower += 0.05;
-    }
-    if (level >= 3) {
-      this.maxHealth += 10;
-      this.attackPower += 0.05;
-      this.dashCooldown -= 0.05;
-    }
+  public apply(modifiers: BuildModifiers): void {
+    this.maxHealth = BASE_HEALTH + modifiers.maxHealthBonus;
+    this.attackPower = modifiers.damage;
+    this.dashCooldown = BASE_DASH_COOLDOWN * modifiers.dashCooldown;
   }
 }

@@ -13,6 +13,7 @@ import { DashSystem } from '../combat/DashSystem';
 import { GAME_CONFIG } from '../GameConfig';
 import { applyRimLight, CharacterGlow } from '../utils/RimLight';
 import { EventBus } from '../core/EventBus';
+import { BuildModifiers, PlayerBuild, TechniqueId } from '../progression/PlayerBuild';
 
 /** How far away an enemy can be and still pull the player's swing towards it. */
 const AIM_ASSIST_RANGE = 6.5;
@@ -24,8 +25,12 @@ const LOCK_AIM_RANGE = 12;
 
 export const MAX_FOCUS = 100;
 const PERFECT_DODGE_FOCUS = 30;
-/** How long after starting a dash an incoming hit still counts as dodged. */
-const DODGE_WINDOW_SECONDS = 0.3;
+const PARRY_FOCUS = 20;
+/** How long after a parry or perfect dodge the next swing counts as a counter. */
+const COUNTER_WINDOW = 1.3;
+/** A Dash Strike can still start this long after a dash ends. */
+const DASH_STRIKE_GRACE = 0.16;
+const BLOCK_SPEED = 1.8;
 const PERFECT_DODGE_COOLDOWN = 0.6;
 const FINISHER_INVULNERABILITY = 0.95;
 /** How long the sword stays out after the last swing. */
@@ -57,6 +62,17 @@ export class Ronin {
   public focus: number = 0;
   public glow: CharacterGlow;
 
+  /** Skill and charm effects, set by the scene whenever the build changes. */
+  public modifiers: BuildModifiers = new PlayerBuild().modifiers;
+  public techniques = new Set<TechniqueId>();
+  /** A guard-broken enemy close enough to execute, set by the scene each frame. */
+  public executionTarget: THREE.Vector3 | null = null;
+  public isBlocking: boolean = false;
+  private isAbsorbingBlow: boolean = false;
+  private parryTimer: number = 0;
+  private counterTimer: number = 0;
+  private isCounterAttack: boolean = false;
+  private sinceDash: number = 99;
   private dodgeWindowTimer: number = 0;
   private perfectDodgeCooldown: number = 0;
 
@@ -83,10 +99,10 @@ export class Ronin {
     this.setSwordDrawn(false);
 
     this.combat.events.addListener({
-      onAttackStarted: (attackId) => {
-        // We will need a reference to hitbox system, but we can just
-        // rely on a flag or pass it, or just let CombatSystem emit it.
-        // Actually, we can just let `Ronin.update` check `attackTimer == 0` for now
+      onAttackStarted: () => {
+        // The first swing after a parry or perfect dodge is a counter
+        this.isCounterAttack = this.counterTimer > 0;
+        this.counterTimer = 0;
       }
     });
 
@@ -128,8 +144,17 @@ export class Ronin {
     this.health.takeDamage(amount, 'ENEMY');
   }
 
+  /** A blocked blow: some damage gets through, but the guard holds. */
+  public takeBlockedDamage(amount: number): void {
+    if (this.health.isDead || this.state.isInvulnerable()) return;
+    this.isAbsorbingBlow = true;
+    this.health.takeDamage(amount, 'ENEMY');
+    this.isAbsorbingBlow = false;
+  }
+
   private onDamageTaken(event: HealthEventPayload): void {
     if (this.health.isDead) return;
+    if (this.isAbsorbingBlow) return;
     this.state.movement = MovementState.HURT;
     this.state.combatPhase = CombatPhase.NONE; // Interrupt attacks
     this.state.currentAttackId = null;
@@ -161,11 +186,50 @@ export class Ronin {
     this.dashSystem['cooldownTimer'] = 0;
     this.lockTarget = null;
     this.dodgeWindowTimer = 0;
+    this.parryTimer = 0;
+    this.counterTimer = 0;
+    this.isBlocking = false;
+    this.executionTarget = null;
     this.setFocus(0);
   }
 
+  public heal(amount: number): void {
+    const before = this.health.currentHealth;
+    this.health.heal(amount);
+    if (this.health.currentHealth !== before) {
+      EventBus.emit('playerHealth', { current: this.health.currentHealth, max: this.health.maxHealth, delta: this.health.currentHealth - before });
+    }
+  }
+
   public addFocus(amount: number): void {
-    this.setFocus(this.focus + amount);
+    this.setFocus(this.focus + amount * this.modifiers.focusGain);
+  }
+
+  /** Applies the current skills and charms. */
+  public applyBuild(modifiers: BuildModifiers, techniques: Set<TechniqueId>): void {
+    this.modifiers = modifiers;
+    this.techniques = techniques;
+    this.combat.hasFourthCut = modifiers.hasFourthCut;
+  }
+
+  /**
+   * Called when a blow is about to land. Blocking turns aside anything from the
+   * front; raising the guard at the last moment parries it outright.
+   */
+  public tryGuard(attackDirection: THREE.Vector3): 'parry' | 'block' | null {
+    if (!this.isBlocking || this.health.isDead) return null;
+    const facing = new THREE.Vector3(Math.sin(this.currentRotation), 0, Math.cos(this.currentRotation));
+    const isFromFront = facing.dot(attackDirection.clone().setY(0).normalize()) < -0.2;
+    if (!isFromFront) return null;
+
+    if (this.parryTimer > 0) {
+      this.parryTimer = 0;
+      this.counterTimer = COUNTER_WINDOW;
+      this.addFocus(PARRY_FOCUS);
+      this.glow.flash(0.5);
+      return 'parry';
+    }
+    return 'block';
   }
 
   private setFocus(value: number): void {
@@ -185,6 +249,7 @@ export class Ronin {
     if (this.perfectDodgeCooldown <= 0) {
       this.perfectDodgeCooldown = PERFECT_DODGE_COOLDOWN;
       this.addFocus(PERFECT_DODGE_FOCUS);
+      this.counterTimer = COUNTER_WINDOW;
       EventBus.emit('perfectDodge', { position: this.root.position.clone() });
     }
     return true;
@@ -197,6 +262,9 @@ export class Ronin {
     }
     if (this.dodgeWindowTimer > 0) this.dodgeWindowTimer -= dt;
     if (this.perfectDodgeCooldown > 0) this.perfectDodgeCooldown -= dt;
+    if (this.parryTimer > 0) this.parryTimer -= dt;
+    if (this.counterTimer > 0) this.counterTimer -= dt;
+    this.sinceDash = this.dashSystem.isDashing ? 0 : this.sinceDash + dt;
     this.glow.update(dt);
 
     if (this.state.movement === MovementState.DEAD) {
@@ -221,30 +289,70 @@ export class Ronin {
     // Process combat inputs
     if (this.isControlsEnabled) {
       const canAct = this.state.movement !== MovementState.HURT;
+      const modifiers = this.modifiers;
 
-      if (inputManager.isActionJustPressed('finisher') && canAct && this.focus >= MAX_FOCUS) {
+      // Raising the guard opens a brief parry window; holding it blocks
+      const wantsBlock = inputManager.isAction('block') && canAct
+        && this.state.movement !== MovementState.DASH && !this.state.isAttacking();
+      if (wantsBlock && !this.isBlocking) this.parryTimer = modifiers.parryWindow;
+      this.isBlocking = wantsBlock;
+
+      const isMoving = inputManager.getMovementDirection().lengthSq() > 0;
+      const canDashStrike = this.techniques.has('dashStrike') && this.sinceDash < DASH_STRIKE_GRACE;
+
+      const isExecuting = this.state.currentAttackId === 'ATTACK_EXECUTE';
+      if (isExecuting) {
+        // Nothing interrupts an execution once it starts
+      } else if (inputManager.isActionJustPressed('finisher') && canAct && this.executionTarget) {
+        this.isBlocking = false;
+        this.targetRotation = Math.atan2(this.executionTarget.x - this.root.position.x, this.executionTarget.z - this.root.position.z);
+        this.combat.startSpecial('ATTACK_EXECUTE');
+        this.state.invulnerabilityTimer = 1.0;
+        EventBus.emit('executionStarted', {});
+      } else if (inputManager.isActionJustPressed('finisher') && canAct && this.focus >= MAX_FOCUS) {
         this.setFocus(0);
         this.aimAttack(inputManager);
         this.combat.startSpecial('ATTACK_FINISHER');
         this.state.invulnerabilityTimer = FINISHER_INVULNERABILITY;
+        if (modifiers.finisherHeal > 0) this.heal(modifiers.finisherHeal);
         EventBus.emit('finisherStarted', {});
+      } else if (inputManager.isActionJustPressed('spiritWave') && canAct && this.techniques.has('spiritWave')) {
+        if (this.focus >= modifiers.waveCost) {
+          this.setFocus(this.focus - modifiers.waveCost);
+          this.aimAttack(inputManager);
+          this.combat.startSpecial('ATTACK_WAVE');
+        } else {
+          EventBus.emit('damageNumber', { position: this.root.position.clone(), text: 'NOT ENOUGH FOCUS', kind: 'label' });
+        }
       } else if (inputManager.isHeavyPressed() && canAct) {
         this.aimAttack(inputManager);
-        this.combat.registerHeavyInput();
+        const canWhirl = this.techniques.has('crimsonWhirl') && inputManager.isRunPressed() && isMoving && !this.state.isAttacking();
+        if (canWhirl) this.combat.startSpecial('ATTACK_WHIRL');
+        else this.combat.registerHeavyInput();
       } else if (inputManager.isAttackPressed() && canAct) {
         this.aimAttack(inputManager);
-        this.combat.registerAttackInput();
+        if (canDashStrike && !this.state.isAttacking()) {
+          // Turns the dash straight into a cut
+          this.dashSystem.isDashing = false;
+          this.state.movement = MovementState.IDLE;
+          this.combat.startSpecial('ATTACK_DASH');
+        } else {
+          this.combat.registerAttackInput();
+        }
       }
 
       // Process Dash
-      if (inputManager.isAction('dash')) {
+      if (inputManager.isAction('dash') && !this.isBlocking) {
         const inputMoveDir = inputManager.getMovementDirection();
         if (this.dashSystem.tryDash(inputMoveDir, this.currentRotation)) {
-          this.dodgeWindowTimer = DODGE_WINDOW_SECONDS;
-          this.state.invulnerabilityTimer = Math.max(this.state.invulnerabilityTimer, DODGE_WINDOW_SECONDS);
+          this.dodgeWindowTimer = modifiers.dodgeWindow;
+          this.state.invulnerabilityTimer = Math.max(this.state.invulnerabilityTimer, modifiers.dodgeWindow);
         }
       }
+    } else {
+      this.isBlocking = false;
     }
+    this.animator.isGuarding = this.isBlocking;
 
     // Update combat state machine
     this.combat.update(dt);
@@ -255,7 +363,7 @@ export class Ronin {
     
     let intendedMove = new THREE.Vector3();
     const isRunning = this.isControlsEnabled && inputManager.isRunPressed();
-    const speed = isRunning ? 8 : 4; // GAME_CONFIG.PLAYER.SPEED
+    const speed = this.isBlocking ? BLOCK_SPEED : isRunning ? 8 : 4; // GAME_CONFIG.PLAYER.SPEED
 
     // Priority: HURT > DASH > ATTACK > MOVEMENT
     if (this.state.movement === MovementState.HURT) {
@@ -291,14 +399,24 @@ export class Ronin {
                if (vfx) {
                  vfx.spawnSlash(this.root.position, forward, attackDef.slashType);
                }
+               // Waves and executions land through the scene, not the blade
+               if (attackDef.noHitbox) {
+                 EventBus.emit('playerStrike', { attackId: attackDef.id, position: this.root.position.clone(), direction: forward.clone() });
+               }
             }
 
-            hitboxSystem.addActiveHitbox({
+            const isHealthy = this.health.currentHealth > this.health.maxHealth * 0.8;
+            const damage = attackDef.damage * this.damageMultiplier
+              * (isHealthy ? this.modifiers.healthyDamage : 1)
+              * (this.isCounterAttack ? this.modifiers.counterDamage : 1);
+            const rangeScale = (attackDef.rangeScale ?? 1) * (attackDef.id === 'ATTACK_FINISHER' ? this.modifiers.finisherRange : 1);
+
+            if (!attackDef.noHitbox) hitboxSystem.addActiveHitbox({
               ownerId: 'PLAYER',
-              damage: Math.round(attackDef.damage * this.damageMultiplier),
+              damage: Math.round(damage),
               position: this.root.position.clone(),
               direction: forward,
-              range: this.katana.getRange() * (attackDef.rangeScale ?? 1),
+              range: this.katana.getRange() * rangeScale,
               hitAngle: this.katana.getHitAngle(),
               knockback: attackDef.knockback ?? 10,
               hitboxType: attackDef.isRadial ? 'RADIAL' : 'ARC',
@@ -307,6 +425,8 @@ export class Ronin {
               hitStop: attackDef.hitStop,
               shake: attackDef.shake,
               isHeavy: attackDef.slashType >= 3,
+              posture: attackDef.posture,
+              isCounter: this.isCounterAttack,
             });
           }
         }

@@ -67,6 +67,23 @@ export class ProjectileSystem {
               continue;
             }
 
+            // A raised guard turns a projectile aside; a timed one sends it back
+            const guard = player.tryGuard(proj.direction);
+            if (guard === 'parry') {
+              EventBus.emit('parry', { attackerId: proj.ownerId, position: player.root.position.clone() });
+              proj.deactivate();
+              continue;
+            }
+            if (guard === 'block') {
+              const before = player.health.currentHealth;
+              player.takeBlockedDamage(Math.round(proj.damage * (1 - player.modifiers.blockReduction)));
+              EventBus.emit('playerHealth', { current: player.health.currentHealth, max: player.health.maxHealth, delta: player.health.currentHealth - before });
+              EventBus.emit('damageNumber', { position: player.root.position.clone(), text: 'BLOCKED', kind: 'label' });
+              vfx.spawnHit(proj.position, proj.direction.clone().negate(), false);
+              proj.deactivate();
+              continue;
+            }
+
             // Hit!
             const oldHp = player['health']['currentHealth'];
             player.takeDamage(proj.damage, proj.direction, proj.knockback);

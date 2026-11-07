@@ -12,6 +12,8 @@ import { HitboxSystem } from '../combat/HitboxSystem';
 import { ProjectileSystem } from '../combat/ProjectileSystem';
 import { AttackRole } from '../combat/AttackDirector';
 import { EnemyAI } from './EnemyAI';
+import { EnemyOptions, EnemyTraits } from './EnemyTraits';
+import { EventBus } from '../core/EventBus';
 import { TENGU_CONFIG, EnemyConfig } from './EnemyConfig';
 import { AudioManager } from '../audio/AudioManager';
 import { AudioId } from '../audio/AudioRegistry';
@@ -25,6 +27,7 @@ export class Tengu implements Enemy {
   public config: EnemyConfig = TENGU_CONFIG;
 
   public glow: CharacterGlow;
+  public traits: EnemyTraits;
   private staggerSeconds: number = 0;
   private rig: CharacterRig;
   private animator: TenguAnimator;
@@ -46,13 +49,16 @@ export class Tengu implements Enemy {
     this.homePosition = pos.clone();
   }
 
-  constructor(id: string) {
+  constructor(id: string, options: EnemyOptions = {}) {
     this.id = id;
+    this.config = EnemyTraits.adjustConfig(this.config, options);
+    this.traits = new EnemyTraits('Tengu', this.config, options);
     this.root = new THREE.Group();
     this.root.name = `Tengu_${id}`;
 
     this.rig = EnemyFactory.createTengu();
     this.root.add(this.rig.root);
+    this.traits.dress(this.rig);
     this.glow = applyRimLight(this.root, 0xe88048, 0.2, { uniqueMaterials: true });
 
     this.animator = new TenguAnimator(this.rig);
@@ -64,7 +70,7 @@ export class Tengu implements Enemy {
   }
 
   public get isStaggered(): boolean {
-    return this.state === EnemyState.HURT && this.staggerSeconds > 0 && !this.health.isDead;
+    return this.state === EnemyState.HURT && (this.staggerSeconds > 0 || this.traits.posture.isBroken) && !this.health.isDead;
   }
 
   public get attackWarning(): number {
@@ -74,6 +80,13 @@ export class Tengu implements Enemy {
 
   public get attackShape(): AttackShape {
     return { range: this.config.attackRange, angle: 0.12 };
+  }
+
+  /** Leaves the enemy reeling, open to an execution. */
+  public breakGuard(seconds: number): void {
+    if (this.health.isDead) return;
+    this.staggerSeconds = seconds;
+    this.setState(EnemyState.HURT);
   }
 
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number, staggerSeconds: number = 0): void {
@@ -88,6 +101,7 @@ export class Tengu implements Enemy {
 
   private onDamageTaken(event: HealthEventPayload): void {
     if (this.health.isDead) return;
+    if (this.traits.isElite && this.health.currentHealth <= this.health.maxHealth * 0.5) this.traits.enrage(this.id);
     this.setState(EnemyState.HURT);
   }
 
@@ -105,7 +119,8 @@ export class Tengu implements Enemy {
     this.setState(EnemyState.IDLE);
     this.root.rotation.set(0, 0, 0);
     this.root.scale.setScalar(1);
-    this.root.visible = true;
+    this.traits.reset();
+    this.root.visible = !this.traits.isHidden;
     this.ai.resetStrafe();
   }
 
@@ -118,6 +133,20 @@ export class Tengu implements Enemy {
 
   public update(dt: number, playerPos: THREE.Vector3, hitboxSystem: HitboxSystem, collisionSystem: any, vfx?: any, projectileSystem?: ProjectileSystem, allEnemies?: Enemy[]): void {
     this.stateTimer += dt;
+    this.traits.posture.update(dt);
+    if (this.traits.isHidden && !this.health.isDead) {
+      const ambushAt = this.traits.tryAmbush(this.root.position, playerPos);
+      if (!ambushAt) {
+        this.root.visible = false;
+        return;
+      }
+      this.root.position.copy(ambushAt);
+      this.root.rotation.y = Math.atan2(playerPos.x - ambushAt.x, playerPos.z - ambushAt.z);
+      this.root.visible = true;
+      this.attackCooldown = 0;
+      this.setState(EnemyState.ATTACK);
+      EventBus.emit('enemyAmbush', { position: ambushAt.clone() });
+    }
     this.glow.update(dt);
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
     
@@ -180,6 +209,8 @@ export class Tengu implements Enemy {
       }
     }
 
+    this.traits.updateSummoning(dt, this.root.position, this.root.rotation.y);
+
     // ─── AI Decision ───
     const decision = this.ai.decide(this.root.position, playerPos, this.attackCooldown, this.state, dt, this.role, this.homePosition);
     
@@ -204,7 +235,7 @@ export class Tengu implements Enemy {
     }
 
     if (this.state === EnemyState.WALK || this.state === EnemyState.MAINTAIN_DISTANCE || this.state === EnemyState.STRAFE || this.state === EnemyState.RETREAT) {
-      this.velocity.copy(decision.moveDirection).multiplyScalar(this.config.movementSpeed);
+      this.velocity.copy(decision.moveDirection).multiplyScalar(this.config.movementSpeed * (this.traits.isEnraged ? 1.25 : 1));
     } else {
       // Damping
       this.velocity.lerp(new THREE.Vector3(0,0,0), dt * 5);
@@ -241,22 +272,26 @@ export class Tengu implements Enemy {
         spawnPos.y += 1.5; // roughly chest/head height
         spawnPos.add(forward.clone().multiplyScalar(1.0)); // spawn slightly ahead
 
-        projectileSystem.spawnProjectile(
-          this.id,
-          spawnPos,
-          forward,
-          this.config.projectileSpeed || 15,
-          damage,
-          knockback,
-          this.config.projectileLifetime || 3.0
-        );
+        // An enraged elite looses a fan of three
+        const spread = this.traits.isElite && this.traits.isEnraged ? [-0.28, 0, 0.28] : [0];
+        for (const angle of spread) {
+          projectileSystem.spawnProjectile(
+            this.id,
+            spawnPos,
+            forward.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), angle),
+            this.config.projectileSpeed || 15,
+            damage,
+            knockback,
+            this.config.projectileLifetime || 3.0
+          );
+        }
       }
       this.velocity.lerp(new THREE.Vector3(0,0,0), dt * 10);
     }
 
     if (this.stateTimer >= totalTime) {
       this.setState(EnemyState.IDLE);
-      this.attackCooldown = this.config.attackCooldownMin + Math.random() * (this.config.attackCooldownMax - this.config.attackCooldownMin);
+      this.attackCooldown = (this.config.attackCooldownMin + Math.random() * (this.config.attackCooldownMax - this.config.attackCooldownMin)) * (this.traits.isEnraged ? 0.6 : 1);
     }
   }
 

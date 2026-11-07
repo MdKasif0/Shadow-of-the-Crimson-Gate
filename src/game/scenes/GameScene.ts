@@ -63,6 +63,20 @@ import { GameStateManager } from '../state/GameStateManager';
 import { GameState } from '../state/GameState';
 import { WorldStateManager } from '../state/WorldStateManager';
 
+// ─── Progression, combat depth and world secrets ───────────────
+import { PlayerBuild, CHARMS, TECHNIQUES, TechniqueId, SkillDef } from '../progression/PlayerBuild';
+import { EssenceDrop } from '../progression/EssenceDrop';
+import { SpiritWaves } from '../combat/SpiritWaves';
+import { WorldSecrets, SECRETS, WARD, SecretDef } from '../world/WorldSecrets';
+import { ShrineMenu } from '../ui/ShrineMenu';
+import { CRIMSON_HEART_DIALOGUE } from '../story/Endings';
+import { ChapterId } from '../story/StoryChapter';
+import { createDefaultFlags } from '../story/StoryFlag';
+import { EncounterState } from '../encounters/Encounter';
+import { BossPhaseId as PhaseId } from '../boss/BossPhase';
+import { keyName } from '../settings/KeyBindings';
+import { Interactable } from '../interaction/Interactable';
+
 /** Enemies this close pull the camera's framing towards them. */
 const COMBAT_FRAMING_RANGE = 12;
 const BOSS_FRAMING_RANGE = 40;
@@ -74,6 +88,27 @@ const COMBAT_MUSIC_RANGE = 16;
 const COMBAT_MUSIC_LINGER = 5;
 
 const realTimeNow = () => performance.now() / 1000;
+
+/** Where the Ronin can rest. Each rest point sits clear of every fight's trigger. */
+const SHRINES = [
+  { id: 'courtyard_shrine', name: 'Courtyard Shrine', position: new THREE.Vector3(-12, 0, 25), rest: new THREE.Vector3(-12, 0, 29.5) },
+  { id: 'main_shrine', name: 'Mountain Shrine', position: new THREE.Vector3(0, 0, -10), rest: new THREE.Vector3(0, 0, -5) },
+  { id: 'wayside_shrine', name: 'Wayside Shrine', position: new THREE.Vector3(-12, 0, -52), rest: new THREE.Vector3(-12, 0, -47.5) },
+];
+
+/** The technique each chapter teaches as it begins. */
+const CHAPTER_TECHNIQUES: Partial<Record<ChapterId, TechniqueId>> = {
+  [ChapterId.CHAPTER_2]: 'dashStrike',
+  [ChapterId.CHAPTER_3]: 'spiritWave',
+  [ChapterId.CHAPTER_4]: 'crimsonWhirl',
+};
+const CHAPTER_ORDER = [ChapterId.CHAPTER_1, ChapterId.CHAPTER_2, ChapterId.CHAPTER_3, ChapterId.CHAPTER_4, ChapterId.EPILOGUE];
+
+const EXECUTION_RANGE = 3.4;
+const BOSS_EXECUTION_RANGE = 5.5;
+const ELITE_BAR_RANGE = 26;
+/** Akane, if she fights beside you, strikes the Oni this often. */
+const ALLY_STRIKE_INTERVAL = 11;
 
 export class GameScene {
   public scene: THREE.Scene;
@@ -131,6 +166,22 @@ export class GameScene {
   private isCinematicActive: boolean = false;
   private hasShownTitle: boolean = false;
 
+  // ─── Progression, combat depth and world secrets ──────────────
+  private build = new PlayerBuild();
+  private shrineMenu = new ShrineMenu();
+  private essenceDrop: EssenceDrop | null = null;
+  private spiritWaves: SpiritWaves;
+  private secrets: WorldSecrets;
+  private collected = new Set<string>();
+  /** The broken enemy in reach this frame, and the one an execution is aimed at. */
+  private executionCandidate: Enemy | CrimsonOni | null = null;
+  private executionVictim: Enemy | CrimsonOni | null = null;
+  private isExecutePromptShown = false;
+  private hazardTimers = new Map<string, number>();
+  private allyTimer = 0;
+  private eliteBarId: string | null = null;
+  private isEndingChoicePending = false;
+
   constructor(cameraController: CameraController) {
     AudioManager.init();
     
@@ -147,14 +198,14 @@ export class GameScene {
     this.arenaHazardSystem = new ArenaHazardSystem(this.scene);
 
     this.playerProgress = new PlayerProgress();
-    this.playerStats = new PlayerStats(this.playerProgress.level);
+    this.playerStats = new PlayerStats();
     this.rewardSystem = new RewardSystem(this.playerProgress);
 
     this.bossIntroCamera = new BossIntroCamera(this.cameraController);
     this.bossUI = new BossUI();
 
     this.player = new Ronin();
-    this.applyPlayerStats();
+    this.applyPlayerStats(true);
     
     // Ensure player is instantiated before AudioZoneManager (though AudioZoneManager doesn't take args currently)
     this.audioZoneManager = new AudioZoneManager();
@@ -179,7 +230,15 @@ export class GameScene {
     this.telegraphVfx = new EncounterTelegraphVFX(this.scene, this.encounterManager);
 
     this.interactionSystem = new InteractionSystem();
-    this.interactionSystem.register(new ShrineInteraction(new THREE.Vector3(0, 0, -10)));
+    for (const shrine of SHRINES) {
+      this.interactionSystem.register(new ShrineInteraction(shrine.id, shrine.name, shrine.position));
+    }
+
+    this.spiritWaves = new SpiritWaves(this.scene);
+    this.secrets = new WorldSecrets(this.collisionSystem);
+    this.scene.add(this.secrets.group);
+    for (const secret of SECRETS) this.interactionSystem.register(this.createSecretInteraction(secret));
+    this.interactionSystem.register(this.createWardInteraction());
 
     this.objectiveManager = new ObjectiveManager();
     this.objectiveUI = new ObjectiveUI();
@@ -198,7 +257,7 @@ export class GameScene {
       this.interactionSystem.register(new NPCInteraction(npc, () => {
         this.cameraController.dialogueFocus = npc.position;
         const dialogue = npc.getDialogue(this.storyManager.flags);
-        this.dialogueManager.startDialogue(dialogue);
+        this.dialogueManager.startDialogue(dialogue, npc.id);
       }));
     }
 
@@ -215,7 +274,17 @@ export class GameScene {
       this.startSlowMotion(0.28, 0.8);
       AudioManager.play(AudioId.SPIRIT_CHIME, { volume: 0.7 });
       EventBus.emit('damageNumber', { position: data.position, text: 'PERFECT', kind: 'label' });
+
+      // Shadow Step: slipping a blow rattles every attacker close by
+      if (this.build.modifiers.hasShadowStep) {
+        for (const enemy of this.enemies) {
+          if (enemy.health.isDead || enemy.root.position.distanceTo(data.position) > 3.6) continue;
+          DamageSystem.addPosture(enemy, enemy.traits.posture.max * 0.35);
+        }
+      }
     });
+
+    this.bindProgressionEvents();
 
     EventBus.on('finisherStarted', () => {
       this.startSlowMotion(0.4, 0.85);
@@ -239,13 +308,6 @@ export class GameScene {
       EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
     });
 
-    EventBus.on('levelUp', (data: any) => {
-      this.playerStats.applyLevel(data.level);
-      this.applyPlayerStats();
-      this.player['health'].heal(this.player['health'].maxHealth); // Full heal on level up
-      EventBus.emit('playerHealth', { current: this.player['health']['currentHealth'], max: this.player['health']['maxHealth'], delta: 0 });
-    });
-
     // ─── Phase 5 Step 2 Flows ─────────────────────────────────────
     EventBus.on('loadCheckpoint', () => {
       this.respawnAtCheckpoint();
@@ -258,10 +320,15 @@ export class GameScene {
         objective: this.objectiveManager.getActive(),
         playerPosition: { x: pos.x, y: pos.y, z: pos.z },
         spiritEssence: this.playerProgress.spiritEssence,
-        level: this.playerProgress.level,
+        level: this.build.level,
         clearedEncounters: Array.from(this.playerProgress.clearedEncounters),
         storyFlags: this.storyManager.flags,
-        crimsonOniDefeated: this.playerProgress.crimsonOniDefeated
+        crimsonOniDefeated: this.playerProgress.crimsonOniDefeated,
+        build: this.build.toSave(),
+        droppedEssence: this.essenceDrop
+          ? { ...this.essenceDrop.position, amount: this.essenceDrop.amount }
+          : null,
+        collected: [...this.collected],
       });
     });
 
@@ -269,10 +336,17 @@ export class GameScene {
       if (!saveData) return;
       
       this.playerProgress.initFromSave(saveData);
-      this.playerStats = new PlayerStats(this.playerProgress.level);
-      this.applyPlayerStats();
+      this.build.load(saveData.build);
+      // Saves from before techniques existed: teach whatever the chapter reached
+      const reached = CHAPTER_ORDER.indexOf(saveData.chapter ?? ChapterId.CHAPTER_1);
+      CHAPTER_ORDER.slice(0, reached + 1).forEach(chapter => {
+        const technique = CHAPTER_TECHNIQUES[chapter];
+        if (technique) this.build.techniques.add(technique);
+      });
+      this.applyPlayerStats(true);
       EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
-      EventBus.emit('levelSync', { level: this.playerProgress.level });
+
+      this.restoreWorldState(saveData.collected ?? [], saveData.droppedEssence ?? null);
 
       const savedPos = saveData.playerPosition;
       const loadPos = savedPos
@@ -281,7 +355,7 @@ export class GameScene {
       this.checkpointManager.setCheckpointPosition(loadPos);
       this.revivePlayer(loadPos);
 
-      if (saveData.storyFlags) this.storyManager.state.flags = saveData.storyFlags;
+      if (saveData.storyFlags) this.storyManager.state.flags = { ...createDefaultFlags(), ...saveData.storyFlags };
       if (saveData.chapter) this.storyManager.state.currentChapter = saveData.chapter;
       if (saveData.objective) this.objectiveManager.setObjective(saveData.objective);
       
@@ -299,11 +373,11 @@ export class GameScene {
     
     EventBus.on('newGame', () => {
       this.playerProgress.wipe();
+      this.build.wipe();
       this.hasSeenBossIntro = false;
-      this.playerStats = new PlayerStats(1);
-      this.applyPlayerStats();
+      this.applyPlayerStats(true);
       EventBus.emit('essenceUpdate', { amount: 0, added: 0 });
-      EventBus.emit('levelSync', { level: 1 });
+      this.restoreWorldState([], null);
 
       const startPos = new THREE.Vector3(0, 0, GAME_CONFIG.PLAYER.SPAWN_Z);
       this.checkpointManager.setCheckpointPosition(startPos);
@@ -360,9 +434,12 @@ export class GameScene {
         this.playerProgress.addEssence(500);
         this.playerProgress.crimsonOniDefeated = true;
         EventBus.emit('requestSave', {});
-        
+
         this.player.isControlsEnabled = true;
-      }, 7000);
+        // What remains of the Oni offers a choice, and the ending follows from it
+        this.isEndingChoicePending = true;
+        this.dialogueManager.startDialogue(CRIMSON_HEART_DIALOGUE, 'crimson_heart');
+      }, 7500);
     });
 
     EventBus.on('spawnBossProjectile', (data: any) => {
@@ -480,7 +557,7 @@ export class GameScene {
     let bestScore = Infinity;
 
     const consider = (candidate: Enemy | CrimsonOni) => {
-      if (candidate.health.isDead || !candidate.root.parent) return;
+      if (candidate.health.isDead || !candidate.root.parent || !candidate.root.visible) return;
       const distance = candidate.root.position.distanceTo(position);
       if (distance > range) return;
 
@@ -530,7 +607,7 @@ export class GameScene {
       mood = this.boss.phase === BossPhaseId.PHASE_3 ? 'boss3' : this.boss.phase === BossPhaseId.PHASE_2 ? 'boss2' : 'boss1';
     } else {
       const isEnemyNear = this.enemies.some(enemy =>
-        !enemy.health.isDead && enemy.root.position.distanceTo(position) < COMBAT_MUSIC_RANGE);
+        !enemy.health.isDead && enemy.root.visible && enemy.root.position.distanceTo(position) < COMBAT_MUSIC_RANGE);
       this.combatMusicTimer = isEnemyNear ? COMBAT_MUSIC_LINGER : Math.max(0, this.combatMusicTimer - realDt);
       if (this.combatMusicTimer > 0) mood = 'combat';
     }
@@ -549,7 +626,7 @@ export class GameScene {
     let nearest: THREE.Vector3 | null = null;
     let nearestDistSq = COMBAT_FRAMING_RANGE * COMBAT_FRAMING_RANGE;
     for (const enemy of this.enemies) {
-      if (enemy.health.isDead) continue;
+      if (enemy.health.isDead || !enemy.root.visible) continue;
       aimTargets.push(enemy.root.position);
       const distSq = enemy.root.position.distanceToSquared(playerPos);
       if (distSq < nearestDistSq) {
@@ -602,12 +679,24 @@ export class GameScene {
     }]);
   }
 
-  private applyPlayerStats(): void {
-    this.player['health'].maxHealth = this.playerStats.maxHealth;
-    this.player['health'].currentHealth = this.playerStats.maxHealth;
-    this.player['dashSystem']['dashCooldown'] = this.playerStats.dashCooldown;
+  /**
+   * Applies the build to the Ronin. Raising maximum health adds the difference
+   * rather than healing outright, unless `isFullHeal`.
+   */
+  private applyPlayerStats(isFullHeal: boolean = false): void {
+    const modifiers = this.build.modifiers;
+    this.playerStats.apply(modifiers);
+    const health = this.player.health;
+    const oldMax = health.maxHealth;
+    health.maxHealth = this.playerStats.maxHealth;
+    health.currentHealth = isFullHeal
+      ? health.maxHealth
+      : Math.min(health.maxHealth, health.currentHealth + Math.max(0, health.maxHealth - oldMax));
+    this.player.dashSystem['dashCooldown'] = this.playerStats.dashCooldown;
     this.player.damageMultiplier = this.playerStats.attackPower;
-    // movement speed etc can be applied here if exposed on player
+    this.player.applyBuild(modifiers, this.build.techniques);
+    EventBus.emit('playerHealth', { current: health.currentHealth, max: health.maxHealth, delta: 0 });
+    EventBus.emit('levelSync', { level: this.build.level });
   }
 
   private time: number = 0;
@@ -639,6 +728,9 @@ export class GameScene {
     // ─── Dialogue & Intro Block ──────────────────────────────────────
     const isDialogueActive = this.dialogueManager.isActive;
     const isIntroActive = this.storyManager.isIntroRunning;
+    this.secrets.update(dt);
+    this.updateNpcPresence();
+    if (this.shrineMenu.isOpen) return;
 
     if (isDialogueActive || isIntroActive) {
       // Update NPCs idle animation
@@ -710,7 +802,10 @@ export class GameScene {
     // Systems updates
     this.interactionSystem.update(playerPos, inputManager);
     this.hitboxSystem.clearActiveHitboxes();
+    this.updateExecutionTarget();
     this.player.update(dt, inputManager, this.collisionSystem, this.hitboxSystem, this.vfx);
+    this.spiritWaves.update(dt, this.hitboxSystem, this.player.damageMultiplier);
+    this.updateEssenceDrop(dt);
     
     // Projectile & Hazard System update
     this.projectileSystem.update(dt, this.player, this.vfx, this.cameraController);
@@ -726,6 +821,8 @@ export class GameScene {
     for (const enemy of this.enemies) {
       enemy.update(dt, playerPos, this.hitboxSystem, this.collisionSystem, this.vfx, this.projectileSystem, this.enemies);
     }
+    this.updateHazards(dt);
+    this.updateEliteBar();
 
     // ─── Boss Update ──────────────────────────────────────────────
     
@@ -766,6 +863,8 @@ export class GameScene {
       }
     }
 
+    this.updateAllyStrikes(dt);
+
     if (this.boss) {
       // Don't update boss combat AI if cinematic is active
       if (!this.isCinematicActive) {
@@ -789,6 +888,7 @@ export class GameScene {
 
     // ─── Check Player Death ───────────────────────────────────────
     if (this.player.health.currentHealth <= 0) {
+      this.dropEssence();
       this.player.isControlsEnabled = false;
       GameStateManager.getInstance().setState(GameState.GAME_OVER);
     }
@@ -810,6 +910,7 @@ export class GameScene {
     this.hitboxSystem.clearActiveHitboxes();
     this.hitboxSystem.clearHurtboxes();
     this.hitStopTimer = 0;
+    this.spiritWaves.clear();
 
     this.resetBossEncounter();
     this.lockTarget = null;
@@ -850,5 +951,422 @@ export class GameScene {
       this.scene.add(this.boss.root);
     }
     this.boss.reset(new THREE.Vector3(0, 0, -115)); // Back of arena
+  }
+
+  // ─── Progression, combat depth and world secrets ──────────────
+
+  private bindProgressionEvents(): void {
+    EventBus.on('shrineRest', (data: { id: string }) => this.restAtShrine(data.id));
+
+    EventBus.on('buildChanged', () => this.applyPlayerStats());
+
+    EventBus.on('playerStrike', (data: { attackId: string; position: THREE.Vector3; direction: THREE.Vector3 }) => {
+      if (data.attackId === 'ATTACK_WAVE') {
+        this.spiritWaves.fire(data.position, data.direction, this.build.modifiers.hasTripleWave, this.hitboxSystem);
+        AudioManager.play(AudioId.VFX_SPIRIT, { volume: 0.7 });
+      } else if (data.attackId === 'ATTACK_EXECUTE') {
+        this.resolveExecution(data.direction);
+      }
+    });
+
+    EventBus.on('executionStarted', () => {
+      this.executionVictim = this.executionCandidate;
+      this.startSlowMotion(0.3, 0.9);
+      this.cameraController.addShake(0.8);
+      AudioManager.play(AudioId.SWORD_DRAW, { volume: 0.8 });
+    });
+
+    EventBus.on('parry', (data: { attackerId: string; position: THREE.Vector3 }) => {
+      this.startSlowMotion(0.32, 0.55);
+      this.cameraController.addShake(0.9);
+      AudioManager.play(AudioId.SWORD_CLASH, { volume: 0.9 });
+      EventBus.emit('damageNumber', { position: data.position.clone().setY(2.2), text: 'PARRY', kind: 'label' });
+      this.vfx.spawnHit(data.position.clone().setY(1.4), new THREE.Vector3(0, 0, 1), true);
+
+      const enemy = this.enemies.find(e => e.id === data.attackerId);
+      if (enemy) DamageSystem.addPosture(enemy, enemy.traits.posture.max * 0.45);
+      else if (this.boss && data.attackerId === this.boss.id) this.boss.applyPostureDamage(16);
+    });
+
+    EventBus.on('enemyDeath', () => {
+      const heal = this.build.modifiers.healOnKill;
+      if (heal > 0) this.player.heal(heal);
+    });
+
+    EventBus.on('eliteEnraged', (data: { name: string }) => {
+      this.cameraController.addShake(1.6);
+      AudioManager.play(AudioId.ARENA_BOSS_WARNING, { volume: 0.8 });
+      EventBus.emit('notice', { title: `${data.name} rages`, text: 'Its attacks change. Watch for the warning.' });
+    });
+
+    EventBus.on('eliteSlam', () => {
+      this.cameraController.addShake(1.4);
+      AudioManager.play(AudioId.ARENA_GROUND_IMPACT, { volume: 0.7 });
+    });
+
+    EventBus.on('enemySummoned', (data: { position: THREE.Vector3 }) => {
+      this.vfx.spawnDeath(data.position);
+      AudioManager.play(AudioId.SHADOW_TELEPORT, { position: data.position, volume: 0.7 });
+    });
+
+    EventBus.on('enemyAmbush', (data: { position: THREE.Vector3 }) => {
+      this.vfx.spawnHurt(data.position);
+      this.cameraController.addShake(0.8);
+      AudioManager.play(AudioId.SHADOW_TELEPORT, { position: data.position, volume: 0.9 });
+      EventBus.emit('damageNumber', { position: data.position.clone().setY(2.3), text: 'AMBUSH', kind: 'label' });
+    });
+
+    EventBus.on('dialogueEffect', (data: { effect: string }) => this.applyDialogueEffect(data.effect));
+
+    EventBus.on(StoryEvents.DIALOGUE_END, (data: { speakerId?: string | null }) => {
+      if (data?.speakerId === 'crimson_heart' && this.isEndingChoicePending) {
+        this.isEndingChoicePending = false;
+        EventBus.emit('endingChosen', {});
+      }
+    });
+
+    EventBus.on(StoryEvents.CHAPTER_START, (data: { chapter: { id: ChapterId } }) => {
+      const technique = CHAPTER_TECHNIQUES[data.chapter.id];
+      if (technique && this.build.learn(technique)) {
+        const { name, how } = TECHNIQUES[technique];
+        const bindings = SettingsManager.getInstance().get().keyBindings;
+        const key = technique === 'spiritWave' ? keyName(bindings.spiritWave)
+          : technique === 'dashStrike' ? `${keyName(bindings.dash)} then ${keyName(bindings.attack)}`
+          : `${keyName(bindings.sprint)} + ${keyName(bindings.heavy)}`;
+        setTimeout(() => EventBus.emit('notice', { title: `New technique: ${name}`, text: `${how}. (${key})` }), 3500);
+        EventBus.emit('requestSave', {});
+      }
+    });
+
+    EventBus.on('encounterComplete', (data: { id: string }) => {
+      const config = EncounterDatabase.getAll().find(c => c.id === data.id);
+      if (config?.charmReward && !this.build.charms.has(config.charmReward)) {
+        this.build.addCharm(config.charmReward);
+        const charm = CHARMS.find(c => c.id === config.charmReward)!;
+        EventBus.emit('notice', { title: `Charm found: ${charm.name}`, text: charm.description });
+      }
+    });
+  }
+
+  /** Heals, saves, brings the yokai back, and opens the upgrade menu. */
+  private restAtShrine(id: string): void {
+    const shrine = SHRINES.find(s => s.id === id);
+    if (!shrine) return;
+
+    this.player.reset(shrine.rest);
+    this.applyPlayerStats(true);
+    this.checkpointManager.setCheckpointPosition(shrine.rest);
+    this.cameraController.snapTo(shrine.rest);
+
+    // Every fight but the boss comes back, as long as it has been fought before
+    this.encounterManager.resetAll(this.scene);
+    this.encounterManager.clearAll();
+    for (const config of EncounterDatabase.getAll()) this.encounterManager.registerEncounter(config);
+    this.enemies = [];
+    this.hitboxSystem.clearHurtboxes();
+    this.projectileSystem.clearAll();
+    this.arenaHazardSystem.reset();
+    this.spiritWaves.clear();
+    this.hazardTimers.clear();
+    this.lockTarget = null;
+
+    AudioManager.play(AudioId.SHRINE_ACTIVATE, { volume: 0.8 });
+    EventBus.emit('requestSave', {});
+
+    EventBus.emit('overlayMenu', { open: true });
+    this.shrineMenu.open({
+      shrineName: shrine.name,
+      build: this.build,
+      getEssence: () => this.playerProgress.spiritEssence,
+      buySkill: (skill: SkillDef) => {
+        this.playerProgress.removeEssence(skill.cost);
+        this.build.buy(skill.id);
+        this.applyPlayerStats(true);
+        EventBus.emit('requestSave', {});
+      },
+      toggleCharm: (charmId: string) => {
+        this.build.toggleCharm(charmId);
+        EventBus.emit('requestSave', {});
+      },
+      onClose: () => EventBus.emit('overlayMenu', { open: false }),
+    });
+  }
+
+  /** Death leaves unspent essence behind. Dying again before recovering it loses it. */
+  private dropEssence(): void {
+    if (this.essenceDrop) {
+      this.essenceDrop.dispose();
+      this.essenceDrop = null;
+      EventBus.emit('notice', { title: 'Essence lost', text: 'You fell again before you could recover it.' });
+    }
+
+    const amount = this.playerProgress.spiritEssence;
+    if (amount > 0) {
+      this.playerProgress.removeEssence(amount);
+      this.placeEssenceDrop(this.player.root.position.clone().setY(0), amount);
+      setTimeout(() => EventBus.emit('notice', { title: `${amount} essence left behind`, text: 'Return to where you fell to recover it.' }), 1200);
+    }
+    EventBus.emit('requestSave', {});
+  }
+
+  private placeEssenceDrop(position: THREE.Vector3, amount: number): void {
+    this.essenceDrop = new EssenceDrop(position, amount);
+    this.scene.add(this.essenceDrop.root);
+  }
+
+  private updateEssenceDrop(dt: number): void {
+    if (!this.essenceDrop || this.player.health.isDead) return;
+    if (!this.essenceDrop.update(dt, this.player.root.position)) return;
+
+    const amount = this.essenceDrop.amount;
+    this.essenceDrop.dispose();
+    this.essenceDrop = null;
+    this.playerProgress.addEssence(amount);
+    AudioManager.play(AudioId.SPIRIT_CHIME, { volume: 0.8 });
+    EventBus.emit('notice', { title: 'Essence recovered', text: `${amount} Spirit Essence returned to you.` });
+    EventBus.emit('requestSave', {});
+  }
+
+  /** The nearest guard-broken enemy in reach, offered to the Ronin to execute. */
+  private updateExecutionTarget(): void {
+    const position = this.player.root.position;
+    let best: Enemy | CrimsonOni | null = null;
+    let bestDist = EXECUTION_RANGE;
+
+    for (const enemy of this.enemies) {
+      if (enemy.health.isDead || !enemy.root.visible || !enemy.traits.posture.isBroken) continue;
+      const dist = enemy.root.position.distanceTo(position);
+      if (dist < bestDist) {
+        best = enemy;
+        bestDist = dist;
+      }
+    }
+    if (!best && this.boss && this.boss.isStaggered && !this.boss.health.isDead
+      && this.boss.root.position.distanceTo(position) < BOSS_EXECUTION_RANGE) {
+      best = this.boss;
+    }
+
+    this.executionCandidate = best;
+    this.player.executionTarget = best ? best.root.position : null;
+    if (!!best !== this.isExecutePromptShown) {
+      this.isExecutePromptShown = !!best;
+      EventBus.emit('executePrompt', { visible: !!best });
+    }
+  }
+
+  private resolveExecution(direction: THREE.Vector3): void {
+    const victim = this.executionVictim;
+    this.executionVictim = null;
+    if (!victim || victim.health.isDead) return;
+
+    const isBoss = victim === this.boss;
+    const enemy = isBoss ? null : victim as Enemy;
+    const damage = isBoss ? victim.health.maxHealth * 0.08
+      : enemy!.traits.isElite ? victim.health.maxHealth * 0.35
+      : victim.health.currentHealth;
+
+    victim.takeDamage(Math.ceil(damage), direction, 14, 1.2);
+    this.hitStopTimer = Math.max(this.hitStopTimer, 0.2);
+    this.cameraController.addShake(2.2);
+    this.vfx.spawnHit(victim.root.position.clone().setY(1.4), direction, true);
+    AudioManager.play(AudioId.SWORD_HIT, { volume: 1 });
+    EventBus.emit('damageNumber', { position: victim.root.position.clone().setY(2.6), text: 'EXECUTION', kind: 'label' });
+    EventBus.emit('damageNumber', { position: victim.root.position.clone(), text: String(Math.ceil(damage)), kind: 'critical' });
+
+    if (enemy) {
+      DamageSystem.emitEnemyHealth(enemy, -damage);
+      if (enemy.health.isDead) DamageSystem.emitDeath(enemy);
+    }
+
+    const { executionHeal, executionFocus } = this.build.modifiers;
+    if (executionHeal > 0) this.player.heal(this.player.health.maxHealth * executionHeal);
+    if (executionFocus > 0) this.player.addFocus(executionFocus);
+  }
+
+  /** Corruption bursts from the ground during fights that call for it. */
+  private updateHazards(dt: number): void {
+    for (const encounter of this.encounterManager.getAllEncounters()) {
+      const hazard = encounter.config.hazard;
+      if (!hazard || encounter.state !== EncounterState.ACTIVE) continue;
+      // Only around the fight itself, not wherever the player wanders off to
+      if (this.player.root.position.distanceTo(encounter.config.center) > encounter.config.leashRadius) continue;
+
+      const timer = (this.hazardTimers.get(encounter.config.id) ?? hazard.interval) - dt;
+      if (timer > 0) {
+        this.hazardTimers.set(encounter.config.id, timer);
+        continue;
+      }
+      this.hazardTimers.set(encounter.config.id, hazard.interval * (0.8 + Math.random() * 0.4));
+      const offset = new THREE.Vector3((Math.random() - 0.5) * 5, 0, (Math.random() - 0.5) * 5);
+      this.arenaHazardSystem.spawnHazard({
+        position: this.player.root.position.clone().add(offset),
+        radius: hazard.radius,
+        damage: hazard.damage,
+        telegraphDuration: 1.4,
+        activeDuration: 0.5,
+      });
+    }
+  }
+
+  /** Chapter elites get the boss bar while they're close. */
+  private updateEliteBar(): void {
+    const position = this.player.root.position;
+    const elite = this.enemies.find(e => e.traits.isElite && !e.health.isDead && e.root.visible
+      && e.root.position.distanceTo(position) < ELITE_BAR_RANGE);
+
+    if (elite) {
+      if (this.eliteBarId !== elite.id) {
+        this.eliteBarId = elite.id;
+        this.bossUI.reset();
+        this.bossUI.showHealthBar(elite.traits.displayName);
+      }
+      EventBus.emit('bossHealth', {
+        current: elite.health.currentHealth,
+        max: elite.health.maxHealth,
+        phase: elite.traits.isEnraged ? PhaseId.PHASE_2 : PhaseId.PHASE_1,
+      });
+      EventBus.emit('bossPosture', { fraction: elite.traits.posture.isBroken ? 1 : elite.traits.posture.fraction });
+    } else if (this.eliteBarId) {
+      this.eliteBarId = null;
+      this.bossUI.reset();
+    }
+  }
+
+  /** Akane, if she fights beside you, cuts at the Oni from the shadows. */
+  private updateAllyStrikes(dt: number): void {
+    const boss = this.boss;
+    const isFighting = boss && this.storyManager.flags.akaneAlly && this.hasBossIntroPlayed
+      && !this.isCinematicActive && !boss.health.isDead;
+    if (!isFighting) {
+      this.allyTimer = 0;
+      return;
+    }
+
+    this.allyTimer += dt;
+    if (this.allyTimer < ALLY_STRIKE_INTERVAL) return;
+    this.allyTimer = 0;
+
+    const toBoss = boss!.root.position.clone().sub(this.player.root.position).setY(0).normalize();
+    boss!.takeDamage(Math.round(boss!.health.maxHealth * 0.035), toBoss, 0);
+    boss!.applyPostureDamage(14);
+    this.vfx.spawnSlash(boss!.root.position, toBoss, 3);
+    AudioManager.play(AudioId.SWORD_HIT, { volume: 0.8 });
+    EventBus.emit('damageNumber', { position: boss!.root.position.clone().setY(3.4), text: 'AKANE STRIKES', kind: 'label' });
+  }
+
+  private updateNpcPresence(): void {
+    const flags = this.storyManager.flags;
+    for (const npc of this.npcs) npc.root.visible = npc.isPresent(flags);
+  }
+
+  private applyDialogueEffect(effect: string): void {
+    const story = this.storyManager.state;
+    switch (effect) {
+      case 'keeperTrust': {
+        story.setFlag('keeperTrusted', true);
+        this.build.addCharm('keepers_bell');
+        const charm = CHARMS.find(c => c.id === 'keepers_bell')!;
+        EventBus.emit('notice', { title: `Charm received: ${charm.name}`, text: charm.description });
+        break;
+      }
+      case 'keeperPay':
+        story.setFlag('keeperPaid', true);
+        this.playerProgress.addEssence(60);
+        break;
+      case 'akaneMet':
+        story.setFlag('akaneMet', true);
+        break;
+      case 'akaneShare': {
+        const shared = this.playerProgress.removeEssence(40);
+        story.setFlag('akaneTrusted', true);
+        EventBus.emit('notice', { title: 'Essence shared', text: shared > 0 ? `You gave Akane ${shared} essence.` : 'You had nothing to give, but she saw you try.' });
+        break;
+      }
+      case 'akaneAlly':
+        story.setFlag('akaneAlly', true);
+        break;
+      case 'akaneRefuse':
+        story.setFlag('akaneRefused', true);
+        break;
+      case 'endingPurify':
+        story.setFlag('endingPurify', true);
+        break;
+      case 'endingClaim':
+        story.setFlag('endingClaim', true);
+        break;
+    }
+    EventBus.emit('requestSave', {});
+  }
+
+  private createSecretInteraction(secret: SecretDef): Interactable {
+    const verb = secret.kind === 'charm' ? 'Take the charm' : secret.kind === 'scroll' ? 'Read the scroll' : 'Gather the essence';
+    return {
+      id: secret.id,
+      position: new THREE.Vector3(secret.x, 0, secret.z),
+      radius: 2.2,
+      label: `[E] ${verb}`,
+      canInteract: () => !this.collected.has(secret.id),
+      onInteract: () => this.collectSecret(secret),
+    };
+  }
+
+  private collectSecret(secret: SecretDef): void {
+    if (secret.kind === 'scroll' && secret.scroll) {
+      // Scrolls can be read again; reading one counts as finding it
+      this.dialogueManager.startDialogue(secret.scroll, secret.id);
+    }
+    if (this.collected.has(secret.id)) return;
+    this.collected.add(secret.id);
+    this.secrets.markCollected(secret.id);
+    AudioManager.play(AudioId.UI_NOTIFICATION, { volume: 0.7 });
+
+    if (secret.kind === 'charm' && secret.charmId) {
+      this.build.addCharm(secret.charmId);
+      const charm = CHARMS.find(c => c.id === secret.charmId)!;
+      const isWorn = this.build.isEquipped(charm.id);
+      EventBus.emit('notice', { title: `Charm found: ${charm.name}`, text: `${charm.description}${isWorn ? ' Now worn.' : ' Wear it at a shrine.'}` });
+    } else if (secret.kind === 'cache' && secret.essence) {
+      this.playerProgress.addEssence(secret.essence);
+      EventBus.emit('notice', { title: 'Hidden essence', text: `${secret.essence} Spirit Essence gathered.` });
+    }
+    EventBus.emit('requestSave', {});
+  }
+
+  private createWardInteraction(): Interactable {
+    const scene = this;
+    return {
+      id: WARD.id,
+      position: new THREE.Vector3(WARD.x + 1.2, 0, WARD.z),
+      radius: 3.6,
+      get label() {
+        return scene.build.techniques.has('spiritWave') ? '[E] Break the spirit ward' : '[E] Examine the spirit ward';
+      },
+      canInteract: () => !this.collected.has(WARD.id),
+      onInteract: () => {
+        if (!this.build.techniques.has('spiritWave')) {
+          EventBus.emit('notice', { title: 'A spirit ward', text: 'Paper charms bar the way. Only a wave of spirit could break them. Come back when you have learned one.' });
+          return;
+        }
+        this.collected.add(WARD.id);
+        this.secrets.breakWard();
+        this.vfx.spawnBossDeathEnergy(new THREE.Vector3(WARD.x, 1, WARD.z));
+        this.cameraController.addShake(0.8);
+        AudioManager.play(AudioId.SHRINE_PURIFY, { volume: 0.8 });
+        EventBus.emit('notice', { title: 'The ward breaks', text: 'Something waits in the alcove beyond.' });
+        EventBus.emit('requestSave', {});
+      },
+    };
+  }
+
+  /** Puts secrets, the ward and any dropped essence back as a save describes them. */
+  private restoreWorldState(collected: string[], dropped: { x: number; y: number; z: number; amount: number } | null): void {
+    this.collected = new Set(collected);
+    this.secrets.resetAll();
+    for (const id of this.collected) this.secrets.markCollected(id);
+    if (this.collected.has(WARD.id)) this.secrets.breakWard();
+
+    this.essenceDrop?.dispose();
+    this.essenceDrop = null;
+    if (dropped && dropped.amount > 0) this.placeEssenceDrop(new THREE.Vector3(dropped.x, 0, dropped.z), dropped.amount);
   }
 }

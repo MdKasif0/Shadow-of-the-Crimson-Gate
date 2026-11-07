@@ -22,6 +22,10 @@ export interface AttackDefinition {
   shake?: number;
   /** Which slash effect to play. */
   slashType: number;
+  /** Wears down an enemy's guard this many times faster than plain damage. */
+  posture?: number;
+  /** Plays the motion without a blade hitbox, for attacks that strike some other way. */
+  noHitbox?: boolean;
 }
 
 export const ATTACK_DATA: Record<string, AttackDefinition> = {
@@ -79,6 +83,82 @@ export const ATTACK_DATA: Record<string, AttackDefinition> = {
     focusGain: 14,
     hitStop: 0.11,
     shake: 1.4,
+    posture: 1.8,
+    slashType: 3,
+  },
+  // Learned with Fourth Cut: a rising strike that ends the combo
+  'ATTACK_4': {
+    id: 'ATTACK_4',
+    damage: 42,
+    windup: 0.13,
+    active: 0.18,
+    recovery: 0.4,
+    lungeSpeed: 12,
+    stagger: 0.5,
+    focusGain: 10,
+    posture: 1.3,
+    hitStop: 0.09,
+    shake: 1,
+    slashType: 2,
+  },
+  // Attack while dashing: cuts through everything in the way
+  'ATTACK_DASH': {
+    id: 'ATTACK_DASH',
+    damage: 34,
+    windup: 0.05,
+    active: 0.2,
+    recovery: 0.32,
+    lungeSpeed: 22,
+    rangeScale: 1.2,
+    knockback: 12,
+    stagger: 0.45,
+    focusGain: 8,
+    posture: 1.8,
+    hitStop: 0.06,
+    shake: 0.8,
+    slashType: 2,
+  },
+  // Heavy while sprinting: a spinning cut that clears space
+  'ATTACK_WHIRL': {
+    id: 'ATTACK_WHIRL',
+    damage: 40,
+    windup: 0.18,
+    active: 0.32,
+    recovery: 0.45,
+    lungeSpeed: 6,
+    rangeScale: 1.4,
+    isRadial: true,
+    knockback: 16,
+    stagger: 0.7,
+    focusGain: 10,
+    posture: 1.4,
+    hitStop: 0.08,
+    shake: 1.2,
+    slashType: 4,
+  },
+  // The motion behind a Spirit Wave; the wave itself does the damage
+  'ATTACK_WAVE': {
+    id: 'ATTACK_WAVE',
+    damage: 0,
+    windup: 0.1,
+    active: 0.08,
+    recovery: 0.28,
+    lungeSpeed: 0,
+    noHitbox: true,
+    slashType: 1,
+  },
+  // Finishes an enemy whose guard is broken
+  'ATTACK_EXECUTE': {
+    id: 'ATTACK_EXECUTE',
+    damage: 0,
+    windup: 0.2,
+    active: 0.16,
+    recovery: 0.55,
+    lungeSpeed: 10,
+    rangeScale: 1.6,
+    noHitbox: true,
+    hitStop: 0.18,
+    shake: 2.2,
     slashType: 3,
   },
   // Spends a full focus meter

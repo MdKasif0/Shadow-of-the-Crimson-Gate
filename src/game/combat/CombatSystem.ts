@@ -13,6 +13,8 @@ export class CombatSystem {
   private currentAttackDef: AttackDefinition | null = null;
   private comboIndex: number = 0;
   private queuedAttackId: string | null = null;
+  /** Set from the build: the light combo carries on into a fourth strike. */
+  public hasFourthCut: boolean = false;
 
   constructor(state: PlayerState) {
     this.state = state;
@@ -61,6 +63,11 @@ export class CombatSystem {
     this.comboIndex++;
   }
 
+  /** Ends whatever is playing, for a dash that turns into a Dash Strike. */
+  public get timer(): number {
+    return this.attackTimer;
+  }
+
   public update(dt: number): void {
     if (this.state.combatPhase === CombatPhase.NONE || !this.currentAttackDef) return;
 
@@ -97,8 +104,9 @@ export class CombatSystem {
         }
 
         // Process buffered input if combo window is open
-        if (this.comboWindowActive && this.inputBuffer && this.currentAttackDef.nextAttackId) {
-          this.startAttack(this.currentAttackDef.nextAttackId);
+        const next = this.currentAttackDef.id === 'ATTACK_3' && this.hasFourthCut ? 'ATTACK_4' : this.currentAttackDef.nextAttackId;
+        if (this.comboWindowActive && this.inputBuffer && next) {
+          this.startAttack(next);
           return; // state changed, break out
         }
 

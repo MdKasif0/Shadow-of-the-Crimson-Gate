@@ -10,6 +10,7 @@ const RONIN_SHEET: ModelSheet = {
   groundY: 1480,
   pixelsPerUnit: 703,
   brightness: 1.5,
+  fallbackColor: 0x1d1a1c,
 };
 
 export interface RoninModel {
