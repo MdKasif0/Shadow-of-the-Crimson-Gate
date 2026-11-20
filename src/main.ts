@@ -17,6 +17,7 @@ import { SettingsManager } from './game/settings/SettingsManager';
 import { AudioManager } from './game/audio/AudioManager';
 import { EventBus } from './game/core/EventBus';
 import { LoadingScreen, subProgress } from './game/ui/LoadingScreen';
+import { AchievementToast } from './game/ui/MetaHUD';
 
 let gameInstance: ThreeGame | null = null;
 let heroCleanup: (() => void) | null = null;
@@ -32,6 +33,7 @@ async function init(): Promise<void> {
   // Initialize managers
   SettingsManager.getInstance();
   SaveManager.getInstance();
+  new AchievementToast();
   AudioManager.init();
   const stateManager = GameStateManager.getInstance();
 

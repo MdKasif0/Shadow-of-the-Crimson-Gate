@@ -8,6 +8,7 @@ import { CameraController } from '../camera/CameraController';
 import { CrimsonOni } from '../boss/CrimsonOni';
 import { DamageKind } from '../ui/DamageNumbers';
 import { GUARD_BREAK_SECONDS } from './Posture';
+import { Run } from '../meta/Run';
 
 /** Hitting a stunned enemy rewards the player for setting it up. */
 const STAGGER_DAMAGE_BONUS = 1.5;
@@ -135,7 +136,8 @@ export class DamageSystem {
       const shield = enemy ? enemy.traits.shieldFactor(enemy.root.rotation.y, hitbox.direction, wasStaggered) : 1;
       const isShielded = shield < 1;
 
-      let damage = hitbox.damage * shield;
+      // Difficulty and New Game+ make enemies tougher by shrinking the damage they take
+      let damage = hitbox.damage * shield / Run.enemyToughness;
       if (wasStaggered) damage *= STAGGER_DAMAGE_BONUS * player.modifiers.staggeredDamage;
 
       const oldHp = target.health.currentHealth;

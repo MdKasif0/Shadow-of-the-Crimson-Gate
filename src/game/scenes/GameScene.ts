@@ -91,6 +91,13 @@ import { CHAPTERS } from '../story/StoryChapter';
 import { EncounterConfig } from '../encounters/EncounterConfig';
 import { ParryFlash } from '../vfx/ParryFlash';
 import { mergeStatic } from '../utils/MergeStatic';
+import { Run, Difficulty } from '../meta/Run';
+import { Records } from '../meta/Records';
+import { bindAchievementTracking, grantAchievement } from '../meta/Achievements';
+import { RunTimer } from '../ui/MetaHUD';
+import { TrialMode, openTrialResults } from '../ui/MetaScreens';
+import { NG_PLUS_DROPS } from '../progression/PlayerBuild';
+import { EnemyKind, EnemySpawnDef } from '../encounters/EncounterConfig';
 
 /** Enemies this close pull the camera's framing towards them. */
 const COMBAT_FRAMING_RANGE = 12;
@@ -236,6 +243,21 @@ export class GameScene {
   /** Last frame's state of each fight, to catch the moment one is won. */
   private encounterStates = new Map<string, EncounterState>();
 
+  // ─── Reasons to come back ─────────────────────────────────────────
+  private runTimer = new RunTimer();
+  /** Deaths since arriving in this level, for Flawless. */
+  private deathsThisLevel = 0;
+  /** Set if the Ronin heals at all during the Crimson Oni fight. */
+  private healedDuringOni = false;
+  private trial: {
+    mode: TrialMode;
+    wave: number;
+    kills: number;
+    time: number;
+    isOver: boolean;
+    resting: number;
+  } | null = null;
+
   constructor(cameraController: CameraController) {
     AudioManager.init();
     
@@ -345,6 +367,7 @@ export class GameScene {
     });
 
     this.bindProgressionEvents();
+    this.bindReplayEvents();
 
     EventBus.on('finisherStarted', () => {
       this.startSlowMotion(0.4, 0.85);
@@ -374,6 +397,8 @@ export class GameScene {
     });
 
     EventBus.on('requestSave', () => {
+      // Trials never touch the story save
+      if (this.trial) return;
       const pos = this.player.root.position;
       SaveManager.getInstance().saveGame({
         chapter: this.storyManager.state.currentChapter,
@@ -390,6 +415,8 @@ export class GameScene {
           : null,
         collected: [...this.collected],
         levels: { ...this.levelProgress, current: this.levelId },
+        difficulty: Run.difficulty,
+        ngPlus: Run.ngPlus,
       });
     });
 
@@ -397,7 +424,9 @@ export class GameScene {
       if (!saveData) return;
       
       // Whatever level the save is in, start from the courtyard and travel on from there
+      this.endTrialQuietly();
       if (this.levelId !== 'courtyard') this.swapTo('courtyard');
+      Run.reset(saveData.difficulty ?? 'normal', saveData.ngPlus ?? 0);
       this.playerProgress.initFromSave(saveData);
       this.build.load(saveData.build);
       this.levelProgress = this.normalizeLevelProgress(saveData.levels, !!saveData.crimsonOniDefeated);
@@ -443,17 +472,30 @@ export class GameScene {
       if (target !== 'courtyard') void this.travel(target, { spawnAt: loadPos, isLoad: true });
     });
     
-    EventBus.on('newGame', () => {
+    EventBus.on('newGame', (data?: { difficulty?: Difficulty; plus?: boolean }) => {
+      this.endTrialQuietly();
       if (this.levelId !== 'courtyard') this.swapTo('courtyard');
+      const isPlus = !!data?.plus;
+      // New Game+ keeps the build, the essence and the best times; the world starts over
+      const bestTimes = isPlus ? { ...this.levelProgress.bestTimes } : {};
+      const essence = this.playerProgress.spiritEssence;
+      Run.reset(isPlus ? Run.difficulty : data?.difficulty ?? 'normal', isPlus ? Run.ngPlus + 1 : 0);
       this.levelProgress = createDefaultLevelProgress();
+      this.levelProgress.bestTimes = bestTimes;
       this.essenceDropLevel = 'courtyard';
       this.levelBossDefeated = false;
       this.levelTimer = 0;
+      this.deathsThisLevel = 0;
       this.playerProgress.wipe();
-      this.build.wipe();
+      if (isPlus) {
+        this.playerProgress.spiritEssence = essence;
+        grantAchievement('ng_plus');
+      } else {
+        this.build.wipe();
+      }
       this.hasSeenBossIntro = false;
       this.applyPlayerStats(true);
-      EventBus.emit('essenceUpdate', { amount: 0, added: 0 });
+      EventBus.emit('essenceUpdate', { amount: this.playerProgress.spiritEssence, added: 0 });
       this.restoreWorldState([], null);
 
       const startPos = new THREE.Vector3(0, 0, GAME_CONFIG.PLAYER.SPAWN_Z);
@@ -490,6 +532,8 @@ export class GameScene {
 
     EventBus.on('bossDeath', (data: any) => {
       this.levelBossDefeated = true;
+      if (!this.healedDuringOni) grantAchievement('oni_no_heal');
+      this.dropNgPlusCharm('CRIMSON_ONI');
       this.bossIsDefeatedSequence = true;
       this.purificationTimer = 0;
       this.startSlowMotion(0.25, 1.4);
@@ -856,6 +900,7 @@ export class GameScene {
       return; 
     }
     if (!this.levelBossDefeated) this.levelTimer += realDt;
+    this.updateRunTimer(realDt);
 
     // Zone & Atmosphere updates
     const playerPos = this.player.root.position;
@@ -893,6 +938,7 @@ export class GameScene {
     this.encounterManager.update(dt, playerPos, this.scene);
     this.enemies = this.encounterManager.getActiveEnemies();
     this.celebrateWonFights();
+    this.updateTrial(dt);
     
     // Group AI Update
     this.attackDirector.update(dt, this.enemies, playerPos);
@@ -968,6 +1014,7 @@ export class GameScene {
     // Trigger Cinematic Intro
     if (this.boss && this.player.root.position.z < -85 && !this.hasBossIntroPlayed) {
       this.hasBossIntroPlayed = true;
+      this.healedDuringOni = false;
 
       if (this.hasSeenBossIntro) {
         // Retrying from the arena checkpoint goes straight back into the fight
@@ -1027,8 +1074,13 @@ export class GameScene {
 
     // ─── Check Player Death ───────────────────────────────────────
     if (this.player.health.currentHealth <= 0) {
-      this.dropEssence();
       this.player.isControlsEnabled = false;
+      if (this.trial) {
+        this.endTrial(false);
+        return;
+      }
+      this.dropEssence();
+      this.deathsThisLevel++;
       GameStateManager.getInstance().setState(GameState.GAME_OVER);
     }
   }
@@ -1313,9 +1365,9 @@ export class GameScene {
     const isBoss = victim === this.boss;
     const enemy = isBoss ? null : victim as Enemy;
     const isLevelBoss = victim instanceof LevelEnemy && victim.isBoss;
-    const damage = isBoss ? victim.health.maxHealth * 0.08
-      : isLevelBoss ? victim.health.maxHealth * 0.1
-      : enemy!.traits.isElite ? victim.health.maxHealth * 0.35
+    const damage = isBoss ? victim.health.maxHealth * 0.08 / Run.enemyToughness
+      : isLevelBoss ? victim.health.maxHealth * 0.1 / Run.enemyToughness
+      : enemy!.traits.isElite ? victim.health.maxHealth * 0.35 / Run.enemyToughness
       : victim.health.currentHealth;
 
     victim.takeDamage(Math.ceil(damage), direction, 14, 1.2);
@@ -1483,6 +1535,8 @@ export class GameScene {
     this.secrets.markCollected(secret.id);
     this.levelSecrets?.markCollected(secret.id);
     AudioManager.play(AudioId.UI_NOTIFICATION, { volume: 0.7 });
+    const everySecret = LEVEL_ORDER.flatMap(level => LEVELS[level].secretIds);
+    if (everySecret.every(id => this.collected.has(id))) grantAchievement('secrets_all');
 
     if (secret.kind === 'charm' && secret.charmId) {
       this.build.addCharm(secret.charmId);
@@ -1513,6 +1567,8 @@ export class GameScene {
         }
         this.collected.add(WARD.id);
         this.secrets.breakWard();
+        const everySecret = LEVEL_ORDER.flatMap(level => LEVELS[level].secretIds);
+        if (everySecret.every(id => this.collected.has(id))) grantAchievement('secrets_all');
         this.vfx.spawnBossDeathEnergy(new THREE.Vector3(WARD.x, 1, WARD.z));
         this.cameraController.addShake(0.8);
         AudioManager.play(AudioId.SHRINE_PURIFY, { volume: 0.8 });
@@ -1569,12 +1625,20 @@ export class GameScene {
     };
 
     EventBus.on('encounterStarted', (data: { id: string }) => {
+      if (this.trial) return;
       if (this.level && data.id === this.level.bossEncounterId) this.onLevelBossStart();
       if (data.id === 'enc_gate_akane') this.dialogueManager.startDialogue(AKANE_REMATCH_DIALOGUE, 'akane_rematch');
     });
 
     EventBus.on('enemyDeath', (data: { enemyType: string; position: THREE.Vector3 }) => {
-      if (this.level && data.enemyType === this.levelBossType()) this.onLevelBossDefeated(data.position);
+      if (this.trial) {
+        this.trial.kills++;
+        return;
+      }
+      if (this.level && data.enemyType === this.levelBossType()) {
+        this.onLevelBossDefeated(data.position);
+        this.dropNgPlusCharm(data.enemyType);
+      }
       if (data.enemyType === 'AKANE') {
         setTimeout(() => this.dialogueManager.startDialogue(AKANE_YIELDS_DIALOGUE, 'akane_yields'), 1600);
       }
@@ -1706,6 +1770,7 @@ export class GameScene {
   /** The chapter card and objective for the level just arrived in. */
   private announceLevel(): void {
     const info = LEVELS[this.levelId];
+    if (this.levelId === 'arena') return;
     if (this.levelId !== 'courtyard') {
       const story = this.storyManager.state;
       if (CHAPTER_ORDER.indexOf(info.chapter) > CHAPTER_ORDER.indexOf(story.currentChapter)) story.currentChapter = info.chapter;
@@ -1728,6 +1793,7 @@ export class GameScene {
     else this.enterLevel(id);
 
     AudioManager.setMusicTheme(LEVELS[id].music, id !== 'courtyard');
+    this.deathsThisLevel = 0;
     this.levelTimer = 0;
     this.isLevelBossFight = false;
     this.levelBossDefeated = id === 'courtyard'
@@ -1909,8 +1975,11 @@ export class GameScene {
 
   /** Records the clear, the time, and opens the next level. */
   private completeLevel(id: LevelId): void {
+    if (this.trial) return;
     const progress = this.levelProgress;
     if (!progress.cleared.includes(id)) progress.cleared.push(id);
+    grantAchievement(`clear_${id}`);
+    if (id === this.levelId && this.deathsThisLevel === 0) grantAchievement('flawless');
     const time = this.levelId === id && this.levelTimer > 1 ? this.levelTimer : null;
     let isBest = false;
     if (time !== null) {
@@ -2024,5 +2093,214 @@ export class GameScene {
   /** Essence left in one level waits there, out of sight elsewhere. */
   private syncEssenceDropVisibility(): void {
     if (this.essenceDrop) this.essenceDrop.root.visible = this.essenceDropLevel === this.levelId;
+  }
+
+  // ─── Reasons to come back ────────────────────────────────────────
+
+  private bindReplayEvents(): void {
+    bindAchievementTracking();
+
+    EventBus.on('playerHealth', (data: { delta: number }) => {
+      if (data.delta > 0 && this.boss && this.hasBossIntroPlayed && !this.boss.health.isDead) this.healedDuringOni = true;
+    });
+
+    EventBus.on('templeEscaped', (data: { remaining: number }) => {
+      if (data.remaining >= 15) grantAchievement('escape_fast');
+    });
+
+    // Finishing the game opens Crimson difficulty, and records how it ended
+    EventBus.on('endingChosen', () => {
+      const flags = this.storyManager.flags;
+      Records.unlockCrimson();
+      if (flags.endingClaim) grantAchievement('ending_claim');
+      if (flags.endingPurify) grantAchievement('ending_purify');
+      if (flags.akaneAlly && !flags.endingClaim) grantAchievement('ending_akane');
+      if (Run.difficulty === 'crimson') grantAchievement('crimson_clear');
+    });
+
+    EventBus.on('startTrial', (data: { mode: TrialMode }) => void this.startTrial(data.mode));
+  }
+
+  /** In New Game+, each guardian drops a charm the first time it falls again. */
+  private dropNgPlusCharm(enemyType: string): void {
+    if (Run.ngPlus < 1 || this.trial) return;
+    const charmId = NG_PLUS_DROPS[enemyType];
+    if (!charmId || this.build.charms.has(charmId)) return;
+    this.build.addCharm(charmId);
+    const charm = CHARMS.find(c => c.id === charmId)!;
+    setTimeout(() => EventBus.emit('notice', { title: `Charm found: ${charm.name}`, text: charm.description }), 4000);
+    EventBus.emit('requestSave', {});
+  }
+
+  /** The clock in the corner: this level against its best, or the Trial's progress. */
+  private updateRunTimer(realDt: number): void {
+    if (this.trial) {
+      const trial = this.trial;
+      if (!trial.isOver) trial.time += realDt;
+      if (trial.mode === 'bossRush') this.runTimer.showText(formatTime(trial.time), `Guardian ${Math.min(5, trial.wave)} of 5`);
+      else this.runTimer.showText(`Wave ${trial.wave}`, `${trial.kills} kills · ${formatTime(trial.time)}`);
+      return;
+    }
+    if (!SettingsManager.getInstance().get().showRunTimer) {
+      this.runTimer.hide();
+      return;
+    }
+    const info = LEVELS[this.levelId];
+    this.runTimer.showLevel(info.numeral, this.levelTimer, this.levelProgress.bestTimes[this.levelId], this.levelBossDefeated);
+  }
+
+  // ─── Trials ──────────────────────────────────────────────────────
+
+  /**
+   * Starts a Boss Rush or Arena run in the Trial Arena, with the build from the
+   * most recent save. Nothing a Trial does is saved, except its score.
+   */
+  public async startTrial(mode: TrialMode): Promise<void> {
+    const save = SaveManager.getInstance().listSlots()
+      .map(s => s.save)
+      .filter(Boolean)
+      .sort((a, b) => (b!.savedAt ?? 0) - (a!.savedAt ?? 0))[0];
+    this.build.load(save?.build);
+    if (save?.levels?.cleared.includes('bamboo')) this.build.setSlotCount(3);
+    for (const technique of ['dashStrike', 'spiritWave', 'crimsonWhirl'] as TechniqueId[]) this.build.techniques.add(technique);
+    Run.reset('normal', 0);
+    this.trial = { mode, wave: 0, kills: 0, time: 0, isOver: false, resting: 0 };
+    this.essenceDrop?.dispose();
+    this.essenceDrop = null;
+
+    await this.travel('arena');
+    this.applyPlayerStats(true);
+    EventBus.emit('objectiveUpdate', { text: mode === 'bossRush' ? 'DEFEAT THE FIVE GUARDIANS' : 'SURVIVE THE WAVES' });
+    this.nextTrialWave();
+  }
+
+  private nextTrialWave(): void {
+    const trial = this.trial;
+    if (!trial || trial.isOver) return;
+    trial.wave++;
+
+    let enemies: EnemySpawnDef[];
+    if (trial.mode === 'bossRush') {
+      const order: EnemyKind[] = ['UMIBOZU', 'JOROGUMO', 'FALLEN_SAMURAI', 'AKANE', 'MAW_OF_YOMI'];
+      if (trial.wave > order.length) {
+        this.endTrial(true);
+        return;
+      }
+      enemies = [{ type: order[trial.wave - 1], offset: new THREE.Vector3(0, 0, -12) }];
+    } else {
+      enemies = this.arenaWave(trial.wave);
+      // Each wave is a little tougher than the last
+      Run.trialToughness = 1 + (trial.wave - 1) * 0.07;
+    }
+
+    this.encounterManager.registerEncounter({
+      id: `trial_${trial.mode}_${trial.wave}`,
+      center: new THREE.Vector3(0, 0, 0),
+      activationRadius: 999,
+      leashRadius: 60,
+      waves: [{ enemies, delayAfterComplete: 0 }],
+    });
+    this.cameraController.addShake(0.8);
+    AudioManager.play(AudioId.ARENA_BOSS_WARNING, { volume: 0.6 });
+    EventBus.emit('notice', {
+      title: trial.mode === 'bossRush' ? `Guardian ${trial.wave} of 5` : `Wave ${trial.wave}`,
+      text: trial.mode === 'bossRush' ? 'It rises from the stone.' : `${enemies.length} yokai close in.`,
+    });
+  }
+
+  /** A wave for the endless Arena, built from a budget that grows each time. */
+  private arenaWave(wave: number): EnemySpawnDef[] {
+    const pool: [EnemyKind, number][] = [
+      ['BASIC_YOKAI', 1], ['SHADOW_YOKAI', 1.5], ['KAMAITACHI', 1.5], ['SHIELDED_YOKAI', 1.5],
+      ['KAPPA', 2], ['TENGU', 2], ['POSSESSED_MONK', 2], ['LURKING_SHADE', 2], ['SHADOW_CALLER', 2.5],
+    ];
+    // Early waves draw only from the simpler yokai
+    const unlocked = pool.slice(0, Math.min(pool.length, 3 + wave));
+    let budget = 2.5 + wave * 1.4;
+    const enemies: EnemySpawnDef[] = [];
+    const spot = (i: number) => {
+      const a = (i / 7) * Math.PI * 2 + wave;
+      return new THREE.Vector3(Math.sin(a) * 15, 0, Math.cos(a) * 15);
+    };
+    // Every fifth wave brings an elite to lead it
+    if (wave % 5 === 0) {
+      const [type] = unlocked[Math.floor(Math.random() * unlocked.length)];
+      enemies.push({ type, offset: spot(0), eliteName: `Champion of Wave ${wave}` });
+      budget -= 4;
+    }
+    while (budget >= 1 && enemies.length < 9) {
+      const affordable = unlocked.filter(([, cost]) => cost <= budget);
+      const [type, cost] = affordable[Math.floor(Math.random() * affordable.length)];
+      enemies.push({ type, offset: spot(enemies.length) });
+      budget -= cost;
+    }
+    return enemies;
+  }
+
+  /** Watches for each wave's end, then rests briefly before the next. */
+  private updateTrial(dt: number): void {
+    const trial = this.trial;
+    if (!trial || trial.isOver) return;
+    const id = `trial_${trial.mode}_${trial.wave}`;
+    const encounter = this.encounterManager.getAllEncounters().find(e => e.config.id === id);
+    if (trial.resting > 0) {
+      trial.resting -= dt;
+      if (trial.resting <= 0) this.nextTrialWave();
+      return;
+    }
+    if (encounter?.state !== EncounterState.COMPLETED) return;
+
+    // Wave won: a breath, a little health back, and the next
+    trial.resting = trial.mode === 'bossRush' ? 3.5 : 3;
+    this.player.heal(this.player.health.maxHealth * (trial.mode === 'bossRush' ? 0.5 : 0.25));
+    if (trial.mode === 'arena' && trial.wave >= 10) grantAchievement('arena_10');
+    if (trial.mode === 'bossRush' && trial.wave >= 5) {
+      trial.resting = 0;
+      this.endTrial(true);
+    }
+  }
+
+  /** Ends the run, records the score, and shows the results. */
+  private endTrial(isVictory: boolean): void {
+    const trial = this.trial;
+    if (!trial || trial.isOver) return;
+    trial.isOver = true;
+    this.player.isControlsEnabled = false;
+    this.startSlowMotion(0.3, 1.2);
+
+    const wavesCleared = isVictory ? trial.wave : Math.max(0, trial.wave - 1);
+    let place: number | null = null;
+    if (trial.mode === 'bossRush') {
+      if (isVictory) {
+        grantAchievement('boss_rush');
+        place = Records.addBossRush({ time: trial.time, difficulty: Run.difficulty, date: Date.now() });
+      }
+    } else if (wavesCleared > 0) {
+      place = Records.addArena({ waves: wavesCleared, kills: trial.kills, date: Date.now() });
+    }
+
+    setTimeout(() => {
+      EventBus.emit('overlayMenu', { open: true });
+      openTrialResults(
+        { mode: trial.mode, isVictory, time: trial.time, waves: trial.mode === 'bossRush' ? wavesCleared : wavesCleared, kills: trial.kills, place },
+        () => {
+          EventBus.emit('overlayMenu', { open: false });
+          void this.startTrial(trial.mode);
+        },
+        () => {
+          EventBus.emit('overlayMenu', { open: false });
+          this.endTrialQuietly();
+          GameStateManager.getInstance().setState(GameState.MAIN_MENU);
+        },
+      );
+    }, 1600);
+  }
+
+  /** Leaves Trial mode without a word, before a story game starts or loads. */
+  private endTrialQuietly(): void {
+    if (!this.trial) return;
+    this.trial = null;
+    Run.trialToughness = 1;
+    this.runTimer.hide();
   }
 }

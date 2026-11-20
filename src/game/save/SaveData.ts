@@ -18,6 +18,10 @@ export interface SaveData {
   build?: BuildSave;
   /** Essence left where the Ronin last fell, waiting to be recovered. */
   droppedEssence?: { x: number; y: number; z: number; amount: number; level?: LevelId } | null;
+  /** Chosen when the journey began. Missing from older saves, which play on Normal. */
+  difficulty?: 'story' | 'normal' | 'crimson';
+  /** How many times this journey has gone into New Game+. */
+  ngPlus?: number;
   /** When this was written, in milliseconds since 1970. Missing from older saves. */
   savedAt?: number;
   /** Which level the Ronin is in, which are open and cleared, and best times. */

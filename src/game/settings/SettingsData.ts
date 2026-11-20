@@ -18,6 +18,8 @@ export interface SettingsData {
   autoQuality: boolean;
   /** On-screen controls: shown on touch screens with AUTO. */
   touchControls: 'AUTO' | 'ON' | 'OFF';
+  /** The speedrun clock in the corner during play. */
+  showRunTimer: boolean;
 }
 
 export type QualityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -60,4 +62,5 @@ export const DEFAULT_SETTINGS: SettingsData = {
   fpsCap: 0,
   autoQuality: true,
   touchControls: 'AUTO',
+  showRunTimer: true,
 };

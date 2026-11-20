@@ -99,4 +99,19 @@ export const LEVELS: Record<LevelId, LevelInfo> = {
     // Everything at once, and a little faster
     music: { transpose: 1, tempo: 1.12, flute: 1.1, koto: 1.3, drums: 1.2 },
   },
+  // The Trials arena: not part of the journey, so never on the map
+  arena: {
+    id: 'arena',
+    numeral: '✦',
+    name: 'The Trial Arena',
+    hook: 'A ring of stone above the clouds, where blades are tested.',
+    rule: 'No shrines, no rest. Win, or fall.',
+    enemies: 'All of them',
+    boss: 'All of them',
+    objective: 'SURVIVE',
+    chapter: ChapterId.CHAPTER_8,
+    map: { x: -100, y: -100 },
+    secretIds: [],
+    music: { transpose: -3, tempo: 1.15, flute: 0.8, koto: 1.2, drums: 1.4 },
+  },
 };

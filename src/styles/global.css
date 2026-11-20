@@ -1370,3 +1370,119 @@ input:focus-visible {
 @media (max-height: 460px) {
   .touch-buttons { transform: scale(0.82); transform-origin: bottom right; }
 }
+
+/* ── Achievements, trials and the run timer ──────────────────────────── */
+
+.meta-screen .save-slots__panel { width: min(680px, 100%); }
+
+.achievements-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.achievement {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid rgba(185, 154, 98, 0.18);
+  opacity: 0.62;
+}
+
+.achievement--earned { opacity: 1; border-color: rgba(255, 207, 106, 0.45); background: rgba(255, 190, 90, 0.05); }
+.achievement__seal { font-size: 20px; line-height: 1; color: #b99a62; }
+.achievement--earned .achievement__seal { color: #ffcf6a; text-shadow: 0 0 10px rgba(255, 207, 106, 0.6); }
+.achievement__body { display: grid; gap: 3px; flex: 1; }
+.achievement__date { color: #ffcf6a; }
+
+.achievement__progress {
+  display: block;
+  height: 3px;
+  margin-top: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.achievement__progress span { display: block; height: 100%; background: #cc4444; transform-origin: left; }
+
+.trials__scores {
+  margin: 0;
+  padding: 10px 18px 12px;
+  border: 1px solid rgba(185, 154, 98, 0.18);
+  border-top: 0;
+  list-style: none;
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+.trials__scores li { display: flex; gap: 8px; padding: 2px 0; }
+.trials__scores li span { width: 18px; color: #b99a62; }
+.trials__scores li em { margin-left: auto; font-style: normal; color: rgba(233, 222, 200, 0.5); }
+.trials__empty { color: rgba(233, 222, 200, 0.45); }
+.trials__place { margin: 0 0 16px; color: #ffcf6a; font-size: 15px; letter-spacing: 0.08em; }
+.trials__actions { display: flex; justify-content: center; margin-bottom: 12px; }
+.trials__actions .hero-nav__cta { margin: 0; padding: 0.55rem 1.4rem; font-size: 0.75rem; }
+
+.achievement-toasts {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 3200;
+  display: grid;
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.achievement-toast {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 280px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border: 1px solid rgba(255, 207, 106, 0.55);
+  background: linear-gradient(90deg, rgba(40, 24, 8, 0.95), rgba(14, 12, 10, 0.95));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 22px rgba(255, 190, 90, 0.18);
+  color: #e9dec8;
+  font-family: var(--font-display);
+  animation: achievement-in 0.45s ease-out;
+  transition: opacity 0.5s, transform 0.5s;
+}
+
+.achievement-toast--leaving { opacity: 0; transform: translateY(-10px); }
+.achievement-toast__seal { font-size: 26px; color: #ffcf6a; text-shadow: 0 0 12px rgba(255, 207, 106, 0.7); }
+.achievement-toast__body { display: grid; gap: 2px; }
+.achievement-toast__label { font-size: 10px; letter-spacing: 0.35em; text-transform: uppercase; color: #b99a62; }
+.achievement-toast strong { font-size: 16px; font-weight: 600; letter-spacing: 0.04em; }
+.achievement-toast__text { font-family: var(--font-ui); font-size: 12px; color: rgba(233, 222, 200, 0.7); }
+
+@keyframes achievement-in { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+
+.run-timer {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  z-index: 60;
+  display: none;
+  text-align: right;
+  font-family: var(--font-display);
+  text-shadow: 0 1px 4px #000;
+  pointer-events: none;
+}
+
+.run-timer--visible { display: grid; gap: 2px; }
+.run-timer__main { font-size: 18px; letter-spacing: 0.1em; color: #e9dec8; font-variant-numeric: tabular-nums; }
+.run-timer__sub { font-family: var(--font-ui); font-size: 11px; letter-spacing: 0.06em; color: rgba(233, 222, 200, 0.6); }
+.run-timer[data-state="behind"] .run-timer__main { color: #ff9a7a; }
+.run-timer[data-state="gold"] .run-timer__main { color: #ffcf6a; }
+
+@media (pointer: coarse) { .run-timer { top: 66px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .achievement-toast { animation: none; }
+}

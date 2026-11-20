@@ -4,6 +4,7 @@ import { SettingsMenu } from './SettingsMenu';
 import { ControlsScreen } from './ControlsScreen';
 import { EventBus } from '../core/EventBus';
 import { AudioManager } from '../audio/AudioManager';
+import { openAchievementsScreen } from './MetaScreens';
 
 export class PauseMenu {
   public element: HTMLElement;
@@ -42,6 +43,7 @@ export class PauseMenu {
         <button id="btn-restart" class="hero-nav__cta" style="width: 300px; justify-content: center; font-size: 16px;">RESTART FROM CHECKPOINT</button>
         <button id="btn-controls" class="hero-nav__cta" style="width: 300px; justify-content: center; font-size: 16px;">CONTROLS</button>
         <button id="btn-settings" class="hero-nav__cta" style="width: 300px; justify-content: center; font-size: 16px;">SETTINGS</button>
+        <button id="btn-achievements" class="hero-nav__cta" style="width: 300px; justify-content: center; font-size: 16px;">ACHIEVEMENTS</button>
         <button id="btn-quit" class="hero-nav__cta" style="width: 300px; justify-content: center; font-size: 16px; border-color: #cc4444; color: #cc4444;">RETURN TO MAIN MENU</button>
       </div>
     `;
@@ -72,6 +74,11 @@ export class PauseMenu {
       document.getElementById('btn-settings')?.addEventListener('click', () => {
         AudioManager.playUISelect();
         new SettingsMenu(() => {});
+      });
+
+      document.getElementById('btn-achievements')?.addEventListener('click', () => {
+        AudioManager.playUISelect();
+        openAchievementsScreen(() => {});
       });
 
       document.getElementById('btn-quit')?.addEventListener('click', () => {

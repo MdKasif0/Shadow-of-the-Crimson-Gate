@@ -56,6 +56,7 @@ const SECTIONS: { title: string; fields: Field[] }[] = [
   {
     title: 'Comfort',
     fields: [
+      { kind: 'toggle', key: 'showRunTimer', label: 'Speedrun timer' },
       { kind: 'toggle', key: 'cameraShake', label: 'Camera shake' },
       { kind: 'toggle', key: 'reduceMotion', label: 'Reduce motion' },
     ],

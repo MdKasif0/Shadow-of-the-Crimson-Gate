@@ -16,7 +16,7 @@ import { StoryFlags } from '../story/StoryFlag';
  * LevelRuntime, swapped in on arrival and thrown away on departure.
  */
 
-export type LevelId = 'courtyard' | 'village' | 'bamboo' | 'temple' | 'gate';
+export type LevelId = 'courtyard' | 'village' | 'bamboo' | 'temple' | 'gate' | 'arena';
 
 export const LEVEL_ORDER: LevelId[] = ['courtyard', 'village', 'bamboo', 'temple', 'gate'];
 

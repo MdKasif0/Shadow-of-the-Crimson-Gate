@@ -6,6 +6,7 @@
  */
 
 import { SaveSlotsScreen } from '../game/ui/SaveSlotsScreen';
+import { openAchievementsScreen, openDifficultyScreen, openTrialsScreen } from '../game/ui/MetaScreens';
 import { GAME_TITLE, HERO_SUBTITLE, ASSETS } from '../utils/constants';
 import { AudioManager } from '../game/audio/AudioManager';
 import { SaveManager } from '../game/save/SaveManager';
@@ -48,6 +49,8 @@ function buildMenuHTML(): string {
     { id: 'nav-continue', label: 'Continue', disabled: !hasSave },
     { id: 'nav-new-game', label: 'New Game', disabled: false },
     { id: 'nav-load', label: 'Load Game', disabled: !hasSave },
+    { id: 'nav-trials', label: 'Trials', disabled: false },
+    { id: 'nav-achievements', label: 'Achievements', disabled: false },
     { id: 'nav-controls', label: 'Controls', disabled: false },
     { id: 'nav-settings', label: 'Settings', disabled: false },
   ];
@@ -244,15 +247,33 @@ export function renderHero(container: HTMLElement): () => void {
 
   section.querySelector('#nav-new-game')?.addEventListener('click', () => {
     AudioManager.playUISelect();
+    const focusNewGame = () => (section.querySelector('#nav-new-game') as HTMLElement | null)?.focus();
     new SaveSlotsScreen('new', slot => {
-      const saveManager = SaveManager.getInstance();
-      saveManager.setActiveSlot(slot);
-      saveManager.deleteSave(slot);
+      openDifficultyScreen(difficulty => {
+        const saveManager = SaveManager.getInstance();
+        saveManager.setActiveSlot(slot);
+        saveManager.deleteSave(slot);
+        leaveFor(() => {
+          EventBus.emit('newGame', { difficulty });
+          GameStateManager.getInstance().setState(GameState.PLAYING);
+        });
+      }, focusNewGame);
+    }, focusNewGame);
+  }, { signal });
+
+  section.querySelector('#nav-trials')?.addEventListener('click', () => {
+    AudioManager.playUISelect();
+    openTrialsScreen(mode => {
       leaveFor(() => {
-        EventBus.emit('newGame', {});
         GameStateManager.getInstance().setState(GameState.PLAYING);
+        EventBus.emit('startTrial', { mode });
       });
-    }, () => (section.querySelector('#nav-new-game') as HTMLElement | null)?.focus());
+    }, () => (section.querySelector('#nav-trials') as HTMLElement | null)?.focus());
+  }, { signal });
+
+  section.querySelector('#nav-achievements')?.addEventListener('click', () => {
+    AudioManager.playUISelect();
+    openAchievementsScreen(() => (section.querySelector('#nav-achievements') as HTMLElement | null)?.focus());
   }, { signal });
 
   section.querySelector('#nav-controls')?.addEventListener('click', () => {

@@ -6,6 +6,7 @@ import { createMotes } from './LevelEffects';
 import { SecretDef } from '../world/WorldSecrets';
 import { EncounterConfig } from '../encounters/EncounterConfig';
 import { SeededRandom } from '../utils/MathUtils';
+import { EventBus } from '../core/EventBus';
 
 const at = (x: number, z: number) => new THREE.Vector3(x, 0, z);
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number): Rect => ({ minX, maxX, minZ, maxZ });
@@ -325,6 +326,7 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
           if (p.z < -93) {
             escape = 'done';
             ctx.memory.add('temple_escaped');
+            EventBus.emit('templeEscaped', { remaining: escapeTime });
             ctx.setCountdown('ESCAPE', null);
             ctx.completeLevel();
             ctx.notice('You made it out', 'Behind you, the long hall folds into the fire.');

@@ -76,8 +76,10 @@ export class EpilogueUI {
   private renderButtons(): void {
     this.overlay.style.pointerEvents = 'auto'; // allow clicking now
     this.content.innerHTML += `
-      <div style="display: flex; gap: 20px; margin-top: 60px;">
+      <p style="margin: 48px 0 0; max-width: 560px; font-family: var(--font-ui, sans-serif); font-size: 13px; color: #a8a090; text-align: center;">New Game+ starts the climb again with your skills and charms. Enemies are stronger, and each guardian drops a new charm.</p>
+      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
         <button id="btn-epi-continue" class="hero-nav__cta" style="width: 200px; justify-content: center; font-size: 14px;">CONTINUE</button>
+        <button id="btn-epi-ngplus" class="hero-nav__cta" style="width: 200px; justify-content: center; font-size: 14px;">NEW GAME+</button>
         <button id="btn-epi-mainmenu" class="hero-nav__cta" style="width: 200px; justify-content: center; font-size: 14px;">MAIN MENU</button>
       </div>
     `;
@@ -85,6 +87,12 @@ export class EpilogueUI {
     setTimeout(() => {
       document.getElementById('btn-epi-continue')?.addEventListener('click', () => {
         this.hide();
+        GameStateManager.getInstance().setState(GameState.PLAYING);
+      });
+
+      document.getElementById('btn-epi-ngplus')?.addEventListener('click', () => {
+        this.hide();
+        EventBus.emit('newGame', { plus: true });
         GameStateManager.getInstance().setState(GameState.PLAYING);
       });
 

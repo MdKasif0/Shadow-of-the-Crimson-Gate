@@ -60,7 +60,22 @@ export const CHARMS: CharmDef[] = [
   { id: 'ash_sutra', name: 'Ash Sutra', description: 'Fire, falls and corruption hurt you half as much.', origin: 'Kept from the flames in the Burning Temple’s courtyard.' },
   { id: 'crimson_ribbon', name: 'Crimson Ribbon', description: 'Counters deal 25% more damage.', origin: 'Akane’s, given when she yielded at the gate.' },
   { id: 'yomi_pearl', name: 'Pearl of Yomi', description: 'Raises your maximum health by 20.', origin: 'Found on the terraces below the Gate.' },
+  // Only in New Game+, each dropped by a guardian the second time it falls
+  { id: 'oni_horn', name: 'Oni Horn', description: 'Deal 20% more damage, and take 10% more.', origin: 'Broken from the Crimson Oni in New Game+.' },
+  { id: 'drowned_bell', name: 'Drowned Bell', description: 'Perfect dodges are 30% easier to time.', origin: 'Rung by Umibōzu as it sank, in New Game+.' },
+  { id: 'jade_silk', name: 'Jade Silk', description: 'Each kill restores 10 health.', origin: 'Left in the web of the Jorōgumo, in New Game+.' },
+  { id: 'cinder_crest', name: 'Cinder Crest', description: 'Fire, falls and corruption barely touch you.', origin: 'Torn from the Fallen Samurai’s helm in New Game+.' },
+  { id: 'eye_of_yomi', name: 'Eye of Yomi', description: 'Gain focus 50% faster.', origin: 'What was left of the Maw, in New Game+.' },
 ];
+
+/** The charm each guardian drops once New Game+ begins. */
+export const NG_PLUS_DROPS: Record<string, string> = {
+  CRIMSON_ONI: 'oni_horn',
+  UMIBOZU: 'drowned_bell',
+  JOROGUMO: 'jade_silk',
+  FALLEN_SAMURAI: 'cinder_crest',
+  MAW_OF_YOMI: 'eye_of_yomi',
+};
 
 /** Charm slots at the start. Clearing the Bamboo Labyrinth adds one more. */
 export const CHARM_SLOTS = 2;
@@ -102,6 +117,8 @@ export interface BuildModifiers {
   dodgeHeal: number;
   /** Multiplier on damage from fire, falls and corruption. */
   hazardResist: number;
+  /** Multiplier on damage taken from enemies. */
+  damageTaken: number;
 }
 
 export interface BuildSave {
@@ -189,18 +206,18 @@ export class PlayerBuild {
     const dashCooldown = (has('light_step') ? 0.7 : 1) * (wears('crane_feather') ? 0.75 : 1);
 
     return {
-      damage: has('honed_edge') ? 1.12 : 1,
+      damage: (has('honed_edge') ? 1.12 : 1) * (wears('oni_horn') ? 1.2 : 1),
       healthyDamage: wears('fox_mask') ? 1.15 : 1,
       staggeredDamage: wears('blood_lotus') ? 1.4 : 1,
-      focusGain: has('deep_well') ? 1.3 : 1,
+      focusGain: (has('deep_well') ? 1.3 : 1) * (wears('eye_of_yomi') ? 1.5 : 1),
       maxHealthBonus: (has('spirit_vessel') ? 30 : 0) + (wears('yomi_pearl') ? 20 : 0),
       dashCooldown,
       parryWindow: (0.2 + (wears('moon_tear') ? 0.07 : 0)) * (has('still_water') ? 1.5 : 1),
-      dodgeWindow: 0.3 * (has('still_water') ? 1.5 : 1),
+      dodgeWindow: 0.3 * (has('still_water') ? 1.5 : 1) * (wears('drowned_bell') ? 1.3 : 1),
       counterDamage: (has('riposte') ? 2.2 : 1.5) * (wears('crimson_ribbon') ? 1.25 : 1),
       blockReduction: wears('keepers_bell') ? 0.9 : 0.6,
       postureDamage: has('guard_breaker') ? 1.6 : 1,
-      healOnKill: wears('ember_bead') ? 6 : 0,
+      healOnKill: (wears('ember_bead') ? 6 : 0) + (wears('jade_silk') ? 10 : 0),
       hasFourthCut: has('fourth_cut'),
       hasTripleWave: has('twin_wave'),
       waveCost: has('twin_wave') ? 20 : 25,
@@ -211,7 +228,8 @@ export class PlayerBuild {
       hasShadowStep: has('shadow_step'),
       footingResist: wears('river_stone') ? 0.25 : 1,
       dodgeHeal: wears('spirit_moth') ? 8 : 0,
-      hazardResist: wears('ash_sutra') ? 0.5 : 1,
+      hazardResist: (wears('ash_sutra') ? 0.5 : 1) * (wears('cinder_crest') ? 0.25 : 1),
+      damageTaken: wears('oni_horn') ? 1.1 : 1,
     };
   }
 

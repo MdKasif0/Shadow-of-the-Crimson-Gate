@@ -4,6 +4,7 @@ import { SaveManager } from '../save/SaveManager';
 import { SaveData } from '../save/SaveData';
 import { LEVELS } from '../levels/LevelCatalog';
 import { formatTime } from './WorldMap';
+import { DIFFICULTIES } from '../meta/Run';
 
 export type SlotMode = 'new' | 'load';
 
@@ -14,9 +15,11 @@ function describe(save: SaveData): { title: string; lines: string[] } {
   const when = save.savedAt
     ? new Date(save.savedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : 'Saved before slots existed';
+  const run = `${DIFFICULTIES[save.difficulty ?? 'normal'].name}${save.ngPlus ? ` · New Game+${save.ngPlus > 1 ? ` ${save.ngPlus}` : ''}` : ''}`;
   return {
     title: `${level.numeral} · ${level.name}`,
     lines: [
+      run,
       `${cleared} of 5 levels cleared${bestTotal > 0 ? ` · best clears ${formatTime(bestTotal)}` : ''}`,
       `✧ ${save.spiritEssence} essence · ${save.build?.skills.length ?? 0} skills · ${save.build?.charms.length ?? 0} charms`,
       when,

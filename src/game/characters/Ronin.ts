@@ -14,6 +14,7 @@ import { GAME_CONFIG } from '../GameConfig';
 import { applyRimLight, CharacterGlow } from '../utils/RimLight';
 import { EventBus } from '../core/EventBus';
 import { BuildModifiers, PlayerBuild, TechniqueId } from '../progression/PlayerBuild';
+import { Run } from '../meta/Run';
 
 /** How far away an enemy can be and still pull the player's swing towards it. */
 const AIM_ASSIST_RANGE = 6.5;
@@ -151,7 +152,7 @@ export class Ronin {
   public takeDamage(amount: number, knockbackDir: THREE.Vector3, knockbackPower: number): void {
     if (this.health.isDead || this.state.isInvulnerable()) return;
     this.velocity.copy(knockbackDir).multiplyScalar(knockbackPower);
-    this.health.takeDamage(amount, 'ENEMY');
+    this.health.takeDamage(Math.max(1, Math.round(amount * Run.damageTaken * this.modifiers.damageTaken)), 'ENEMY');
   }
 
   /** Fire, falls and the like: hurts, but doesn't knock the Ronin about. */
@@ -159,7 +160,7 @@ export class Ronin {
     if (this.health.isDead || amount <= 0) return;
     const before = this.health.currentHealth;
     this.isAbsorbingBlow = true;
-    this.health.takeDamage(amount, 'HAZARD');
+    this.health.takeDamage(Math.max(1, Math.round(amount * Run.damageTaken)), 'HAZARD');
     this.isAbsorbingBlow = false;
     EventBus.emit('playerHealth', { current: this.health.currentHealth, max: this.health.maxHealth, delta: this.health.currentHealth - before });
   }
@@ -168,7 +169,7 @@ export class Ronin {
   public takeBlockedDamage(amount: number): void {
     if (this.health.isDead || this.state.isInvulnerable()) return;
     this.isAbsorbingBlow = true;
-    this.health.takeDamage(amount, 'ENEMY');
+    this.health.takeDamage(Math.round(amount * Run.damageTaken * this.modifiers.damageTaken), 'ENEMY');
     this.isAbsorbingBlow = false;
   }
 

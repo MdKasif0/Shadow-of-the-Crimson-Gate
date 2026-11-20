@@ -4,6 +4,7 @@ import { buildDrownedVillage } from './DrownedVillage';
 import { buildBambooLabyrinth } from './BambooLabyrinth';
 import { buildBurningTemple } from './BurningTemple';
 import { buildGateOfYomi } from './GateOfYomi';
+import { buildTrialArena } from './TrialArena';
 
 /** Builds one of the later levels. The courtyard is the original world and isn't built here. */
 export function buildLevel(id: Exclude<LevelId, 'courtyard'>, collision: CollisionSystem): LevelRuntime {
@@ -12,5 +13,6 @@ export function buildLevel(id: Exclude<LevelId, 'courtyard'>, collision: Collisi
     case 'bamboo': return buildBambooLabyrinth(collision);
     case 'temple': return buildBurningTemple(collision);
     case 'gate': return buildGateOfYomi(collision);
+    case 'arena': return buildTrialArena(collision);
   }
 }
