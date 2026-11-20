@@ -90,6 +90,7 @@ import { WorldMap, LevelLoadingCard, LevelCountdown, formatTime } from '../ui/Wo
 import { CHAPTERS } from '../story/StoryChapter';
 import { EncounterConfig } from '../encounters/EncounterConfig';
 import { ParryFlash } from '../vfx/ParryFlash';
+import { ContactShadows, ShadowCaster } from '../rendering/ContactShadows';
 import { mergeStatic } from '../utils/MergeStatic';
 import { Run, Difficulty } from '../meta/Run';
 import { Records } from '../meta/Records';
@@ -240,6 +241,8 @@ export class GameScene {
   } | null = null;
   private essenceDropLevel: LevelId = 'courtyard';
   private parryFlash!: ParryFlash;
+  private courtyardExtras: LevelBuilder | null = null;
+  private contactShadows!: ContactShadows;
   /** Last frame's state of each fight, to catch the moment one is won. */
   private encounterStates = new Map<string, EncounterState>();
 
@@ -312,6 +315,7 @@ export class GameScene {
 
     this.scene.add(this.levelHazards.group);
     this.parryFlash = new ParryFlash(this.scene);
+    this.contactShadows = new ContactShadows(this.scene);
     this.bindLevelEnemyWorld();
 
     this.spiritWaves = new SpiritWaves(this.scene);
@@ -621,6 +625,11 @@ export class GameScene {
     }, 100);
   }
 
+  /** Where a cinematic camera should focus: the boss during its intro and death, else the Ronin. */
+  public get cinematicFocus(): THREE.Vector3 {
+    return this.boss && (this.isCinematicActive || this.bossIsDefeatedSequence) ? this.boss.root.position : this.player.root.position;
+  }
+
   /** True while the loading card is up and the next level is being built. */
   public get isLoadingLevel(): boolean {
     return this.isTraveling;
@@ -876,6 +885,7 @@ export class GameScene {
 
     this.vfx.update(dt, this.time);
     this.parryFlash.update(realDt);
+    this.updateContactShadows();
     this.telegraphVfx.update(dt, this.time);
 
     // ─── Dialogue & Intro Block ──────────────────────────────────────
@@ -1002,7 +1012,9 @@ export class GameScene {
     this.audioZoneManager.update(dt);
     this.lighting.setMoonIntensity(2.6);
     this.lighting.setHeroLight(0xa8c4ff, 7, 12);
+    this.atmosphere.sky.cloudiness = 0.42;
     this.courtyard?.exit?.update(this.time);
+    this.courtyardExtras?.tick(this.time, dt, this.cameraController.camera);
     this.courtyard?.exit?.setOpen(this.playerProgress.crimsonOniDefeated);
   }
 
@@ -1655,6 +1667,12 @@ export class GameScene {
   private buildCourtyardExit(world: THREE.Group): void {
     const builder = new LevelBuilder('CourtyardExit', this.collisionSystem, 77);
     const exit = builder.exitGate(COURTYARD_EXIT.x, COURTYARD_EXIT.z, 0, 0xff6a4a);
+    // Moonlight falling through the forest canopy
+    const beams = builder.shafts({ color: 0xb0c8ff, opacity: 0.42, width: [1.4, 2.8], length: 20 });
+    for (const [x, z] of [[-3, -24], [4, -29], [-6, -35], [2, -40], [7, -44], [-4, -47], [5, -33], [-8, -27]]) {
+      beams.add(new THREE.Vector3(x, 0, z), () => builder.random.next());
+    }
+    this.courtyardExtras = builder;
     builder.finish();
     world.add(builder.group);
     WorldLights.sources.push(...builder.lights);
@@ -1793,6 +1811,7 @@ export class GameScene {
     else this.enterLevel(id);
 
     AudioManager.setMusicTheme(LEVELS[id].music, id !== 'courtyard');
+    EventBus.emit('levelGrade', { grade: LEVELS[id].grade });
     this.deathsThisLevel = 0;
     this.levelTimer = 0;
     this.isLevelBossFight = false;
@@ -2044,6 +2063,7 @@ export class GameScene {
     this.player.externalPush.set(0, 0, 0);
     const frame = level.update(this.levelContext(dt)) || {};
     const air = { ...level.atmosphere, ...frame };
+    this.atmosphere.sky.cloudiness = air.cloudiness ?? 0.5;
     this.atmosphere.update(dt, position, air.fogDensity, new THREE.Color(air.fogColor));
     this.lighting.update(dt, new THREE.Color(air.ambientColor), air.ambientIntensity);
     this.lighting.setMoonIntensity(air.moonIntensity ?? 2.6);
@@ -2075,6 +2095,21 @@ export class GameScene {
     this.player.glow.flash(0.5);
     EventBus.emit('damageNumber', { position: this.player.root.position.clone(), text: String(damage), kind: 'player' });
     if (label) EventBus.emit('damageNumber', { position: this.player.root.position.clone().setY(this.player.root.position.y + 2.4), text: label, kind: 'label' });
+  }
+
+  /** A soft shadow right under everyone standing on the ground. */
+  private updateContactShadows(): void {
+    const casters: ShadowCaster[] = [];
+    if (this.player.root.visible) casters.push({ position: this.player.root.position, radius: 0.55, strength: 1 });
+    for (const enemy of this.enemies) {
+      if (!enemy.root.visible) continue;
+      const scale = enemy.root.scale.x;
+      const radius = (enemy instanceof LevelEnemy ? enemy.config.hurtboxRadius : 0.6) * scale;
+      casters.push({ position: enemy.root.position, radius, strength: enemy.health.isDead ? scale : 1 });
+    }
+    if (this.boss?.root.visible) casters.push({ position: this.boss.root.position, radius: 2, strength: this.boss.health.isDead ? 0.5 : 1 });
+    for (const npc of this.npcs) if (npc.root.visible) casters.push({ position: npc.root.position, radius: 0.5, strength: 1 });
+    this.contactShadows.update(casters, (x, z) => this.level ? this.level.groundHeight(x, z) : 0);
   }
 
   /** The last blow of a fight lands in slow motion. Bosses have their own, longer, moment. */

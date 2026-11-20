@@ -9,7 +9,7 @@ export class AtmosphereSystem {
   private scene: THREE.Scene;
   private currentFogDensity: number = 0.008;
   private currentFogColor: THREE.Color = new THREE.Color(0x1c2a44);
-  private sky: SkyDome;
+  public readonly sky: SkyDome;
   private mist: GroundMist;
 
   constructor(scene: THREE.Scene) {

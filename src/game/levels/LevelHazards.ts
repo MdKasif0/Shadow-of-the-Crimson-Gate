@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HazardKind } from '../enemies/LevelEnemyTypes';
+import { HeatSource, HeatSources } from '../rendering/HeatSources';
 
 /**
  * LevelHazards — Ground that lingers: fire that burns while you stand in it,
@@ -29,6 +30,7 @@ interface Zone {
   warn: THREE.Mesh;
   body: THREE.Mesh;
   flames: THREE.Mesh[];
+  heat: HeatSource | null;
 }
 
 export class LevelHazards {
@@ -78,6 +80,7 @@ export class LevelHazards {
     this.zones.push({
       kind, position: position.clone(), radius, damage, age: 0,
       life: life ?? LIFE_SECONDS[kind], isLive: false, root, warn, body, flames,
+      heat: kind === 'fire' ? HeatSources.add(position, radius, 0.8) : null,
     });
   }
 
@@ -144,6 +147,7 @@ export class LevelHazards {
 
   private removeAt(index: number): void {
     const zone = this.zones[index];
+    if (zone.heat) HeatSources.remove(zone.heat);
     zone.root.traverse(object => {
       const mesh = object as THREE.Mesh;
       if (!mesh.isMesh) return;

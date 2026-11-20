@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { getGlowTexture } from '../utils/ProceduralTextures';
 
 /**
  * LevelEffects — Weather and air for the later levels: rain, embers, drifting
@@ -64,8 +65,9 @@ export function createMotes(count: number, color: number, options: { rise: numbe
   }));
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  // Soft round points, not the square sprites points draw by default
   const material = new THREE.PointsMaterial({
-    color, size: options.size, transparent: true, opacity: 0.85, depthWrite: false,
+    map: getGlowTexture(), color, size: options.size * 2.2, transparent: true, opacity: 0.85, depthWrite: false,
     blending: THREE.AdditiveBlending, sizeAttenuation: true,
   });
   const points = new THREE.Points(geometry, material);

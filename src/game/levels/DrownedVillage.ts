@@ -147,7 +147,7 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
     occluders: b.occluders,
     spawn: at(0, 46),
     bounds: { MIN_X: bounds.minX, MAX_X: bounds.maxX, MIN_Z: bounds.minZ, MAX_Z: bounds.maxZ },
-    atmosphere: { fogColor: 0x24303c, fogDensity: 0.017, ambientColor: 0x5a7088, ambientIntensity: 1.2 },
+    atmosphere: { fogColor: 0x24303c, fogDensity: 0.017, ambientColor: 0x5a7088, ambientIntensity: 1.2, cloudiness: 0.95 },
     shrine: { id: 'village_shrine', name: 'Drowned Shrine', position: at(-10, 40), rest: at(-6.5, 40) },
     exit: at(0, -88),
     encounters: ENCOUNTERS,
@@ -157,7 +157,7 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
     groundHeight: b.heightAt,
     footing: b.footingAt,
     update: ctx => {
-      b.tick(ctx.time, ctx.dt);
+      b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       exit.update(ctx.time);
       exit.setOpen(ctx.isBossDefeated);
       rain.update(ctx.dt, ctx.player.root.position, ctx.time);

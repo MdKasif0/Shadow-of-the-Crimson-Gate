@@ -16,6 +16,7 @@ const SKY_FRAGMENT = /* glsl */`
   uniform vec3 uZenith;
   uniform vec3 uMoonDir;
   uniform float uTime;
+  uniform float uCloudiness;
   varying vec3 vDirection;
 
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -24,30 +25,73 @@ const SKY_FRAGMENT = /* glsl */`
     f = f * f * (3.0 - 2.0 * f);
     return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
   }
-  float clouds(vec2 p) {
-    return noise(p) * 0.55 + noise(p * 2.1 + 3.1) * 0.3 + noise(p * 4.3 + 7.7) * 0.15;
+  float fbm(vec2 p) {
+    float sum = 0.0, amp = 0.5;
+    for (int i = 0; i < 5; i++) {
+      sum += noise(p) * amp;
+      p = p * 2.03 + vec2(1.7, 9.2);
+      amp *= 0.5;
+    }
+    return sum;
   }
 
   void main() {
     vec3 dir = normalize(vDirection);
     float up = max(dir.y, 0.0);
-    vec3 color = mix(uHorizon, uZenith, pow(up, 0.55));
-
-    // Stars
-    vec2 starCell = floor(dir.xz / max(dir.y, 0.15) * 90.0);
-    float star = step(0.9975, hash(starCell)) * smoothstep(0.08, 0.4, dir.y);
-    color += vec3(0.75, 0.85, 1.0) * star * (0.5 + 0.5 * sin(uTime * 2.0 + hash(starCell) * 40.0));
-
-    // Moon and halo
     float moonAngle = dot(dir, uMoonDir);
-    color += vec3(0.5, 0.62, 0.85) * pow(max(moonAngle, 0.0), 90.0) * 0.55;
-    color += vec3(3.4, 3.7, 4.2) * smoothstep(0.9988, 0.9992, moonAngle);
 
-    // Drifting cloud bands that catch the moonlight
-    vec2 cloudUv = dir.xz / (dir.y + 0.25) * 1.4 + vec2(uTime * 0.006, uTime * 0.002);
-    float density = smoothstep(0.42, 0.78, clouds(cloudUv)) * smoothstep(0.0, 0.2, dir.y);
-    vec3 cloudColor = mix(uHorizon * 0.8, vec3(0.3, 0.36, 0.48), pow(max(moonAngle, 0.0), 8.0));
-    color = mix(color, cloudColor, density * 0.8);
+    // Sky: a bright band at the horizon, deepening overhead
+    vec3 color = mix(uHorizon, uZenith, pow(up, 0.45));
+    color += uHorizon * 0.35 * exp(-up * 9.0);
+
+    // Stars, thicker along a faint river of light across the sky
+    vec2 starUv = dir.xz / max(dir.y + 0.12, 0.12);
+    float band = exp(-pow(dot(dir, normalize(vec3(0.8, 0.2, 0.55))), 2.0) * 14.0);
+    // Each star is a point somewhere in its cell, not the whole cell
+    vec2 grid = starUv * 70.0;
+    vec2 cell = floor(grid);
+    vec2 spot = vec2(hash(cell + 1.3), hash(cell + 8.7)) * 0.7 + 0.15;
+    float point = 1.0 - smoothstep(0.0, 0.09, length(fract(grid) - spot));
+    float starChance = mix(0.985, 0.955, band);
+    float star = step(starChance, hash(cell)) * point * smoothstep(0.05, 0.35, dir.y);
+    float twinkle = 0.55 + 0.45 * sin(uTime * (1.5 + hash(cell + 3.0) * 3.0) + hash(cell) * 40.0);
+    color += vec3(0.78, 0.86, 1.0) * star * twinkle * (0.5 + hash(cell + 7.0) * 0.9);
+    color += vec3(0.32, 0.34, 0.45) * band * fbm(starUv * 3.0) * 0.12 * smoothstep(0.05, 0.4, dir.y);
+
+    // The moon: a wide soft halo, a ring of corona, then the disc with its seas
+    float moonGlow = pow(max(moonAngle, 0.0), 24.0) * 0.35 + pow(max(moonAngle, 0.0), 300.0) * 0.9;
+    vec3 halo = vec3(0.55, 0.66, 0.9) * moonGlow;
+    float disc = smoothstep(0.99935, 0.99945, moonAngle);
+    vec3 tangent = normalize(cross(uMoonDir, vec3(0.0, 1.0, 0.0)));
+    vec3 bitangent = cross(tangent, uMoonDir);
+    vec2 moonUv = vec2(dot(dir, tangent), dot(dir, bitangent)) * 900.0;
+    float seas = fbm(moonUv * 0.18 + 4.0);
+    float limb = sqrt(max(0.0, 1.0 - dot(moonUv, moonUv) / 1300.0));
+    // Bright enough to bloom a little, but not so bright the seas wash out
+    vec3 moon = vec3(1.45, 1.52, 1.62) * mix(0.55, 1.0, smoothstep(0.35, 0.65, seas)) * (0.6 + 0.4 * limb);
+
+    // Two layers of cloud: high thin streaks, and a lower, heavier drift
+    vec2 highUv = dir.xz / (dir.y + 0.18) * vec2(0.5, 1.6) + vec2(uTime * 0.004, 0.0);
+    float high = smoothstep(0.55, 0.85, fbm(highUv * 1.3)) * 0.45;
+    vec2 lowUv = dir.xz / (dir.y + 0.22) * 1.25 + vec2(uTime * 0.009, uTime * 0.003);
+    float shape = fbm(lowUv);
+    float cover = mix(0.72, 0.38, uCloudiness);
+    float low = smoothstep(cover, cover + 0.22, shape);
+    float horizonFade = smoothstep(-0.02, 0.18, dir.y);
+    high *= horizonFade;
+    low *= horizonFade;
+
+    // Cloud edges facing the moon catch its light
+    float lit = pow(max(moonAngle, 0.0), 6.0);
+    float rim = smoothstep(cover - 0.04, cover + 0.06, shape) - smoothstep(cover + 0.06, cover + 0.2, shape);
+    vec3 cloudBase = mix(uZenith * 1.6 + uHorizon * 0.25, uHorizon * 0.9, 1.0 - up);
+    vec3 cloudColor = cloudBase + vec3(0.55, 0.62, 0.78) * (lit * 0.5 + rim * lit * 1.4);
+
+    // Moon behind the clouds: dimmed, but shining through the thin parts
+    color += halo * (1.0 - low * 0.65);
+    color = mix(color, moon, disc * (1.0 - low * 0.85) * (1.0 - high * 0.4));
+    color = mix(color, cloudColor * 1.15, high * 0.6);
+    color = mix(color, cloudColor, low * 0.92);
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -70,6 +114,7 @@ export class SkyDome {
         uZenith: { value: new THREE.Color(0x05080f) },
         uMoonDir: { value: MOON_DIRECTION },
         uTime: { value: 0 },
+        uCloudiness: { value: 0.5 },
       },
     });
 
@@ -84,7 +129,12 @@ export class SkyDome {
     scene.add(this.mesh);
   }
 
+  /** 0 for a clear sky, 1 for overcast. Eases towards it. */
+  public cloudiness = 0.5;
+
   public update(dt: number, fogColor: THREE.Color): void {
+    const u = this.material.uniforms.uCloudiness;
+    u.value += (this.cloudiness - u.value) * Math.min(1, dt * 0.8);
     this.material.uniforms.uTime.value += dt;
     this.material.uniforms.uHorizon.value.copy(fogColor);
     this.material.uniforms.uZenith.value.copy(fogColor).multiplyScalar(0.18).add(new THREE.Color(0x03060d));

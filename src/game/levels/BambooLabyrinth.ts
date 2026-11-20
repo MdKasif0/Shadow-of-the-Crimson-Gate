@@ -250,6 +250,16 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
   }
   const exit = b.exitGate(exitX, -71, 0, 0x8affb0);
 
+  // Moonlight falling through gaps in the canopy, along the true path and over the clearing
+  const beams = b.shafts({ color: 0xb8e8b0, opacity: 0.55, width: [1.2, 2.6], length: 18 });
+  maze.path.forEach(([pr, pc], i) => {
+    if (i % 3 === 0) beams.add(new THREE.Vector3(cellX(pc) + r.range(-1.5, 1.5), 0, cellZ(pr) + r.range(-1.5, 1.5)), () => r.next());
+  });
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    beams.add(new THREE.Vector3(exitX + Math.sin(a) * 7, 0, clearingZ + Math.cos(a) * 7), () => r.next());
+  }
+
   // ─── Fights and secrets ─────────────────────────────────────────────
   const pathCell = (fraction: number) => maze.path[Math.min(maze.path.length - 1, Math.floor(maze.path.length * fraction))];
   const fight = (id: string, [row, col]: [number, number], waves: EnemySpawnDef[][], reward: number, extra: Partial<EncounterConfig> = {}): EncounterConfig => ({
@@ -313,7 +323,7 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
     bounds: { MIN_X: bounds.minX, MAX_X: bounds.maxX, MIN_Z: bounds.minZ, MAX_Z: bounds.maxZ },
     atmosphere: {
       fogColor: 0x07110b, fogDensity: 0.036, ambientColor: 0x2a4a34, ambientIntensity: 0.5,
-      moonIntensity: 0.55, heroLight: { color: 0xffc070, intensity: 26, distance: 15 },
+      moonIntensity: 0.55, cloudiness: 0.3, heroLight: { color: 0xffc070, intensity: 26, distance: 15 },
     },
     shrine: { id: 'bamboo_shrine', name: 'Grove Shrine', position: at(entryX + 5, 46), rest: at(entryX + 1.5, 46) },
     exit: at(exitX, -71),
@@ -324,7 +334,7 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
     groundHeight: b.heightAt,
     footing: b.footingAt,
     update: ctx => {
-      b.tick(ctx.time, ctx.dt);
+      b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       exit.update(ctx.time);
       exit.setOpen(ctx.isBossDefeated);
       motes.update(ctx.dt, ctx.player.root.position, ctx.time);

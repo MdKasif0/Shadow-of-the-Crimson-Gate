@@ -6,6 +6,9 @@ import { SeededRandom } from '../utils/MathUtils';
 import { createSurfaceTextures } from '../utils/ProceduralTextures';
 import { Rect, inRect } from './LevelTypes';
 import { mergeStatic } from '../utils/MergeStatic';
+import { LightShafts, ShaftOptions, createHaloSprite } from '../rendering/LightShafts';
+import { HeatSource, HeatSources } from '../rendering/HeatSources';
+import { getGlowTexture } from '../utils/ProceduralTextures';
 
 /**
  * LevelKit — Shared pieces for building the later levels: ground, buildings,
@@ -37,6 +40,8 @@ export class LevelBuilder {
   private footings: Footing[] = [];
   private animated: ((time: number, dt: number) => void)[] = [];
   private disposables = new Set<{ dispose: () => void }>();
+  private shaftSets: LightShafts[] = [];
+  private heat: HeatSource[] = [];
 
   constructor(name: string, public readonly collision: CollisionSystem, seed: number) {
     this.group.name = name;
@@ -67,9 +72,18 @@ export class LevelBuilder {
     return factor;
   };
 
-  /** Runs everything the level animates: water, flames, gates. */
-  public tick(time: number, dt: number): void {
+  /** Runs everything the level animates: water, flames, gates, and beams turning to the camera. */
+  public tick(time: number, dt: number, camera?: THREE.Camera): void {
     for (const animate of this.animated) animate(time, dt);
+    if (camera) for (const shafts of this.shaftSets) shafts.update(time, camera);
+  }
+
+  /** A set of light beams; add each with `.add(groundPoint)`. */
+  public shafts(options: ShaftOptions): LightShafts {
+    const shafts = new LightShafts(options);
+    this.group.add(shafts.group);
+    this.shaftSets.push(shafts);
+    return shafts;
   }
 
   public onTick(animate: (time: number, dt: number) => void): void {
@@ -85,6 +99,8 @@ export class LevelBuilder {
       else material?.dispose();
     });
     for (const item of this.disposables) item.dispose();
+    for (const shafts of this.shaftSets) shafts.dispose();
+    for (const source of this.heat) HeatSources.remove(source);
     this.group.removeFromParent();
   }
 
@@ -140,6 +156,10 @@ export class LevelBuilder {
     const sprite = createGlowSprite(color, glowSize, 0.75);
     sprite.position.set(x, y, z);
     this.group.add(sprite);
+    // The lit air around it, wide and faint
+    const halo = createHaloSprite(color, glowSize * 4.5, getGlowTexture());
+    halo.position.set(x, y, z);
+    this.group.add(halo);
     const pool = createLightPool(color, range * 0.35, 0.18);
     pool.position.set(x, 0.06, z);
     pool.userData.noShadow = true;
@@ -463,5 +483,6 @@ export class LevelBuilder {
       });
     });
     this.light(x, y + 1.2 * size, z, 0xff7a2a, 18 * size, 9 + size * 3, 0.3, 2.2 * size);
+    this.heat.push(HeatSources.add(new THREE.Vector3(x, y + 0.6 * size, z), 1.6 * size, 1));
   }
 }

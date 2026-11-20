@@ -209,6 +209,12 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
 
   const exit = b.exitGate(0, -98, 0, 0xffa040);
 
+  // Firelight through the smoke over the courtyards, and moonlight through the hall's broken roof
+  const smoke = b.shafts({ color: 0xff8a4a, opacity: 0.32, width: [1.6, 3.2], length: 14 });
+  for (const [x, z] of [[-8, 40], [9, 36], [-11, -4], [7, -20], [-3, -12], [13, -28], [-13, 22]]) smoke.add(new THREE.Vector3(x, 0, z), () => b.random.next());
+  const roof = b.shafts({ color: 0xc8b8ff, opacity: 0.38, width: [1.4, 2.4], length: 16 });
+  for (const [x, z] of [[-5, -44], [4, -50], [-3, -58], [6, -64]]) roof.add(new THREE.Vector3(x, 0.1, z), () => b.random.next());
+
   // Permanent fires, lit once the level is entered
   const standingFires: [number, number, number][] = [[8, 41, 1.8], [-9, 35, 1.6], [-10, -6, 2.4], [6, -24, 2], [-13, -18, 2]];
 
@@ -278,7 +284,7 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
     occluders: b.occluders,
     spawn: at(0, 46),
     bounds: { MIN_X: bounds.minX, MAX_X: bounds.maxX, MIN_Z: bounds.minZ, MAX_Z: bounds.maxZ },
-    atmosphere: { fogColor: 0x2a1006, fogDensity: 0.016, ambientColor: 0xa85a38, ambientIntensity: 1.25, moonIntensity: 1.4 },
+    atmosphere: { fogColor: 0x2a1006, fogDensity: 0.016, ambientColor: 0xc8643a, ambientIntensity: 1.7, moonIntensity: 0.6, cloudiness: 0.75, heroLight: { color: 0xffa070, intensity: 9, distance: 12 } },
     shrine: { id: 'temple_shrine', name: 'Cinder Shrine', position: at(-11, 44), rest: at(-7.5, 44) },
     exit: at(0, -98),
     encounters: ENCOUNTERS,
@@ -289,7 +295,7 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
     footing: b.footingAt,
     defersCompletion: true,
     update: ctx => {
-      b.tick(ctx.time, ctx.dt);
+      b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       exit.update(ctx.time);
       embers.update(ctx.dt, ctx.player.root.position, ctx.time);
       const p = ctx.player.root.position;

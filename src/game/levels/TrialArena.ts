@@ -46,6 +46,11 @@ export function buildTrialArena(collision: CollisionSystem): LevelRuntime {
     b.stoneLantern(Math.sin(a) * (RADIUS - 3), Math.cos(a) * (RADIUS - 3), 0xff5a4a);
   }
   b.boundaryCliffs({ minX: -36, maxX: 36, minZ: -36, maxZ: 36 }, cliff, 10);
+  const beams = b.shafts({ color: 0xff7a8a, opacity: 0.26, width: [2, 3.5], length: 20 });
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.4;
+    beams.add(new THREE.Vector3(Math.sin(a) * 12, 0.3, Math.cos(a) * 12), () => b.random.next());
+  }
   b.finish();
 
   const motes = createMotes(80, 0xff6a5a, { rise: 0.7, size: 0.13, spread: 20, height: 9 });
@@ -69,7 +74,7 @@ export function buildTrialArena(collision: CollisionSystem): LevelRuntime {
     groundHeight: b.heightAt,
     footing: b.footingAt,
     update: ctx => {
-      b.tick(ctx.time, ctx.dt);
+      b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       motes.update(ctx.dt, ctx.player.root.position, ctx.time);
     },
     reset: () => {},

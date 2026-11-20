@@ -131,6 +131,10 @@ export function buildGateOfYomi(collision: CollisionSystem): LevelRuntime {
   b.solid(0, -91, 16, 1.4);
   for (const x of [-12, 12]) b.stoneLantern(x, -62, 0xff4a4a, top);
 
+  // Crimson light spilling down the terraces from the gate
+  const gateLight = b.shafts({ color: 0xff4a5a, opacity: 0.26, width: [2, 4], length: 22, direction: new THREE.Vector3(0, -0.55, 1) });
+  for (const [x, z, y] of [[-6, -64, 3.2], [5, -70, 3.2], [-2, -78, 3.2], [8, -58, 3.2], [-9, -74, 3.2]]) gateLight.add(new THREE.Vector3(x, y, z), () => b.random.next());
+
   b.finish();
 
   // ─── Rules: wind ────────────────────────────────────────────────────
@@ -149,7 +153,7 @@ export function buildGateOfYomi(collision: CollisionSystem): LevelRuntime {
     occluders: b.occluders,
     spawn: at(0, 46),
     bounds: { MIN_X: bounds.minX, MAX_X: bounds.maxX, MIN_Z: bounds.minZ, MAX_Z: bounds.maxZ },
-    atmosphere: { fogColor: 0x2a0a16, fogDensity: 0.012, ambientColor: 0x8a3a5a, ambientIntensity: 1.35, moonIntensity: 2 },
+    atmosphere: { fogColor: 0x2a0a16, fogDensity: 0.012, ambientColor: 0x8a3a5a, ambientIntensity: 1.35, moonIntensity: 2, cloudiness: 0.6 },
     shrine: { id: 'gate_shrine', name: 'Summit Shrine', position: at(-9, 44), rest: at(-5.5, 44) },
     exit: at(0, -86),
     encounters: ENCOUNTERS,
@@ -159,7 +163,7 @@ export function buildGateOfYomi(collision: CollisionSystem): LevelRuntime {
     groundHeight: b.heightAt,
     footing: b.footingAt,
     update: ctx => {
-      b.tick(ctx.time, ctx.dt);
+      b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       motes.update(ctx.dt, ctx.player.root.position, ctx.time);
       veilMaterial.opacity = (ctx.isBossDefeated ? 0.12 : 0.4) + Math.sin(ctx.time * 1.7) * 0.08;
       veil.scale.x = 1 + Math.sin(ctx.time * 0.9) * 0.02;

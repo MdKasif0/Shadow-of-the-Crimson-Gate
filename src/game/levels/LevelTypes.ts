@@ -37,6 +37,8 @@ export interface LevelAtmosphere {
   ambientIntensity: number;
   /** Strength of the moonlight. The courtyard uses 2.6. */
   moonIntensity?: number;
+  /** 0 for a clear sky, 1 for overcast. */
+  cloudiness?: number;
   /** The light the Ronin carries: a lantern, in the dark levels. */
   heroLight?: { color: number; intensity: number; distance: number };
 }

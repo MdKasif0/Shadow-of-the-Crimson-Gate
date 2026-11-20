@@ -9,55 +9,13 @@ import { EventBus } from './EventBus';
 import { SettingsManager } from '../settings/SettingsManager';
 import { GRAPHICS_PRESETS, SettingsData } from '../settings/SettingsData';
 import { LoadReporter } from '../ui/LoadingScreen';
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
+import { CinematicGradeShader, ColorGrade, DEFAULT_GRADE, MAX_HAZE_SOURCES } from '../rendering/CinematicGrade';
+import { HeatSources } from '../rendering/HeatSources';
+import { applyHeightFog } from '../rendering/HeightFog';
 
-/** Display-space grade: split-tone, contrast, vignette and film grain. */
-const GradeShader = {
-  uniforms: {
-    tDiffuse: { value: null as THREE.Texture | null },
-    uTime: { value: 0 },
-    uGrain: { value: 0.035 },
-  },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse;
-    uniform float uTime;
-    uniform float uGrain;
-    varying vec2 vUv;
-
-    float random(vec2 p) {
-      return fract(sin(dot(p + uTime, vec2(12.9898, 78.233))) * 43758.5453);
-    }
-
-    void main() {
-      vec3 color = texture2D(tDiffuse, vUv).rgb;
-      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-
-      // Cool blue-teal shadows against warm highlights
-      vec3 shadows = vec3(0.90, 1.00, 1.12);
-      vec3 highlights = vec3(1.06, 1.00, 0.92);
-      color *= mix(shadows, highlights, smoothstep(0.08, 0.65, luma));
-
-      // Gentle S-curve for contrast, and a little more saturation
-      color = mix(color, color * color * (3.0 - 2.0 * color), 0.35);
-      color = mix(vec3(luma), color, 1.14);
-
-      // Vignette
-      vec2 centered = vUv - 0.5;
-      color *= 1.0 - smoothstep(0.35, 0.95, length(centered) * 1.15) * 0.5;
-
-      // Grain shows most in the shadows, as it does on film
-      color += (random(vUv) - 0.5) * uGrain * (1.0 - luma * 0.7);
-
-      gl_FragColor = vec4(color, 1.0);
-    }
-  `,
-};
+// Fog that thins with height, applied before any material compiles
+applyHeightFog();
 
 /** Frames slower than this (about 38 FPS) trigger automatic quality reduction. */
 const ADAPT_SLOW_FRAME_SECONDS = 0.026;
@@ -74,6 +32,15 @@ export class Renderer {
   private bloomPass: UnrealBloomPass | null = null;
   private aoPass: GTAOPass | null = null;
   private gradePass: ShaderPass | null = null;
+  private dofPass: BokehPass | null = null;
+  /** The grade being eased towards, and how far there. */
+  private targetGrade: ColorGrade = DEFAULT_GRADE;
+  private currentGrade: ColorGrade = { ...DEFAULT_GRADE, shadows: [...DEFAULT_GRADE.shadows], highlights: [...DEFAULT_GRADE.highlights] };
+  private dofFocus: number | null = null;
+  private dofAmount = 0;
+  private blurAmount = 0;
+  private blurDirection = new THREE.Vector2();
+  private hazeProjected = new THREE.Vector3();
 
   private framesSinceAdapt: number = 0;
   private slowFramesSinceAdapt: number = 0;
@@ -136,7 +103,92 @@ export class Renderer {
         target.dispose(); // Rebuilt with the new sample count on next use
       }
     }
-    if (this.gradePass) this.gradePass.uniforms.uGrain.value = reduceMotion ? 0 : 0.035;
+    if (this.gradePass) {
+      this.gradePass.uniforms.uGrain.value = reduceMotion ? 0 : 0.04;
+      // Without multisampling, the grade pass smooths edges itself
+      this.gradePass.uniforms.uFxaa.value = preset.msaaSamples === 0 ? 1 : 0;
+    }
+  }
+
+  /** Eases the colour grade towards a level's own. */
+  public setGrade(grade: ColorGrade, isInstant = false): void {
+    this.targetGrade = grade;
+    if (isInstant) this.currentGrade = { ...grade, shadows: [...grade.shadows], highlights: [...grade.highlights] };
+  }
+
+  /** Depth of field, for cinematic shots. Pass null to return to sharp play. */
+  public setDepthOfField(focusDistance: number | null): void {
+    this.dofFocus = focusDistance;
+  }
+
+  /** A streak of motion blur along a screen direction, fading on its own. */
+  public kickMotionBlur(x: number, y: number, amount: number): void {
+    if (SettingsManager.getInstance().get().reduceMotion) return;
+    const length = Math.hypot(x, y);
+    if (length < 0.001) return;
+    this.blurDirection.set(x / length, y / length);
+    this.blurAmount = Math.max(this.blurAmount, amount);
+  }
+
+  private updateCinematics(camera: THREE.Camera, dt: number): void {
+    const pass = this.gradePass;
+    if (!pass) return;
+    const u = pass.uniforms;
+    const ease = Math.min(1, dt * 1.6);
+    const g = this.currentGrade;
+    const t = this.targetGrade;
+    for (let i = 0; i < 3; i++) {
+      g.shadows[i] += (t.shadows[i] - g.shadows[i]) * ease;
+      g.highlights[i] += (t.highlights[i] - g.highlights[i]) * ease;
+    }
+    g.saturation += (t.saturation - g.saturation) * ease;
+    g.contrast += (t.contrast - g.contrast) * ease;
+    g.lift += (t.lift - g.lift) * ease;
+    g.vignette += (t.vignette - g.vignette) * ease;
+    u.uShadows.value.set(...g.shadows);
+    u.uHighlights.value.set(...g.highlights);
+    u.uSaturation.value = g.saturation;
+    u.uContrast.value = g.contrast;
+    u.uLift.value = g.lift;
+    u.uVignette.value = g.vignette;
+
+    // Motion blur dies away quickly
+    this.blurAmount = Math.max(0, this.blurAmount - dt * 5);
+    u.uBlurAmount.value = this.blurAmount;
+    u.uBlurDirection.value.copy(this.blurDirection);
+
+    const size = this.webgl.getDrawingBufferSize(new THREE.Vector2());
+    u.uAspect.value = size.x / Math.max(size.y, 1);
+    u.uTexel.value.set(1 / Math.max(size.x, 1), 1 / Math.max(size.y, 1));
+
+    // Heat haze over the nearest fires in view
+    const perspective = camera as THREE.PerspectiveCamera;
+    const nearby = [...HeatSources.sources]
+      .map(source => ({ source, distance: source.position.distanceTo(camera.position) }))
+      .filter(item => item.distance < 45)
+      .sort((a, b) => a.distance - b.distance);
+    let count = 0;
+    for (const { source, distance } of nearby) {
+      if (count >= MAX_HAZE_SOURCES) break;
+      this.hazeProjected.copy(source.position).setY(source.position.y + source.size * 0.8).project(camera);
+      if (this.hazeProjected.z > 1 || Math.abs(this.hazeProjected.x) > 1.3 || Math.abs(this.hazeProjected.y) > 1.3) continue;
+      const screenRadius = (source.size * 1.4) / (distance * Math.tan(THREE.MathUtils.degToRad((perspective.fov ?? 45) / 2)) * 2);
+      u.uHaze.value[count].set(this.hazeProjected.x * 0.5 + 0.5, this.hazeProjected.y * 0.5 + 0.5, Math.min(0.5, screenRadius), source.strength * (1 - distance / 45));
+      count++;
+    }
+    u.uHazeCount.value = SettingsManager.getInstance().get().reduceMotion ? 0 : count;
+
+    // Depth of field fades in and out rather than snapping
+    const dof = this.dofPass;
+    if (dof) {
+      const target = this.dofFocus !== null ? 1 : 0;
+      this.dofAmount += (target - this.dofAmount) * Math.min(1, dt * 3);
+      dof.enabled = this.dofAmount > 0.02 && GRAPHICS_PRESETS[SettingsManager.getInstance().get().graphicsQuality].bloom;
+      const uniforms = (dof as unknown as { uniforms: Record<string, { value: number }> }).uniforms;
+      if (this.dofFocus !== null) uniforms.focus.value = this.dofFocus;
+      uniforms.aperture.value = 0.00035 * this.dofAmount;
+      uniforms.maxblur.value = 0.008 * this.dofAmount;
+    }
   }
 
   private buildComposer(scene: THREE.Scene, camera: THREE.Camera): EffectComposer {
@@ -153,9 +205,10 @@ export class Renderer {
     composer.addPass(new RenderPass(scene, camera));
 
     const aoPass = new GTAOPass(scene, camera, size.x, size.y);
-    aoPass.updateGtaoMaterial({ radius: 0.7, distanceExponent: 1.3, thickness: 1.2, scale: 1.1, samples: 10, distanceFallOff: 1, screenSpaceRadius: false });
+    // Wide enough to darken where walls meet floors and objects meet the ground
+    aoPass.updateGtaoMaterial({ radius: 1.1, distanceExponent: 1.5, thickness: 1.4, scale: 1.25, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
     aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, radiusExponent: 1, rings: 2, samples: 8 });
-    aoPass.blendIntensity = 0.85;
+    aoPass.blendIntensity = 1;
     this.excludeEffectsFromAO(aoPass, scene);
     composer.addPass(aoPass);
     this.aoPass = aoPass;
@@ -163,9 +216,13 @@ export class Renderer {
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.42, 0.65, 0.88);
     composer.addPass(this.bloomPass);
 
+    this.dofPass = new BokehPass(scene, camera, { focus: 10, aperture: 0, maxblur: 0 });
+    this.dofPass.enabled = false;
+    composer.addPass(this.dofPass);
+
     composer.addPass(new OutputPass());
 
-    this.gradePass = new ShaderPass(GradeShader);
+    this.gradePass = new ShaderPass(CinematicGradeShader);
     composer.addPass(this.gradePass);
 
     this.composer = composer;
@@ -235,6 +292,7 @@ export class Renderer {
   public render(scene: THREE.Scene, camera: THREE.Camera, dt: number = 0): void {
     const composer = this.composer ?? this.buildComposer(scene, camera);
     if (this.gradePass) this.gradePass.uniforms.uTime.value = (this.gradePass.uniforms.uTime.value + dt) % 100;
+    this.updateCinematics(camera, dt);
     composer.render(dt);
     this.adaptQuality(dt);
   }

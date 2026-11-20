@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { createHaloSprite } from '../rendering/LightShafts';
+import { getGlowTexture } from '../utils/ProceduralTextures';
 import { SeededRandom } from '../utils/MathUtils';
 import { CollisionSystem } from '../collision/CollisionSystem';
 import { createGlowSprite, createLightPool, WorldLights } from '../lighting/WorldLights';
@@ -87,6 +89,11 @@ export class LanternGenerator {
     const glow = createGlowSprite(LANTERN_COLOR, 3.4, 0.55);
     glow.position.y = LANTERN_CORE_HEIGHT;
     prefab.add(glow);
+
+    // The lit air around the lantern, wide and faint
+    const halo = createHaloSprite(LANTERN_COLOR, 11, getGlowTexture());
+    halo.position.y = LANTERN_CORE_HEIGHT;
+    prefab.add(halo);
 
     prefab.add(createLightPool(LANTERN_COLOR, 6, 0.16));
 

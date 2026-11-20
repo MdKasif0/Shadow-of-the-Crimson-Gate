@@ -20,6 +20,7 @@ import { DamageNumbers } from './ui/DamageNumbers';
 import { SettingsManager } from './settings/SettingsManager';
 import { SettingsData, QualityLevel } from './settings/SettingsData';
 import { TouchControls } from './ui/TouchControls';
+import { ColorGrade } from './rendering/CinematicGrade';
 
 /** Seconds of play measured before deciding the game is running too slowly. */
 const PERF_WINDOW = 6;
@@ -85,6 +86,7 @@ export class ThreeGame {
     this.applySettings(SettingsManager.getInstance().get());
     EventBus.on('settingsChanged', (settings: SettingsData) => this.applySettings(settings));
     this.touch = new TouchControls(this.input);
+    EventBus.on('levelGrade', (data: { grade: ColorGrade }) => this.renderer.setGrade(data.grade));
     
     this.bindMouseCapture();
   }
@@ -259,10 +261,22 @@ export class ThreeGame {
     this.cameraController.moveDirection.copy(canMove ? this.input.getMovementDirection() : ZERO);
     this.cameraController.isSprinting = canMove && this.input.isRunPressed() && this.cameraController.moveDirection.lengthSq() > 0;
     this.cameraController.isDeathOrbit = state === GameState.GAME_OVER;
-    if (this.gameScene.player.dashSystem.isDashing) this.cameraController.addDashKick();
+    if (this.gameScene.player.dashSystem.isDashing) {
+      this.cameraController.addDashKick();
+      // The world streaks past opposite the dash, on screen
+      const dash = this.gameScene.player.dashSystem.dashDirection;
+      const yaw = this.cameraController.yaw;
+      const right = dash.x * Math.cos(yaw) - dash.z * Math.sin(yaw);
+      const forward = -(dash.x * Math.sin(yaw) + dash.z * Math.cos(yaw));
+      this.renderer.kickMotionBlur(right, forward, 1);
+    }
 
     const isFrozen = !isActive && state !== GameState.GAME_OVER;
     this.cameraController.update(this.gameScene.player.root.position, dt, isFrozen);
+    // Cinematic shots get depth of field, focused on whatever they're looking at
+    this.renderer.setDepthOfField(this.cameraController.isSequencePlaying
+      ? this.cameraController.camera.position.distanceTo(this.gameScene.cinematicFocus)
+      : null);
     this.gameScene.updateOcclusion(isFrozen ? 0 : dt);
     this.damageNumbers.update(isFrozen ? 0 : dt, this.cameraController.camera);
     AudioManager.updateListener(this.cameraController.camera);

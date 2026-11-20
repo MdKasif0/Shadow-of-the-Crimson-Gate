@@ -33,12 +33,14 @@ export interface GraphicsPreset {
   msaaSamples: number;
   bloom: boolean;
   ambientOcclusion: boolean;
+  /** Half-width of the sharp-shadow area around the player. Smaller is crisper. */
+  shadowExtent: number;
 }
 
 export const GRAPHICS_PRESETS: Record<QualityLevel, GraphicsPreset> = {
-  LOW: { maxPixelRatio: 1, shadowMapSize: 0, lampLights: 2, msaaSamples: 0, bloom: false, ambientOcclusion: false },
-  MEDIUM: { maxPixelRatio: 1.25, shadowMapSize: 1024, lampLights: 4, msaaSamples: 4, bloom: true, ambientOcclusion: false },
-  HIGH: { maxPixelRatio: 1.5, shadowMapSize: 2048, lampLights: 6, msaaSamples: 4, bloom: true, ambientOcclusion: true }
+  LOW: { maxPixelRatio: 1, shadowMapSize: 0, lampLights: 2, msaaSamples: 0, bloom: false, ambientOcclusion: false, shadowExtent: 34 },
+  MEDIUM: { maxPixelRatio: 1.25, shadowMapSize: 2048, lampLights: 4, msaaSamples: 4, bloom: true, ambientOcclusion: true, shadowExtent: 30 },
+  HIGH: { maxPixelRatio: 1.5, shadowMapSize: 3072, lampLights: 6, msaaSamples: 4, bloom: true, ambientOcclusion: true, shadowExtent: 26 }
 };
 
 /** Fraction of particles kept per VFX Density level. */

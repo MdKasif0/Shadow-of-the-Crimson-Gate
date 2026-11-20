@@ -5,7 +5,7 @@ import { GRAPHICS_PRESETS, SettingsData } from '../settings/SettingsData';
 import { MOON_DIRECTION } from '../atmosphere/SkyDome';
 import { LightSource, WorldLights } from './WorldLights';
 
-/** Half-width of the area around the player that gets sharp shadows. */
+/** Half-width of the area around the player that gets sharp shadows, until a preset sets it. */
 const SHADOW_EXTENT = 34;
 const LIGHT_DISTANCE = 90;
 const POOL_REFRESH_SECONDS = 0.3;
@@ -36,6 +36,7 @@ export class LightingSystem {
   private time: number = 0;
 
   private moonOffset = MOON_DIRECTION.clone().multiplyScalar(LIGHT_DISTANCE);
+  private shadowExtent = SHADOW_EXTENT;
   private sampleCenter = new THREE.Vector3();
 
   constructor(scene: THREE.Scene) {
@@ -106,6 +107,12 @@ export class LightingSystem {
     const shadow = this.moon.shadow;
 
     this.moon.castShadow = preset.shadowMapSize > 0;
+    // A smaller area means more shadow-map detail around the player
+    const camera = shadow.camera;
+    camera.left = camera.bottom = -preset.shadowExtent;
+    camera.right = camera.top = preset.shadowExtent;
+    camera.updateProjectionMatrix();
+    this.shadowExtent = preset.shadowExtent;
     if (preset.shadowMapSize > 0 && shadow.mapSize.x !== preset.shadowMapSize) {
       shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
       // The renderer rebuilds the map at the new size on the next frame
@@ -135,7 +142,7 @@ export class LightingSystem {
 
   /** Moves the shadow area with the player, in whole shadow-map texels so edges don't shimmer. */
   private followWithShadows(playerPos: THREE.Vector3): void {
-    const texel = (SHADOW_EXTENT * 2) / Math.max(this.moon.shadow.mapSize.x, 1);
+    const texel = (this.shadowExtent * 2) / Math.max(this.moon.shadow.mapSize.x, 1);
     const x = Math.round(playerPos.x / texel) * texel;
     const z = Math.round(playerPos.z / texel) * texel;
     this.moon.target.position.set(x, 0, z);
