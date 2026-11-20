@@ -5,6 +5,8 @@ import { ShadowYokai } from '../enemies/ShadowYokai';
 import { Tengu } from '../enemies/Tengu';
 import { EnemyOptions } from '../enemies/EnemyTraits';
 import { EnemyKind } from './EncounterConfig';
+import { LevelEnemy } from '../enemies/LevelEnemy';
+import { LEVEL_ENEMIES } from '../enemies/LevelEnemyDefs';
 
 /**
  * EncounterSpawner — Builds enemies by kind. Roles such as the shielded yokai or
@@ -22,9 +24,16 @@ export class EncounterSpawner {
       case 'SHADOW_CALLER': enemy = new ShadowYokai(id, { ...options, variant: 'SUMMONER' }); break;
       case 'LURKING_SHADE': enemy = new ShadowYokai(id, { ...options, variant: 'AMBUSHER' }); break;
       case 'TENGU': enemy = new Tengu(id, options); break;
-      default:
+      default: {
+        const def = LEVEL_ENEMIES[type];
+        if (def) {
+          enemy = new LevelEnemy(id, def, options);
+          enemy.reset(position);
+          break;
+        }
         console.warn(`Unknown enemy type: ${type}`);
         return null;
+      }
     }
 
     enemy.root.position.copy(position);

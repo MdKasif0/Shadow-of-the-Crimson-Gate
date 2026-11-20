@@ -80,7 +80,7 @@ export class DamageSystem {
         if (isPlayerAttack) continue;
         if (player.tryPerfectDodge()) continue;
 
-        const guard = player.tryGuard(hit.hitbox.direction);
+        const guard = hit.hitbox.unblockable ? null : player.tryGuard(hit.hitbox.direction);
         if (guard === 'parry') {
           EventBus.emit('parry', { attackerId: hit.hitbox.ownerId, position: player.root.position.clone() });
           hitStopTime = Math.max(hitStopTime, 0.09);
@@ -104,6 +104,12 @@ export class DamageSystem {
         if (guard !== 'block') {
           player.glow.flash(0.8);
           cameraController.addImpactKick(hit.hitbox.direction, 0.35);
+        }
+
+        // A grab that lands holds the Ronin fast
+        if (hit.hitbox.grab && guard !== 'block' && newHp > 0) {
+          const grabber = enemies.find(e => e.id === hit.hitbox.ownerId) as (Enemy & { onGrabLanded?: () => void }) | undefined;
+          grabber?.onGrabLanded?.();
         }
 
         if (newHp <= 0) {

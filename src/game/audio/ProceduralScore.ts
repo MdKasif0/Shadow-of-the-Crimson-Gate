@@ -6,7 +6,22 @@
  * ensemble is playing, so the music builds as a fight escalates.
  */
 
-export type ScoreMood = 'combat' | 'boss1' | 'boss2' | 'boss3';
+export type ScoreMood = 'explore' | 'combat' | 'boss1' | 'boss2' | 'boss3';
+
+/**
+ * A level's colour on the score: its key, pace and which instruments lead.
+ * Every level keeps the same ensemble, so the music still sounds like one game.
+ */
+export interface ScoreTheme {
+  /** Semitones from D. */
+  transpose: number;
+  tempo: number;
+  flute: number;
+  koto: number;
+  drums: number;
+}
+
+export const NEUTRAL_THEME: ScoreTheme = { transpose: 0, tempo: 1, flute: 1, koto: 1, drums: 1 };
 
 interface MoodSettings {
   bpm: number;
@@ -26,6 +41,13 @@ const o = 0.55; // Lighter hit
 const _ = 0;
 
 const MOODS: Record<ScoreMood, MoodSettings> = {
+  // Walking music: no taiko, a soft pulse, and the melody instruments in front
+  explore: {
+    bpm: 66,
+    taiko: [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    shime: [o, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
+    droneLevel: 0.07, fluteChance: 0.4, kotoChance: 0.26, level: 0.55,
+  },
   combat: {
     bpm: 96,
     taiko: [X, _, _, _, _, _, o, _, X, _, _, _, o, _, _, _],
@@ -69,6 +91,9 @@ export class ProceduralScore {
   private bar = 0;
   private droneNodes: AudioScheduledSourceNode[] = [];
   private droneGain: GainNode | null = null;
+  private theme: ScoreTheme = NEUTRAL_THEME;
+  /** 0 to 1: how heated the fight is. Raises the volume and thickens the texture. */
+  private intensity = 0.5;
 
   constructor(ctx: BaseAudioContext, destination: AudioNode) {
     this.ctx = ctx;
@@ -97,7 +122,7 @@ export class ProceduralScore {
   public play(mood: ScoreMood, fadeSeconds: number = 1.5): void {
     this.mood = mood;
     const now = this.ctx.currentTime;
-    this.fadeTo(MOODS[mood].level, fadeSeconds);
+    this.fadeTo(this.levelFor(mood), fadeSeconds);
     this.setDroneLevel(MOODS[mood].droneLevel, fadeSeconds);
 
     if (this.isPlaying) return;
@@ -118,6 +143,36 @@ export class ProceduralScore {
     for (const node of this.droneNodes) node.stop(stopAt);
     this.droneNodes = [];
     this.droneGain = null;
+  }
+
+  /** Changes key, pace and instrument balance. A new key takes over at the next note. */
+  public setTheme(theme: ScoreTheme): void {
+    this.theme = theme;
+    if (this.isPlaying && this.droneNodes.length > 0) {
+      const ratio = Math.pow(2, theme.transpose / 12);
+      const roots = [DRONE_ROOT, DRONE_ROOT, DRONE_ROOT * 1.5];
+      this.droneNodes.forEach((node, i) => {
+        const osc = node as OscillatorNode;
+        osc.frequency?.linearRampToValueAtTime(roots[i] * ratio, this.ctx.currentTime + 1.5);
+      });
+    }
+  }
+
+  /** Swells the music as more enemies close in. */
+  public setIntensity(value: number): void {
+    const next = Math.max(0, Math.min(1, value));
+    if (Math.abs(next - this.intensity) < 0.04) return;
+    this.intensity = next;
+    if (this.isPlaying) this.fadeTo(this.levelFor(this.mood), 0.8);
+  }
+
+  private levelFor(mood: ScoreMood): number {
+    const base = MOODS[mood].level;
+    return mood === 'combat' ? base * (0.7 + 0.45 * this.intensity) : base;
+  }
+
+  private note(index: number): number {
+    return SCALE[index] * Math.pow(2, this.theme.transpose / 12);
   }
 
   /** Writes a stretch of the score ahead of time, for offline rendering in tests. */
@@ -141,7 +196,7 @@ export class ProceduralScore {
   }
 
   private stepDuration(): number {
-    return 60 / MOODS[this.mood].bpm / 4;
+    return 60 / (MOODS[this.mood].bpm * this.theme.tempo) / 4;
   }
 
   private schedule(): void {
@@ -162,15 +217,20 @@ export class ProceduralScore {
     const settings = MOODS[this.mood];
     const step = this.step;
 
-    const taiko = settings.taiko[step];
-    if (taiko > 0) this.playTaiko(time, taiko);
+    const theme = this.theme;
+    const heat = this.mood === 'combat' ? this.intensity : 0.5;
+    let taiko = settings.taiko[step] * theme.drums;
+    // A crowded fight adds off-beat hits
+    if (taiko === 0 && this.mood === 'combat' && heat > 0.65 && step % 4 === 2 && Math.random() < heat - 0.4) taiko = o;
+    if (taiko > 0) this.playTaiko(time, Math.min(1, taiko));
 
-    const shime = settings.shime[step];
-    if (shime > 0) this.playShime(time, shime);
+    const shime = settings.shime[step] * theme.drums;
+    if (shime > 0) this.playShime(time, Math.min(1, shime));
 
-    if (step % 2 === 0 && Math.random() < settings.kotoChance) this.playKoto(time);
+    const koto = settings.kotoChance * theme.koto * (this.mood === 'combat' ? 0.6 + 0.8 * heat : 1);
+    if (step % 2 === 0 && Math.random() < koto) this.playKoto(time);
 
-    if (step === 0 && this.bar % 2 === 0 && Math.random() < settings.fluteChance) {
+    if (step === 0 && this.bar % 2 === 0 && Math.random() < settings.fluteChance * theme.flute) {
       this.playFlute(time, this.stepDuration() * 14);
     }
 
@@ -189,7 +249,8 @@ export class ProceduralScore {
     filter.connect(this.output);
 
     // Root and fifth, slightly detuned so they beat slowly against each other
-    for (const [frequency, detune] of [[DRONE_ROOT, -5], [DRONE_ROOT, 6], [DRONE_ROOT * 1.5, 2]]) {
+    const ratio = Math.pow(2, this.theme.transpose / 12);
+    for (const [frequency, detune] of [[DRONE_ROOT * ratio, -5], [DRONE_ROOT * ratio, 6], [DRONE_ROOT * 1.5 * ratio, 2]]) {
       const osc = this.ctx.createOscillator();
       osc.type = 'sawtooth';
       osc.frequency.value = frequency;
@@ -258,7 +319,7 @@ export class ProceduralScore {
 
   private playKoto(time: number): void {
     const octave = Math.random() > 0.55 ? 4 : 2;
-    const frequency = SCALE[Math.floor(Math.random() * SCALE.length)] * octave;
+    const frequency = this.note(Math.floor(Math.random() * SCALE.length)) * octave;
 
     const osc = this.ctx.createOscillator();
     osc.type = 'triangle';
@@ -272,7 +333,7 @@ export class ProceduralScore {
   }
 
   private playFlute(time: number, duration: number): void {
-    const frequency = SCALE[Math.floor(Math.random() * SCALE.length)] * 2;
+    const frequency = this.note(Math.floor(Math.random() * SCALE.length)) * 2;
 
     const osc = this.ctx.createOscillator();
     osc.type = 'sine';

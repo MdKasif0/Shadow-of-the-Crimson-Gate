@@ -6,6 +6,8 @@ export class GameLoop {
   // Callbacks
   private updateCallback: (dt: number) => void;
   private renderCallback: () => void;
+  /** Frames per second to stop at; 0 for none. */
+  public fpsCap = 0;
 
   constructor(updateCallback: (dt: number) => void, renderCallback: () => void) {
     this.updateCallback = updateCallback;
@@ -27,6 +29,13 @@ export class GameLoop {
 
   private loop(now: number): void {
     if (!this.isRunning) return;
+
+    // With a cap, skip frames that come too soon. The small allowance stops a
+    // 60 fps cap on a 60 Hz screen from dropping every other frame.
+    if (this.fpsCap > 0 && now - this.lastTime < 1000 / this.fpsCap - 2) {
+      this.animFrameId = requestAnimationFrame(this.loop);
+      return;
+    }
     
     // Calculate delta time in seconds
     let dt = (now - this.lastTime) / 1000;

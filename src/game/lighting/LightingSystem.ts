@@ -191,6 +191,18 @@ export class LightingSystem {
     }
   }
 
+  /** Moonlight strength; the courtyard uses 2.6, the dark levels much less. */
+  public setMoonIntensity(intensity: number): void {
+    this.moon.intensity += (intensity - this.moon.intensity) * 0.1;
+  }
+
+  /** The light carried with the player: a cool fill by default, a lantern in the dark. */
+  public setHeroLight(color: number, intensity: number, distance: number): void {
+    this.heroLight.color.lerp(new THREE.Color(color), 0.1);
+    this.heroLight.intensity += (intensity - this.heroLight.intensity) * 0.1;
+    this.heroLight.distance = distance;
+  }
+
   /** Red glow radiating from the boss. Pass 0 to turn it off. */
   public setBossGlow(position: THREE.Vector3 | null, intensity: number): void {
     if (position) this.bossLight.position.set(position.x, position.y + 2.6, position.z);

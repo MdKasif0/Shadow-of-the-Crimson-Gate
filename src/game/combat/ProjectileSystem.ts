@@ -22,6 +22,18 @@ export class ProjectileSystem {
       this.projectiles.push(proj);
       this.scene.add(proj.root);
     }
+    for (const type of ['FIRE', 'WATER', 'POISON', 'VOID'] as ProjectileType[]) {
+      for (let i = 0; i < 12; i++) {
+        const proj = new Projectile(`proj_${type.toLowerCase()}_${i}`, type);
+        this.projectiles.push(proj);
+        this.scene.add(proj.root);
+      }
+    }
+  }
+
+  /** Every projectile in flight drifts with the wind. */
+  public applyWind(push: THREE.Vector3, dt: number): void {
+    for (const proj of this.projectiles) proj.deflect(push, dt);
   }
 
   public spawnProjectile(
@@ -117,10 +129,8 @@ export class ProjectileSystem {
     }
   }
 
+  /** Same as clearAll. The pool is kept, so projectiles can still fire afterwards. */
   public clear(): void {
-    for (const p of this.projectiles) {
-      p.deactivate();
-    }
-    this.projectiles = [];
+    this.clearAll();
   }
 }

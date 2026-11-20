@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 
-export type ProjectileType = 'DEFAULT' | 'CRIMSON_ARC';
+export type ProjectileType = 'DEFAULT' | 'CRIMSON_ARC' | 'FIRE' | 'WATER' | 'POISON' | 'VOID';
+
+/** Core and aura colours for the plain orb projectiles. */
+const ORB_COLORS: Record<string, { core: number; aura: number; size: number }> = {
+  DEFAULT: { core: 0x00ffff, aura: 0x004455, size: 1 },
+  FIRE: { core: 0xffc04a, aura: 0xa82808, size: 1.25 },
+  WATER: { core: 0xc8f0ff, aura: 0x1a5a8a, size: 1.4 },
+  POISON: { core: 0xd8ff7a, aura: 0x3a6a10, size: 1.1 },
+  VOID: { core: 0xff4a8a, aura: 0x3a0828, size: 1.5 },
+};
 
 export class Projectile {
   public id: string;
@@ -44,13 +53,14 @@ export class Projectile {
       });
       this.mesh = new THREE.Mesh(auraGeo, auraMat);
     } else {
-      const coreGeo = new THREE.SphereGeometry(0.15, 8, 8);
-      const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+      const look = ORB_COLORS[type] ?? ORB_COLORS.DEFAULT;
+      const coreGeo = new THREE.SphereGeometry(0.15 * look.size, 8, 8);
+      const coreMat = new THREE.MeshBasicMaterial({ color: look.core });
       this.coreMesh = new THREE.Mesh(coreGeo, coreMat);
 
-      const auraGeo = new THREE.SphereGeometry(0.3, 16, 16);
+      const auraGeo = new THREE.SphereGeometry(0.3 * look.size, 16, 16);
       const auraMat = new THREE.MeshBasicMaterial({
-        color: 0x004455,
+        color: look.aura,
         transparent: true,
         opacity: 0.6,
         blending: THREE.AdditiveBlending,
@@ -85,6 +95,12 @@ export class Projectile {
     this.root.position.copy(this.position);
     this.root.visible = true;
     this.time = 0;
+  }
+
+  /** Bends the flight path, as a gust of wind does. Keeps the speed the same. */
+  public deflect(push: THREE.Vector3, dt: number): void {
+    if (!this.active || push.lengthSq() === 0) return;
+    this.direction.addScaledVector(push, dt / Math.max(this.speed, 1)).setY(0).normalize();
   }
 
   public update(dt: number): void {

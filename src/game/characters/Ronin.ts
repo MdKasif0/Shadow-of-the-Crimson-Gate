@@ -68,6 +68,16 @@ export class Ronin {
   /** A guard-broken enemy close enough to execute, set by the scene each frame. */
   public executionTarget: THREE.Vector3 | null = null;
   public isBlocking: boolean = false;
+  /** Set by the level each frame: 1 on solid ground, lower in water or webs. */
+  public footing: number = 1;
+  /** Held fast by a grab. Dash presses struggle free sooner. */
+  public rootedTimer: number = 0;
+  /** A shove from outside, such as a gust of wind, in units per second. */
+  public externalPush = new THREE.Vector3();
+  /** Floor height under a point, for levels with decks and ramps. */
+  public groundHeight: ((x: number, z: number) => number) | null = null;
+  /** What's underfoot, for footstep sounds. Unset, the courtyard's own rule applies. */
+  public surfaceAt: ((x: number, z: number) => 'stone' | 'grass' | 'water' | 'wood') | null = null;
   private isAbsorbingBlow: boolean = false;
   private parryTimer: number = 0;
   private counterTimer: number = 0;
@@ -144,6 +154,16 @@ export class Ronin {
     this.health.takeDamage(amount, 'ENEMY');
   }
 
+  /** Fire, falls and the like: hurts, but doesn't knock the Ronin about. */
+  public takeHazardDamage(amount: number): void {
+    if (this.health.isDead || amount <= 0) return;
+    const before = this.health.currentHealth;
+    this.isAbsorbingBlow = true;
+    this.health.takeDamage(amount, 'HAZARD');
+    this.isAbsorbingBlow = false;
+    EventBus.emit('playerHealth', { current: this.health.currentHealth, max: this.health.maxHealth, delta: this.health.currentHealth - before });
+  }
+
   /** A blocked blow: some damage gets through, but the guard holds. */
   public takeBlockedDamage(amount: number): void {
     if (this.health.isDead || this.state.isInvulnerable()) return;
@@ -167,8 +187,26 @@ export class Ronin {
     this.state.combatPhase = CombatPhase.NONE;
   }
 
+  public get isRooted(): boolean {
+    return this.rootedTimer > 0 && !this.health.isDead;
+  }
+
+  /** Held in place for a moment, unable to move or swing. */
+  public grab(seconds: number): void {
+    if (this.health.isDead) return;
+    this.rootedTimer = Math.max(this.rootedTimer, seconds);
+    this.isBlocking = false;
+    this.state.combatPhase = CombatPhase.NONE;
+    this.state.currentAttackId = null;
+    this.dashSystem.isDashing = false;
+    if (this.state.movement === MovementState.DASH) this.state.movement = MovementState.IDLE;
+  }
+
   public reset(position: THREE.Vector3): void {
     this.setPosition(position.x, position.y, position.z);
+    this.rootedTimer = 0;
+    this.footing = 1;
+    this.externalPush.set(0, 0, 0);
     this.health['currentHealth'] = this.health['maxHealth'];
     this.health.isDead = false;
     this.state.movement = MovementState.IDLE;
@@ -264,6 +302,15 @@ export class Ronin {
     if (this.perfectDodgeCooldown > 0) this.perfectDodgeCooldown -= dt;
     if (this.parryTimer > 0) this.parryTimer -= dt;
     if (this.counterTimer > 0) this.counterTimer -= dt;
+    if (this.rootedTimer > 0) {
+      this.rootedTimer -= dt;
+      // Every dash press is a pull against the grip
+      if (this.isControlsEnabled && inputManager.isActionJustPressed('dash')) {
+        this.rootedTimer -= 0.3;
+        this.glow.flash(0.3);
+        if (this.rootedTimer <= 0) EventBus.emit('grabEscaped', { position: this.root.position.clone() });
+      }
+    }
     this.sinceDash = this.dashSystem.isDashing ? 0 : this.sinceDash + dt;
     this.glow.update(dt);
 
@@ -287,7 +334,7 @@ export class Ronin {
     }
 
     // Process combat inputs
-    if (this.isControlsEnabled) {
+    if (this.isControlsEnabled && !this.isRooted) {
       const canAct = this.state.movement !== MovementState.HURT;
       const modifiers = this.modifiers;
 
@@ -358,12 +405,13 @@ export class Ronin {
     this.combat.update(dt);
 
     // Fetch movement dir
-    const inputMoveDir = this.isControlsEnabled ? inputManager.getMovementDirection() : new THREE.Vector3();
+    const canSteer = this.isControlsEnabled && !this.isRooted;
+    const inputMoveDir = canSteer ? inputManager.getMovementDirection() : new THREE.Vector3();
     const isAttacking = this.state.isAttacking();
     
     let intendedMove = new THREE.Vector3();
-    const isRunning = this.isControlsEnabled && inputManager.isRunPressed();
-    const speed = this.isBlocking ? BLOCK_SPEED : isRunning ? 8 : 4; // GAME_CONFIG.PLAYER.SPEED
+    const isRunning = canSteer && inputManager.isRunPressed();
+    const speed = (this.isBlocking ? BLOCK_SPEED : isRunning ? 8 : 4) * this.footing;
 
     // Priority: HURT > DASH > ATTACK > MOVEMENT
     if (this.state.movement === MovementState.HURT) {
@@ -446,8 +494,9 @@ export class Ronin {
         const stepThreshold = isRunning ? 2.4 : 1.8;
         if (this.footstepDistance >= stepThreshold) {
           this.footstepDistance = 0;
-          const isGrass = this.root.position.z < -20 && this.root.position.z > -50;
-          AudioManager.playFootstep(isGrass ? 'grass' : 'stone');
+          const { x, z } = this.root.position;
+          const isGrass = z < -20 && z > -50;
+          AudioManager.playFootstep(this.surfaceAt ? this.surfaceAt(x, z) : isGrass ? 'grass' : 'stone');
         }
       } else {
         this.footstepDistance = 0;
@@ -460,6 +509,7 @@ export class Ronin {
       intendedMove.add(this.velocity.clone().multiplyScalar(dt));
       this.velocity.lerp(new THREE.Vector3(0,0,0), dt * 8); // Damping
     }
+    if (this.externalPush.lengthSq() > 0) intendedMove.addScaledVector(this.externalPush, dt);
 
     // Resolve Movement against collisions
     if (intendedMove.lengthSq() > 0) {
@@ -476,6 +526,7 @@ export class Ronin {
       this.root.position.x = THREE.MathUtils.clamp(this.root.position.x, bounds.MIN_X, bounds.MAX_X);
       this.root.position.z = THREE.MathUtils.clamp(this.root.position.z, bounds.MIN_Z, bounds.MAX_Z);
     }
+    this.followGround(dt);
 
     // Locked on: keep facing the target, except when dashing
     if (this.lockTarget && this.state.movement !== MovementState.DASH && !isAttacking) {
@@ -573,6 +624,13 @@ export class Ronin {
     this.root.rotation.set(0, y, 0); // Restore full rotation safely
   }
   
+  /** Steps up onto decks and down off them, a little smoothed. */
+  private followGround(dt: number): void {
+    const target = this.groundHeight ? this.groundHeight(this.root.position.x, this.root.position.z) : 0;
+    const y = this.root.position.y;
+    this.root.position.y = Math.abs(target - y) < 0.01 ? target : y + (target - y) * Math.min(1, dt * 14);
+  }
+
   private applyVelocity(dt: number, collisionSystem: any): void {
     if (this.velocity.lengthSq() > 0.01) {
       const resolvedMove = collisionSystem.resolveMovement(

@@ -1,149 +1,179 @@
 import { SettingsManager } from '../settings/SettingsManager';
+import { SettingsData } from '../settings/SettingsData';
 import { AudioManager } from '../audio/AudioManager';
 
+type Field =
+  | { kind: 'range'; key: keyof SettingsData; label: string; min: number; max: number; step: number; format?: (v: number) => string }
+  | { kind: 'select'; key: keyof SettingsData; label: string; options: { value: string; label: string }[]; numeric?: boolean }
+  | { kind: 'toggle'; key: keyof SettingsData; label: string; hint?: string };
+
+const QUALITY = [
+  { value: 'LOW', label: 'Low' },
+  { value: 'MEDIUM', label: 'Medium' },
+  { value: 'HIGH', label: 'High' },
+];
+const percent = (v: number) => `${Math.round(v * 100)}%`;
+
+const SECTIONS: { title: string; fields: Field[] }[] = [
+  {
+    title: 'Sound',
+    fields: [
+      { kind: 'range', key: 'masterVolume', label: 'Master volume', min: 0, max: 1, step: 0.05, format: percent },
+      { kind: 'range', key: 'musicVolume', label: 'Music', min: 0, max: 1, step: 0.05, format: percent },
+      { kind: 'range', key: 'sfxVolume', label: 'Sound effects', min: 0, max: 1, step: 0.05, format: percent },
+    ],
+  },
+  {
+    title: 'Controls',
+    fields: [
+      { kind: 'range', key: 'lookSensitivity', label: 'Camera sensitivity', min: 0.3, max: 2.5, step: 0.05, format: v => `${v.toFixed(2)}×` },
+      { kind: 'toggle', key: 'invertY', label: 'Invert camera Y' },
+      {
+        kind: 'select', key: 'touchControls', label: 'Touch controls', options: [
+          { value: 'AUTO', label: 'On touch screens' },
+          { value: 'ON', label: 'Always' },
+          { value: 'OFF', label: 'Never' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Graphics',
+    fields: [
+      { kind: 'select', key: 'graphicsQuality', label: 'Quality (shadows, lights)', options: QUALITY },
+      { kind: 'select', key: 'vfxIntensity', label: 'Particles', options: QUALITY },
+      {
+        kind: 'select', key: 'fpsCap', label: 'Frame rate limit', numeric: true, options: [
+          { value: '0', label: 'No limit' },
+          { value: '120', label: '120 fps' },
+          { value: '60', label: '60 fps' },
+          { value: '30', label: '30 fps (saves battery)' },
+        ],
+      },
+      { kind: 'toggle', key: 'autoQuality', label: 'Lower quality if the game slows down' },
+    ],
+  },
+  {
+    title: 'Comfort',
+    fields: [
+      { kind: 'toggle', key: 'cameraShake', label: 'Camera shake' },
+      { kind: 'toggle', key: 'reduceMotion', label: 'Reduce motion' },
+    ],
+  },
+];
+
+/** Every option in one panel, saved the moment it changes. */
 export class SettingsMenu {
   private overlay: HTMLDivElement;
 
   constructor(private onClose: () => void) {
     this.overlay = document.createElement('div');
-    this.overlay.className = 'menu-overlay';
-    Object.assign(this.overlay.style, {
-      position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
-      backgroundColor: 'rgba(0, 0, 0, 0.85)', zIndex: '2000',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      backdropFilter: 'blur(10px)',
-      color: '#fff', fontFamily: "'Cinzel', serif",
-    });
-
-    // render() looks its controls up in the document, so the overlay has to be in it first
+    this.overlay.className = 'settings-menu game-overlay-enter';
+    this.overlay.setAttribute('role', 'dialog');
+    this.overlay.setAttribute('aria-label', 'Settings');
     document.body.appendChild(this.overlay);
+    document.addEventListener('keydown', this.onKey, true);
     this.render();
+  }
+
+  private onKey = (event: KeyboardEvent): void => {
+    if (event.code !== 'Escape') return;
+    event.stopPropagation();
+    event.preventDefault();
+    this.close();
+  };
+
+  private close(): void {
+    AudioManager.playUIBack();
+    this.destroy();
+    this.onClose();
+  }
+
+  private renderField(field: Field, settings: SettingsData): string {
+    const id = `setting-${field.key}`;
+    const value = settings[field.key];
+    if (field.kind === 'range') {
+      const n = value as number;
+      return `
+        <label class="settings-row" for="${id}">
+          <span>${field.label}</span>
+          <span class="settings-row__control">
+            <input type="range" id="${id}" data-key="${field.key}" data-kind="range" min="${field.min}" max="${field.max}" step="${field.step}" value="${n}" />
+            <output for="${id}">${field.format ? field.format(n) : n}</output>
+          </span>
+        </label>`;
+    }
+    if (field.kind === 'select') {
+      return `
+        <label class="settings-row" for="${id}">
+          <span>${field.label}</span>
+          <select id="${id}" data-key="${field.key}" data-kind="${field.numeric ? 'number' : 'select'}">
+            ${field.options.map(o => `<option value="${o.value}" ${String(value) === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+          </select>
+        </label>`;
+    }
+    return `
+      <label class="settings-row" for="${id}">
+        <span>${field.label}</span>
+        <input type="checkbox" id="${id}" data-key="${field.key}" data-kind="toggle" ${value ? 'checked' : ''} />
+      </label>`;
   }
 
   private render(): void {
     const settings = SettingsManager.getInstance().get();
-
     this.overlay.innerHTML = `
-      <div style="width: 100%; max-width: 600px; padding: 40px; background: rgba(20,20,20,0.9); border: 1px solid #444; border-radius: 8px;">
-        <h2 style="font-size: 32px; letter-spacing: 4px; text-align: center; margin-bottom: 30px; color: #cc4444;">SETTINGS</h2>
-        
-        <div style="display: flex; flex-direction: column; gap: 20px;">
-          
-          <!-- Master Volume -->
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="font-size: 18px; letter-spacing: 2px;">Master Volume</label>
-            <input type="range" id="setting-master-vol" min="0" max="1" step="0.05" value="${settings.masterVolume}" style="width: 200px;" />
-          </div>
-
-          <!-- Music Volume -->
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="font-size: 18px; letter-spacing: 2px;">Music Volume</label>
-            <input type="range" id="setting-music-vol" min="0" max="1" step="0.05" value="${settings.musicVolume}" style="width: 200px;" />
-          </div>
-
-          <!-- Graphics Quality -->
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="font-size: 18px; letter-spacing: 2px;">Graphics Quality</label>
-            <select id="setting-graphics" style="width: 200px; padding: 5px; background: #000; color: #fff; border: 1px solid #444; font-family: inherit;">
-              <option value="LOW" ${settings.graphicsQuality === 'LOW' ? 'selected' : ''}>LOW</option>
-              <option value="MEDIUM" ${settings.graphicsQuality === 'MEDIUM' ? 'selected' : ''}>MEDIUM</option>
-              <option value="HIGH" ${settings.graphicsQuality === 'HIGH' ? 'selected' : ''}>HIGH</option>
-            </select>
-          </div>
-
-          <!-- VFX Intensity -->
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="font-size: 18px; letter-spacing: 2px;">VFX Intensity</label>
-            <select id="setting-vfx" style="width: 200px; padding: 5px; background: #000; color: #fff; border: 1px solid #444; font-family: inherit;">
-              <option value="LOW" ${settings.vfxIntensity === 'LOW' ? 'selected' : ''}>LOW</option>
-              <option value="MEDIUM" ${settings.vfxIntensity === 'MEDIUM' ? 'selected' : ''}>MEDIUM</option>
-              <option value="HIGH" ${settings.vfxIntensity === 'HIGH' ? 'selected' : ''}>HIGH</option>
-            </select>
-          </div>
-
-          <!-- Camera Shake -->
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="font-size: 18px; letter-spacing: 2px;">Camera Shake</label>
-            <input type="checkbox" id="setting-cam-shake" ${settings.cameraShake ? 'checked' : ''} style="transform: scale(1.5);" />
-          </div>
-
-          <!-- Reduce Motion -->
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label style="font-size: 18px; letter-spacing: 2px;">Reduce Motion</label>
-            <input type="checkbox" id="setting-reduce-motion" ${settings.reduceMotion ? 'checked' : ''} style="transform: scale(1.5);" />
-          </div>
-
+      <div class="settings-menu__panel">
+        <h2>Settings</h2>
+        ${SECTIONS.map(section => `
+          <section class="settings-menu__section">
+            <h3>${section.title}</h3>
+            ${section.fields.map(field => this.renderField(field, settings)).join('')}
+          </section>`).join('')}
+        <div class="settings-menu__actions">
+          <button type="button" class="hero-nav__cta" id="btn-fullscreen">${document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'}</button>
+          <button type="button" class="hero-nav__cta" id="btn-close-settings">Close <span>Esc</span></button>
         </div>
+      </div>`;
 
-        <div style="margin-top: 40px; text-align: center; display: flex; justify-content: center; gap: 20px;">
-          <button id="btn-fullscreen" style="padding: 12px 30px; background: transparent; border: 1px solid #cc4444; color: #cc4444; font-family: 'Cinzel', serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">
-            ${document.fullscreenElement ? 'EXIT FULLSCREEN' : 'ENTER FULLSCREEN'}
-          </button>
-          <button id="btn-close-settings" style="padding: 12px 30px; background: transparent; border: 1px solid #cc4444; color: #cc4444; font-family: 'Cinzel', serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;">
-            CLOSE
-          </button>
-        </div>
-      </div>
-    `;
+    this.overlay.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-key]').forEach(input => {
+      const key = input.dataset.key as keyof SettingsData;
+      const kind = input.dataset.kind;
+      const read = (): unknown => kind === 'toggle' ? (input as HTMLInputElement).checked
+        : kind === 'range' || kind === 'number' ? parseFloat(input.value)
+        : input.value;
 
-    // Event Listeners
-    const updateSettings = () => {
-      const masterVolume = parseFloat((document.getElementById('setting-master-vol') as HTMLInputElement).value);
-      const musicVolume = parseFloat((document.getElementById('setting-music-vol') as HTMLInputElement).value);
-      const graphicsQuality = (document.getElementById('setting-graphics') as HTMLSelectElement).value as any;
-      const vfxIntensity = (document.getElementById('setting-vfx') as HTMLSelectElement).value as any;
-      const cameraShake = (document.getElementById('setting-cam-shake') as HTMLInputElement).checked;
-      const reduceMotion = (document.getElementById('setting-reduce-motion') as HTMLInputElement).checked;
-
-      AudioManager.playUISelect();
-
-      SettingsManager.getInstance().update({
-        masterVolume, musicVolume, graphicsQuality, vfxIntensity, cameraShake, reduceMotion
+      if (kind === 'range') {
+        // Show the value as it moves; save once it's let go
+        input.addEventListener('input', () => {
+          const field = SECTIONS.flatMap(s => s.fields).find(f => f.key === key);
+          const output = input.parentElement?.querySelector('output');
+          const n = parseFloat(input.value);
+          if (output && field?.kind === 'range') output.textContent = field.format ? field.format(n) : String(n);
+        });
+      }
+      input.addEventListener('change', () => {
+        AudioManager.playUISelect();
+        SettingsManager.getInstance().update({ [key]: read() } as Partial<SettingsData>);
       });
-    };
-
-    ['setting-master-vol', 'setting-music-vol', 'setting-graphics', 'setting-vfx', 'setting-cam-shake', 'setting-reduce-motion'].forEach(id => {
-      document.getElementById(id)?.addEventListener('change', updateSettings);
     });
 
-    const btnClose = document.getElementById('btn-close-settings');
-    if (btnClose) {
-      btnClose.addEventListener('click', () => {
-        AudioManager.playUIBack();
-        this.destroy();
-        this.onClose();
-      });
-      btnClose.addEventListener('mouseenter', () => {
-        AudioManager.playUIHover();
-        btnClose.style.background = 'rgba(204,68,68,0.2)';
-      });
-      btnClose.addEventListener('mouseleave', () => btnClose.style.background = 'transparent');
-    }
-
-    const btnFullscreen = document.getElementById('btn-fullscreen');
-    if (btnFullscreen) {
-      btnFullscreen.addEventListener('click', () => {
-        AudioManager.playUIConfirm();
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(err => console.warn(err));
-          btnFullscreen.textContent = 'EXIT FULLSCREEN';
-        } else {
-          document.exitFullscreen().catch(err => console.warn(err));
-          btnFullscreen.textContent = 'ENTER FULLSCREEN';
-        }
-      });
-      btnFullscreen.addEventListener('mouseenter', () => {
-        AudioManager.playUIHover();
-        btnFullscreen.style.background = 'rgba(204,68,68,0.2)';
-      });
-      btnFullscreen.addEventListener('mouseleave', () => btnFullscreen.style.background = 'transparent');
-    }
+    const fullscreen = this.overlay.querySelector('#btn-fullscreen') as HTMLButtonElement;
+    fullscreen.addEventListener('click', () => {
+      AudioManager.playUIConfirm();
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.warn(err));
+        fullscreen.textContent = 'Exit fullscreen';
+      } else {
+        document.exitFullscreen().catch(err => console.warn(err));
+        fullscreen.textContent = 'Fullscreen';
+      }
+    });
+    this.overlay.querySelector('#btn-close-settings')?.addEventListener('click', () => this.close());
+    (this.overlay.querySelector('[data-key]') as HTMLElement | null)?.focus();
   }
 
   public destroy(): void {
-    if (this.overlay && this.overlay.parentNode) {
-      this.overlay.parentNode.removeChild(this.overlay);
-    }
+    document.removeEventListener('keydown', this.onKey, true);
+    this.overlay.remove();
   }
 }

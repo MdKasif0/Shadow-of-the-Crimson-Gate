@@ -53,7 +53,14 @@ async function init(): Promise<void> {
 
   // Build the game while the loading screen is up
   try {
-    gameInstance = await init3DGame('game-container', subProgress(loadingScreen.report, 0, 0.97));
+    gameInstance = await init3DGame('game-container', subProgress(loadingScreen.report, 0, 0.8));
+    // Sounds next, so nothing pops in late. A slow connection doesn't hold the menu back for long.
+    const audioProgress = subProgress(loadingScreen.report, 0.8, 0.97);
+    await audioProgress(0, 'Tuning the instruments');
+    await Promise.race([
+      AudioManager.prefetchAll(fraction => audioProgress(fraction)),
+      new Promise(resolve => setTimeout(resolve, 12000)),
+    ]);
     await loadingScreen.report(0.97);
     await loadingScreen.waitForMenuAssets();
     await loadingScreen.report(1);
@@ -94,6 +101,27 @@ async function init(): Promise<void> {
   }
 
   loadingScreen.hide();
+  shareLoadedFilesWithServiceWorker();
+}
+
+/**
+ * On the very first visit, the game loads before the service worker takes over,
+ * so it hands the worker the list of what it loaded, to keep for offline play.
+ */
+function shareLoadedFilesWithServiceWorker(): void {
+  if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
+  navigator.serviceWorker.ready.then(registration => {
+    const urls = performance.getEntriesByType('resource').map(entry => entry.name);
+    registration.active?.postMessage({ type: 'cache-urls', urls });
+  }).catch(() => {});
+}
+
+// Installed or not, the built game caches itself so it can be played offline
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(error => console.warn('[App] Offline support unavailable.', error));
+
+  });
 }
 
 if (document.readyState === 'loading') {

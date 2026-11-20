@@ -9,7 +9,7 @@
 import { EventBus } from '../core/EventBus';
 import { AudioId, AudioCategory, AudioPriority, AUDIO_REGISTRY } from './AudioRegistry';
 import { AudioBus, AudioBuses, createAudioBuses } from './AudioBus';
-import { ProceduralScore, ScoreMood } from './ProceduralScore';
+import { ScoreTheme, ProceduralScore, ScoreMood } from './ProceduralScore';
 import * as THREE from 'three';
 
 /** What the music should currently be doing. */
@@ -75,6 +75,8 @@ export class AudioManager {
 
   // Cache: AudioId → decoded AudioBuffer
   private static bufferCache: Map<string, AudioBuffer> = new Map();
+  /** Files fetched during the loading screen, waiting for the AudioContext to decode them. */
+  private static rawCache: Map<AudioId, ArrayBuffer> = new Map();
   // Track which files have already been warned as missing
   private static warnedMissing: Set<string> = new Set();
   // Loading promises to avoid double-fetching
@@ -96,6 +98,7 @@ export class AudioManager {
   private static audioState: AudioState = AudioState.MENU;
 
   private static score: ProceduralScore | null = null;
+  private static scoredExplore = false;
   private static currentMood: MusicMood | null = null;
   private static hallSend: GainNode | null = null;
   private static openSend: GainNode | null = null;
@@ -116,8 +119,9 @@ export class AudioManager {
         this.score = new ProceduralScore(this.ctx, this.buses.music.node);
         this.setupReverb();
 
-        // Preload critical assets
+        // Preload critical assets, then decode everything fetched during loading
         this.preloadEssentials();
+        for (const id of [...this.rawCache.keys()]) this.loadBuffer(id);
       } else if (this.ctx.state === 'suspended') {
         this.ctx.resume();
         this.suspended = false;
@@ -260,6 +264,13 @@ export class AudioManager {
   private static async fetchAndDecode(id: AudioId, path: string, optional: boolean): Promise<AudioBuffer | null> {
     if (!this.ctx) return null;
     try {
+      const prefetched = this.rawCache.get(id);
+      if (prefetched) {
+        this.rawCache.delete(id);
+        const audioBuffer = await this.ctx.decodeAudioData(prefetched);
+        this.bufferCache.set(id, audioBuffer);
+        return audioBuffer;
+      }
       const response = await fetch(path);
       if (!response.ok) {
         if (!optional && !this.warnedMissing.has(id)) {
@@ -279,6 +290,31 @@ export class AudioManager {
       }
       return null;
     }
+  }
+
+  /**
+   * Downloads every sound the game needs while the loading screen is up, so
+   * nothing arrives late in play. Decoding waits for the first click, as
+   * browsers require. Reports progress from 0 to 1.
+   */
+  public static async prefetchAll(onProgress: (fraction: number) => void | Promise<void>): Promise<void> {
+    const ids = (Object.keys(AUDIO_REGISTRY) as AudioId[]).filter(id => !AUDIO_REGISTRY[id].optional);
+    let done = 0;
+    const queue = [...ids];
+    const worker = async () => {
+      while (queue.length > 0) {
+        const id = queue.shift()!;
+        try {
+          const response = await fetch(AUDIO_REGISTRY[id].path);
+          if (response.ok && !this.bufferCache.has(id)) this.rawCache.set(id, await response.arrayBuffer());
+        } catch {
+          // Played later from the network instead, or silently skipped
+        }
+        done++;
+        await onProgress(done / ids.length);
+      }
+    };
+    await Promise.all(Array.from({ length: 6 }, worker));
   }
 
   private static preloadEssentials(): void {
@@ -434,12 +470,34 @@ export class AudioManager {
     this.currentMusicId = id;
   }
 
+  /**
+   * A level's musical colour. With `scoredExplore`, walking music comes from the
+   * live score in the level's key, rather than the courtyard's recorded track.
+   */
+  public static setMusicTheme(theme: ScoreTheme, scoredExplore: boolean): void {
+    this.score?.setTheme(theme);
+    if (scoredExplore === this.scoredExplore) return;
+    this.scoredExplore = scoredExplore;
+    // Re-enter the current mood so the right source plays it
+    const mood = this.currentMood;
+    this.currentMood = null;
+    if (mood) this.setMusicMood(mood);
+  }
+
+  /** 0 to 1: how many enemies are pressing in. The battle music swells with it. */
+  public static setMusicIntensity(value: number): void {
+    this.score?.setIntensity(value);
+  }
+
   /** Moves the music to a mood, crossfading between recorded tracks and the live score. */
   public static setMusicMood(mood: MusicMood): void {
     if (mood === this.currentMood || !this.ctx || !this.score) return;
     this.currentMood = mood;
 
-    if (mood === 'explore' || mood === 'victory') {
+    if (mood === 'explore' && this.scoredExplore) {
+      this.stopMusic(2.2);
+      this.score.play('explore', 2.5);
+    } else if (mood === 'explore' || mood === 'victory') {
       this.score.stop(2.2);
       this.playMusic(mood === 'explore' ? AudioId.MUSIC_EXPLORATION : AudioId.MUSIC_VICTORY, 2.5);
     } else {
@@ -663,10 +721,15 @@ export class AudioManager {
 
   // ─── Footsteps ─────────────────────────────────────────────────────────
 
-  public static playFootstep(surface: 'stone' | 'grass' = 'stone'): void {
+  public static playFootstep(surface: 'stone' | 'grass' | 'water' | 'wood' = 'stone'): void {
     // The footstep files are long walking recordings, so each step plays a short slice
     const opts = { pitchMin: 0.96, pitchMax: 1.04, cooldownMs: 250, sliceSeconds: 0.4 };
-    if (surface === 'grass') {
+    if (surface === 'water') {
+      // Wading: a slower, heavier slosh
+      this.playRandom([AudioId.FOOTSTEP_GRASS_01, AudioId.FOOTSTEP_GRASS_02], { ...opts, pitchMin: 0.62, pitchMax: 0.72, volume: 1.2 });
+    } else if (surface === 'wood') {
+      this.play(AudioId.FOOTSTEP_STONE_02, { ...opts, pitchMin: 1.18, pitchMax: 1.3 });
+    } else if (surface === 'grass') {
       this.playRandom([AudioId.FOOTSTEP_GRASS_01, AudioId.FOOTSTEP_GRASS_02], opts);
     } else {
       this.play(AudioId.FOOTSTEP_STONE_02, opts);

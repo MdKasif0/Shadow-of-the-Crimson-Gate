@@ -1,6 +1,6 @@
 import { AudioManager } from '../audio/AudioManager';
 import { AudioId } from '../audio/AudioRegistry';
-import { CHARM_SLOTS, CHARMS, PlayerBuild, SKILL_PATHS, SKILLS, SkillDef } from '../progression/PlayerBuild';
+import { CHARMS, PlayerBuild, SKILL_PATHS, SKILLS, SkillDef } from '../progression/PlayerBuild';
 
 export interface ShrineMenuContext {
   shrineName: string;
@@ -8,6 +8,8 @@ export interface ShrineMenuContext {
   getEssence: () => number;
   buySkill: (skill: SkillDef) => void;
   toggleCharm: (charmId: string) => void;
+  /** Leaves the shrine for the world map, to travel elsewhere. */
+  openMap?: () => void;
   onClose: () => void;
 }
 
@@ -99,7 +101,7 @@ export class ShrineMenu {
           <span class="shrine-charm__name">${charm.name}</span>
           <span class="shrine-charm__desc">${charm.description}</span>
           <span class="shrine-charm__origin">${charm.origin}</span>
-          <span class="shrine-charm__state">${equipped ? 'Worn' : worn >= CHARM_SLOTS ? 'Slots full' : 'Wear'}</span>
+          <span class="shrine-charm__state">${equipped ? 'Worn' : worn >= build.slotCount ? 'Slots full' : 'Wear'}</span>
         </button>`;
     }).join('');
 
@@ -113,12 +115,13 @@ export class ShrineMenu {
         </header>
         <div class="shrine-menu__tabs" role="tablist">
           <button type="button" role="tab" data-tab="skills" aria-selected="${this.tab === 'skills'}">Skills</button>
-          <button type="button" role="tab" data-tab="charms" aria-selected="${this.tab === 'charms'}">Charms <span>${worn} / ${CHARM_SLOTS} worn</span></button>
+          <button type="button" role="tab" data-tab="charms" aria-selected="${this.tab === 'charms'}">Charms <span>${worn} / ${build.slotCount} worn</span></button>
         </div>
         <div class="shrine-menu__body">
           ${this.tab === 'skills' ? `<div class="shrine-paths">${skills}</div>` : `<div class="shrine-charms">${charms}</div>`}
         </div>
         <footer class="shrine-menu__footer">
+          ${context.openMap ? '<button type="button" class="hero-nav__cta shrine-menu__map">Travel <span>World map</span></button>' : ''}
           <button type="button" class="hero-nav__cta shrine-menu__leave">Leave the shrine <span>Esc</span></button>
         </footer>
       </div>`;
@@ -156,6 +159,14 @@ export class ShrineMenu {
         AudioManager.playUISelect();
         this.render();
       });
+    });
+
+    overlay.querySelector('.shrine-menu__map')?.addEventListener('click', () => {
+      AudioManager.playUIConfirm();
+      const openMap = context.openMap;
+      // Hands the overlay straight to the map, without letting the game resume in between
+      context.onClose = () => openMap?.();
+      this.close();
     });
 
     overlay.querySelector('.shrine-menu__leave')?.addEventListener('click', () => {

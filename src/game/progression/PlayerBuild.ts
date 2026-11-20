@@ -55,9 +55,16 @@ export const CHARMS: CharmDef[] = [
   { id: 'keepers_bell', name: "Keeper's Bell", description: 'Blocking stops 90% of damage instead of 60%.', origin: 'A gift from the Shrine Keeper.' },
   { id: 'moon_tear', name: 'Moon Tear', description: 'Parries are easier to time.', origin: 'Sealed away behind the courtyard’s spirit ward.' },
   { id: 'blood_lotus', name: 'Blood Lotus', description: 'Deal 40% more damage to staggered and broken enemies.', origin: 'Taken from the Hollow Widow.' },
+  { id: 'river_stone', name: 'River Stone', description: 'Water and webs barely slow you.', origin: 'Lying in the deep water at the edge of the Drowned Village.' },
+  { id: 'spirit_moth', name: 'Spirit Moth', description: 'Perfect dodges restore 8 health.', origin: 'Resting in a dead end of the Bamboo Labyrinth.' },
+  { id: 'ash_sutra', name: 'Ash Sutra', description: 'Fire, falls and corruption hurt you half as much.', origin: 'Kept from the flames in the Burning Temple’s courtyard.' },
+  { id: 'crimson_ribbon', name: 'Crimson Ribbon', description: 'Counters deal 25% more damage.', origin: 'Akane’s, given when she yielded at the gate.' },
+  { id: 'yomi_pearl', name: 'Pearl of Yomi', description: 'Raises your maximum health by 20.', origin: 'Found on the terraces below the Gate.' },
 ];
 
+/** Charm slots at the start. Clearing the Bamboo Labyrinth adds one more. */
 export const CHARM_SLOTS = 2;
+export const MAX_CHARM_SLOTS = 3;
 
 export type TechniqueId = 'dashStrike' | 'spiritWave' | 'crimsonWhirl';
 
@@ -90,6 +97,11 @@ export interface BuildModifiers {
   executionHeal: number;
   executionFocus: number;
   hasShadowStep: boolean;
+  /** How much of the slowing from water and webs still applies. */
+  footingResist: number;
+  dodgeHeal: number;
+  /** Multiplier on damage from fire, falls and corruption. */
+  hazardResist: number;
 }
 
 export interface BuildSave {
@@ -99,11 +111,25 @@ export interface BuildSave {
   techniques: TechniqueId[];
 }
 
+const clampSlots = (n: number) => Math.min(MAX_CHARM_SLOTS, Math.max(CHARM_SLOTS, n));
+
 export class PlayerBuild {
   public skills = new Set<string>();
   public charms = new Set<string>();
   public equipped: (string | null)[] = new Array(CHARM_SLOTS).fill(null);
   public techniques = new Set<TechniqueId>();
+
+  public get slotCount(): number {
+    return this.equipped.length;
+  }
+
+  /** Opens more charm slots. Never takes any away. */
+  public setSlotCount(count: number): void {
+    const target = Math.min(MAX_CHARM_SLOTS, Math.max(this.equipped.length, count));
+    if (target === this.equipped.length) return;
+    while (this.equipped.length < target) this.equipped.push(null);
+    EventBus.emit('buildChanged', {});
+  }
 
   public get level(): number {
     return 1 + this.skills.size;
@@ -167,11 +193,11 @@ export class PlayerBuild {
       healthyDamage: wears('fox_mask') ? 1.15 : 1,
       staggeredDamage: wears('blood_lotus') ? 1.4 : 1,
       focusGain: has('deep_well') ? 1.3 : 1,
-      maxHealthBonus: has('spirit_vessel') ? 30 : 0,
+      maxHealthBonus: (has('spirit_vessel') ? 30 : 0) + (wears('yomi_pearl') ? 20 : 0),
       dashCooldown,
       parryWindow: (0.2 + (wears('moon_tear') ? 0.07 : 0)) * (has('still_water') ? 1.5 : 1),
       dodgeWindow: 0.3 * (has('still_water') ? 1.5 : 1),
-      counterDamage: has('riposte') ? 2.2 : 1.5,
+      counterDamage: (has('riposte') ? 2.2 : 1.5) * (wears('crimson_ribbon') ? 1.25 : 1),
       blockReduction: wears('keepers_bell') ? 0.9 : 0.6,
       postureDamage: has('guard_breaker') ? 1.6 : 1,
       healOnKill: wears('ember_bead') ? 6 : 0,
@@ -183,6 +209,9 @@ export class PlayerBuild {
       executionHeal: has('executioner') ? 0.25 : 0,
       executionFocus: has('executioner') ? 40 : 0,
       hasShadowStep: has('shadow_step'),
+      footingResist: wears('river_stone') ? 0.25 : 1,
+      dodgeHeal: wears('spirit_moth') ? 8 : 0,
+      hazardResist: wears('ash_sutra') ? 0.5 : 1,
     };
   }
 
@@ -198,8 +227,9 @@ export class PlayerBuild {
   public load(data: Partial<BuildSave> | undefined): void {
     this.skills = new Set(data?.skills ?? []);
     this.charms = new Set(data?.charms ?? []);
-    this.equipped = new Array(CHARM_SLOTS).fill(null);
-    (data?.equipped ?? []).slice(0, CHARM_SLOTS).forEach((id, i) => {
+    const slots = clampSlots(data?.equipped?.length ?? CHARM_SLOTS);
+    this.equipped = new Array(slots).fill(null);
+    (data?.equipped ?? []).slice(0, slots).forEach((id, i) => {
       this.equipped[i] = id && this.charms.has(id) ? id : null;
     });
     this.techniques = new Set(data?.techniques ?? []);

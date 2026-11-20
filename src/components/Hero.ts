@@ -5,6 +5,7 @@
  * title, and the main menu. Returns a cleanup function.
  */
 
+import { SaveSlotsScreen } from '../game/ui/SaveSlotsScreen';
 import { GAME_TITLE, HERO_SUBTITLE, ASSETS } from '../utils/constants';
 import { AudioManager } from '../game/audio/AudioManager';
 import { SaveManager } from '../game/save/SaveManager';
@@ -42,10 +43,11 @@ const SPEAKER_ICON = `
 `;
 
 function buildMenuHTML(): string {
-  const hasSave = SaveManager.getInstance().hasSave();
+  const hasSave = SaveManager.getInstance().hasAnySave();
   const items = [
     { id: 'nav-continue', label: 'Continue', disabled: !hasSave },
     { id: 'nav-new-game', label: 'New Game', disabled: false },
+    { id: 'nav-load', label: 'Load Game', disabled: !hasSave },
     { id: 'nav-controls', label: 'Controls', disabled: false },
     { id: 'nav-settings', label: 'Settings', disabled: false },
   ];
@@ -219,22 +221,38 @@ export function renderHero(container: HTMLElement): () => void {
     item.addEventListener('focus', () => select(item, true), { signal });
   });
 
-  section.querySelector('#nav-continue')?.addEventListener('click', () => {
+  const loadSlot = (slot: number) => {
     const saveManager = SaveManager.getInstance();
+    saveManager.setActiveSlot(slot);
     if (!saveManager.hasSave()) return;
     leaveFor(() => {
       EventBus.emit('loadGame', saveManager.getSave());
       GameStateManager.getInstance().setState(GameState.PLAYING);
     });
+  };
+
+  // Continue picks up the most recently saved slot
+  section.querySelector('#nav-continue')?.addEventListener('click', () => {
+    const slot = SaveManager.getInstance().mostRecentSlot();
+    if (slot !== null) loadSlot(slot);
+  }, { signal });
+
+  section.querySelector('#nav-load')?.addEventListener('click', () => {
+    AudioManager.playUISelect();
+    new SaveSlotsScreen('load', loadSlot, () => (section.querySelector('#nav-load') as HTMLElement | null)?.focus());
   }, { signal });
 
   section.querySelector('#nav-new-game')?.addEventListener('click', () => {
-    leaveFor(() => {
+    AudioManager.playUISelect();
+    new SaveSlotsScreen('new', slot => {
       const saveManager = SaveManager.getInstance();
-      if (saveManager.hasSave()) saveManager.deleteSave();
-      EventBus.emit('newGame', {});
-      GameStateManager.getInstance().setState(GameState.PLAYING);
-    });
+      saveManager.setActiveSlot(slot);
+      saveManager.deleteSave(slot);
+      leaveFor(() => {
+        EventBus.emit('newGame', {});
+        GameStateManager.getInstance().setState(GameState.PLAYING);
+      });
+    }, () => (section.querySelector('#nav-new-game') as HTMLElement | null)?.focus());
   }, { signal });
 
   section.querySelector('#nav-controls')?.addEventListener('click', () => {

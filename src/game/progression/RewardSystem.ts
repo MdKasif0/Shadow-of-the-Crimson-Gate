@@ -1,5 +1,6 @@
 import { EventBus } from '../core/EventBus';
 import { PlayerProgress } from './PlayerProgress';
+import { LEVEL_ENEMIES } from '../enemies/LevelEnemyDefs';
 
 const ESSENCE_BY_TYPE: Record<string, number> = {
   BASIC_YOKAI: 10,
@@ -18,7 +19,8 @@ const ESSENCE_BY_VARIANT: Record<string, number> = {
 export class RewardSystem {
   constructor(private progress: PlayerProgress) {
     EventBus.on('enemyDeath', (data: { enemyType: string; variant?: string; isElite?: boolean }) => {
-      const base = (data.variant ? ESSENCE_BY_VARIANT[data.variant] : undefined) ?? ESSENCE_BY_TYPE[data.enemyType] ?? 0;
+      const base = (data.variant ? ESSENCE_BY_VARIANT[data.variant] : undefined)
+        ?? ESSENCE_BY_TYPE[data.enemyType] ?? LEVEL_ENEMIES[data.enemyType]?.essence ?? 0;
       this.progress.addEssence(data.isElite ? base * 6 : base);
     });
 

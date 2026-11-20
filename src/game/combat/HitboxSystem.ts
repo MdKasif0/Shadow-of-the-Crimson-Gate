@@ -27,6 +27,10 @@ export interface Hitbox {
   posture?: number;
   /** The swing after a parry or perfect dodge. */
   isCounter?: boolean;
+  /** Seizes the player for this many seconds if it lands. */
+  grab?: number;
+  /** Goes straight through a raised guard. */
+  unblockable?: boolean;
 }
 
 export interface HitEvent {

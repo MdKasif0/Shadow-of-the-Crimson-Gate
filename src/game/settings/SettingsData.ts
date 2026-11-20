@@ -9,6 +9,15 @@ export interface SettingsData {
   graphicsQuality: QualityLevel;
   reduceMotion: boolean;
   keyBindings: KeyBindings;
+  /** Multiplies how far the camera turns per mouse or stick movement. */
+  lookSensitivity: number;
+  invertY: boolean;
+  /** Frames per second to stop at; 0 for no limit. */
+  fpsCap: number;
+  /** Lowers graphics quality on its own if the game can't keep up. */
+  autoQuality: boolean;
+  /** On-screen controls: shown on touch screens with AUTO. */
+  touchControls: 'AUTO' | 'ON' | 'OFF';
 }
 
 export type QualityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -45,5 +54,10 @@ export const DEFAULT_SETTINGS: SettingsData = {
   vfxIntensity: 'HIGH',
   graphicsQuality: 'HIGH',
   reduceMotion: false,
-  keyBindings: { ...DEFAULT_KEY_BINDINGS }
+  keyBindings: { ...DEFAULT_KEY_BINDINGS },
+  lookSensitivity: 1,
+  invertY: false,
+  fpsCap: 0,
+  autoQuality: true,
+  touchControls: 'AUTO',
 };

@@ -28,10 +28,10 @@ export class StoryManager {
     });
 
     // Listen for boss death
+    // The Oni was only the gate's lock: the story goes on beyond it
     EventBus.on('bossDeath', () => {
       this.state.setFlag('crimsonOniDefeated', true);
       this.completeCurrentObjective();
-      this.advanceToChapter(ChapterId.EPILOGUE);
     });
 
     // The epilogue waits for the choice made at the Crimson Heart
@@ -166,7 +166,7 @@ export class StoryManager {
         break;
 
       case 'BOSS_ARENA':
-        if (this.state.currentChapter !== ChapterId.EPILOGUE) {
+        if (this.state.currentChapter !== ChapterId.EPILOGUE && !this.state.getFlag('crimsonOniDefeated')) {
           this.advanceToChapter(ChapterId.CHAPTER_4);
           this.completeCurrentObjective();
           this.setObjective({

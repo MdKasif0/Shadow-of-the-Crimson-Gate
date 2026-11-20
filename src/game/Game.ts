@@ -17,6 +17,13 @@ import { LoadReporter, subProgress } from './ui/LoadingScreen';
 import { AudioManager } from './audio/AudioManager';
 import { StoryEvents } from './story/StoryEvent';
 import { DamageNumbers } from './ui/DamageNumbers';
+import { SettingsManager } from './settings/SettingsManager';
+import { SettingsData, QualityLevel } from './settings/SettingsData';
+import { TouchControls } from './ui/TouchControls';
+
+/** Seconds of play measured before deciding the game is running too slowly. */
+const PERF_WINDOW = 6;
+const QUALITY_STEPS: QualityLevel[] = ['HIGH', 'MEDIUM', 'LOW'];
 
 const ZERO = new THREE.Vector3();
 
@@ -39,6 +46,10 @@ export class ThreeGame {
   private hasUsedMouseLook: boolean = false;
   private lastDt: number = 0;
   private damageNumbers = new DamageNumbers();
+  private touch: TouchControls;
+  private perfTime = 0;
+  private perfFrames = 0;
+  private slowWindows = 0;
 
   constructor(containerId: string) {
     this.containerId = containerId;
@@ -71,6 +82,9 @@ export class ThreeGame {
     this.update = this.update.bind(this);
     this.render = this.render.bind(this);
     this.loop = new GameLoop(this.update, this.render);
+    this.applySettings(SettingsManager.getInstance().get());
+    EventBus.on('settingsChanged', (settings: SettingsData) => this.applySettings(settings));
+    this.touch = new TouchControls(this.input);
     
     this.bindMouseCapture();
   }
@@ -197,7 +211,8 @@ export class ThreeGame {
       && !this.gameScene.isStoryIntroRunning
       && !this.isInDialogue
       && !document.pointerLockElement
-      && !this.hasUsedMouseLook;
+      && !this.hasUsedMouseLook
+      && !this.touch.isActive;
     const opacity = shouldShow ? '1' : '0';
     if (this.captureHint.style.opacity !== opacity) this.captureHint.style.opacity = opacity;
   }
@@ -211,7 +226,8 @@ export class ThreeGame {
     const look = this.input.consumeLook();
     const isActive = state === GameState.PLAYING || state === GameState.BOSS;
     if (isActive && !this.isInDialogue && !this.cameraController.isSequencePlaying) {
-      this.cameraController.look(look.x, look.y);
+      const settings = SettingsManager.getInstance().get();
+      this.cameraController.look(look.x * settings.lookSensitivity, look.y * settings.lookSensitivity * (settings.invertY ? -1 : 1));
       if (look.x !== 0 || look.y !== 0) this.hasUsedMouseLook = true;
     }
     this.input.cameraYaw = this.cameraController.yaw;
@@ -228,6 +244,8 @@ export class ThreeGame {
     }
 
     this.updateGamepadMenus(state);
+    this.touch.update(isActive && !this.isInDialogue && !this.gameScene.isStoryIntroRunning);
+    if (isActive && !this.gameScene.isLoadingLevel) this.watchPerformance(dt);
 
     // Freeze game simulation if paused or in menu
     if (state === GameState.PLAYING || state === GameState.BOSS) {
@@ -251,6 +269,37 @@ export class ThreeGame {
 
     this.lastDt = dt;
     this.input.endFrame();
+  }
+
+  private applySettings(settings: SettingsData): void {
+    this.loop.fpsCap = settings.fpsCap;
+  }
+
+  /**
+   * Watches the frame rate while playing. If it stays well under what the
+   * screen (or the cap) allows, graphics quality steps down, one level at a time.
+   */
+  private watchPerformance(dt: number): void {
+    const settings = SettingsManager.getInstance().get();
+    if (!settings.autoQuality || settings.graphicsQuality === 'LOW') return;
+    this.perfTime += dt;
+    this.perfFrames++;
+    if (this.perfTime < PERF_WINDOW) return;
+
+    const fps = this.perfFrames / this.perfTime;
+    this.perfTime = 0;
+    this.perfFrames = 0;
+    const target = settings.fpsCap > 0 ? Math.min(settings.fpsCap, 60) : 60;
+    this.slowWindows = fps < target * 0.7 ? this.slowWindows + 1 : 0;
+    if (this.slowWindows < 2) return;
+
+    this.slowWindows = 0;
+    const next = QUALITY_STEPS[QUALITY_STEPS.indexOf(settings.graphicsQuality) + 1];
+    SettingsManager.getInstance().update({ graphicsQuality: next, vfxIntensity: next === 'LOW' ? 'LOW' : settings.vfxIntensity });
+    EventBus.emit('notice', {
+      title: `Graphics lowered to ${next.toLowerCase()}`,
+      text: `The game was running at about ${Math.round(fps)} fps, so shadows and lights were reduced. You can change this in Settings.`,
+    });
   }
 
   private render(): void {

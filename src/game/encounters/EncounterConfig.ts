@@ -1,9 +1,13 @@
 import * as THREE from 'three';
+import { StoryFlags } from '../story/StoryFlag';
 
 export type EnemyKind =
   | 'BASIC_YOKAI' | 'SHIELDED_YOKAI' | 'MINION'
   | 'SHADOW_YOKAI' | 'SHADOW_CALLER' | 'LURKING_SHADE'
-  | 'TENGU';
+  | 'TENGU'
+  // Levels II to V
+  | 'KAPPA' | 'KAMAITACHI' | 'KAMAITACHI_LURKER' | 'SPIDERLING' | 'POSSESSED_MONK'
+  | 'UMIBOZU' | 'JOROGUMO' | 'FALLEN_SAMURAI' | 'AKANE' | 'MAW_OF_YOMI';
 
 export interface EnemySpawnDef {
   type: EnemyKind;
@@ -35,5 +39,11 @@ export interface EncounterConfig {
   /** Off the main path, so the story doesn't wait on it. */
   isOptional?: boolean;
   hazard?: HazardConfig;
+  /** Only happens if this story flag is set. */
+  requiresFlag?: keyof StoryFlags;
+  /** Once won, never comes back, even after resting. */
+  once?: boolean;
+  /** Never happens if this story flag is set. */
+  unlessFlag?: keyof StoryFlags;
   waves: WaveConfig[];
 }

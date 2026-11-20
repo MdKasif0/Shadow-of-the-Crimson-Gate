@@ -19,10 +19,16 @@ export class AttackDirector {
     // 1. Categorize enemies by natural preference
     for (const enemy of enemies) {
       if (enemy.health.isDead) continue;
+      // Later yokai say how they like to fight; bosses always fight
+      const preferred = (enemy as Enemy & { preferredRole?: string }).preferredRole;
+      if (preferred === 'boss') {
+        enemy.assignRole(AttackRole.PRIMARY_MELEE);
+        continue;
+      }
       
-      if (enemy.enemyType === 'TENGU') {
+      if (preferred === 'support' || enemy.enemyType === 'TENGU') {
         supports.push(enemy);
-      } else if (enemy.enemyType === 'SHADOW_YOKAI') {
+      } else if (preferred === 'flanker' || enemy.enemyType === 'SHADOW_YOKAI') {
         flankCandidates.push(enemy);
       } else {
         meleeCandidates.push(enemy);

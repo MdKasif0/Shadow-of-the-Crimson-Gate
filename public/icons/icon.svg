@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#4a1414"/>
+      <stop offset="0.6" stop-color="#1a0a0c"/>
+      <stop offset="1" stop-color="#0a0a0c"/>
+    </radialGradient>
+    <radialGradient id="moon" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd8a8" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ff6a3a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <circle cx="256" cy="214" r="150" fill="url(#moon)" opacity="0.55"/>
+  <!-- The gate -->
+  <g fill="#c41e1e">
+    <path d="M70 128 Q256 92 442 128 L436 158 Q256 128 76 158 Z"/>
+    <rect x="96" y="176" width="320" height="26" rx="4"/>
+    <rect x="140" y="150" width="34" height="290" rx="6"/>
+    <rect x="338" y="150" width="34" height="290" rx="6"/>
+    <rect x="243" y="158" width="26" height="34"/>
+  </g>
+  <path d="M70 128 Q256 92 442 128 L440 138 Q256 104 72 138 Z" fill="#1a0a0a"/>
+  <!-- A lone figure beneath it -->
+  <path d="M256 330 c-10 0 -16 8 -16 18 c0 6 3 10 6 13 l-14 64 h48 l-14 -64 c3 -3 6 -7 6 -13 c0 -10 -6 -18 -16 -18 z" fill="#0a0808"/>
+  <rect x="0" y="438" width="512" height="74" fill="#0a0808"/>
+</svg>

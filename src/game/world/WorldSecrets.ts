@@ -15,6 +15,8 @@ export interface SecretDef {
   kind: SecretKind;
   x: number;
   z: number;
+  /** Height of the ground it rests on, for secrets up on a deck or roof. */
+  y?: number;
   charmId?: string;
   essence?: number;
   scroll?: DialogueNode[];
@@ -66,25 +68,28 @@ export interface SecretVisual {
 export class WorldSecrets {
   public readonly group = new THREE.Group();
   public readonly visuals = new Map<string, SecretVisual>();
-  private wardMesh!: THREE.Group;
-  private wardBox!: THREE.Box3;
+  private wardMesh: THREE.Group | null = null;
+  private wardBox: THREE.Box3 | null = null;
   private time = 0;
 
-  constructor(private collisionSystem: CollisionSystem) {
+  /** The courtyard's secrets come with the warded alcove; other levels pass their own. */
+  constructor(private collisionSystem: CollisionSystem, defs: SecretDef[] = SECRETS, withAlcove: boolean = true) {
     this.group.name = 'Secrets';
-    for (const def of SECRETS) this.visuals.set(def.id, this.buildSecret(def));
-    this.buildAlcove();
+    for (const def of defs) this.visuals.set(def.id, this.buildSecret(def));
+    if (withAlcove) this.buildAlcove();
   }
 
   private buildSecret(def: SecretDef): SecretVisual {
     const stone = new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.95, flatShading: true });
     const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.55, 0.7, 7), stone);
-    pedestal.position.set(def.x, 0.35, def.z);
+    const baseY = def.y ?? 0;
+    pedestal.position.set(def.x, baseY + 0.35, def.z);
     pedestal.castShadow = pedestal.receiveShadow = true;
     this.group.add(pedestal);
 
     const item = new THREE.Group();
-    item.position.set(def.x, 1.15, def.z);
+    item.position.set(def.x, baseY + 1.15, def.z);
+    item.userData.baseY = baseY + 1.15;
     const color = def.kind === 'charm' ? 0xffcf6a : def.kind === 'scroll' ? 0xffe9c0 : 0x7fe8ff;
 
     if (def.kind === 'charm') {
@@ -155,12 +160,14 @@ export class WorldSecrets {
   }
 
   public breakWard(): void {
+    if (!this.wardMesh || !this.wardBox) return;
     this.wardMesh.visible = false;
     const index = this.collisionSystem.boxes.indexOf(this.wardBox);
     if (index >= 0) this.collisionSystem.boxes.splice(index, 1);
   }
 
   public restoreWard(): void {
+    if (!this.wardMesh || !this.wardBox) return;
     this.wardMesh.visible = true;
     if (!this.collisionSystem.boxes.includes(this.wardBox)) this.collisionSystem.addBox(this.wardBox);
   }
@@ -175,9 +182,9 @@ export class WorldSecrets {
     for (const { item } of this.visuals.values()) {
       if (!item.visible) continue;
       item.rotation.y += dt * 1.2;
-      item.position.y = 1.15 + Math.sin(this.time * 2 + item.position.x) * 0.08;
+      item.position.y = item.userData.baseY + Math.sin(this.time * 2 + item.position.x) * 0.08;
     }
-    if (this.wardMesh.visible) {
+    if (this.wardMesh?.visible) {
       const veil = this.wardMesh.children[0] as THREE.Mesh;
       (veil.material as THREE.MeshBasicMaterial).opacity = 0.18 + Math.sin(this.time * 2.4) * 0.07;
     }

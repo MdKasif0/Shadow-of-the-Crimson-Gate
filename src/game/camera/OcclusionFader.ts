@@ -4,7 +4,7 @@ const FADED_OPACITY = 0.16;
 const CHECK_INTERVAL = 0.08;
 const FADE_SPEED = 7;
 
-interface Occluder {
+export interface Occluder {
   object: THREE.Object3D;
   bounds: THREE.Box3;
   opacity: number;
@@ -56,6 +56,19 @@ export class OcclusionFader {
       if (Math.abs(occluder.opacity - target) < 0.01) occluder.opacity = target;
       this.applyOpacity(occluder);
     }
+  }
+
+  /** Hands over every occluder and forgets them, for a level that's being put away. */
+  public takeAll(): Occluder[] {
+    this.reset();
+    const all = this.occluders;
+    this.occluders = [];
+    return all;
+  }
+
+  /** Brings back occluders taken earlier. */
+  public restore(occluders: Occluder[]): void {
+    this.occluders = occluders;
   }
 
   /** Clears all fading at once, for use when the camera jumps. */

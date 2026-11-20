@@ -46,6 +46,12 @@ export class InputManager {
   private _isActionDown = new Map<GameAction, boolean>();
   private _wasActionDown = new Map<GameAction, boolean>();
 
+  /** On-screen controls: a stick from -1 to 1, and the buttons held down. */
+  public virtualStick = new THREE.Vector2();
+  private _virtualHeld = new Set<GameAction>();
+  /** Taps shorter than a frame still count for one frame. */
+  private _virtualLatched = new Set<GameAction>();
+
   private _gamepad: Gamepad | null = null;
   private _padPrevious: boolean[] = [];
   private _stick = new THREE.Vector2();
@@ -88,8 +94,11 @@ export class InputManager {
 
       const button = GAMEPAD_BUTTONS[action];
       const isPadDown = button !== undefined && !!this._gamepad?.buttons[button]?.pressed;
-      this._isActionDown.set(action, !!this.keys[bindings[action]] || isPadDown);
+      const isVirtualDown = this._virtualHeld.has(action) || this._virtualLatched.has(action);
+      this._isActionDown.set(action, !!this.keys[bindings[action]] || isPadDown || isVirtualDown);
     }
+    // A tap has now been seen for one frame
+    this._virtualLatched.clear();
   }
 
   private pollGamepad(dt: number): void {
@@ -120,6 +129,26 @@ export class InputManager {
 
   public isPressed(code: string): boolean { return !!this.keys[code]; }
 
+  public pressVirtual(action: GameAction): void {
+    this._virtualHeld.add(action);
+    this._virtualLatched.add(action);
+  }
+
+  public releaseVirtual(action: GameAction): void {
+    this._virtualHeld.delete(action);
+  }
+
+  public releaseAllVirtual(): void {
+    this._virtualHeld.clear();
+    this.virtualStick.set(0, 0);
+  }
+
+  /** Camera movement from a touch drag, in the same units as mouse pixels. */
+  public addLook(x: number, y: number): void {
+    this._lookX += x;
+    this._lookY += y;
+  }
+
   public isAction(action: GameAction): boolean {
     return this._isActionDown.get(action) ?? false;
   }
@@ -141,7 +170,7 @@ export class InputManager {
   }
 
   public getMovementDirection(): THREE.Vector3 {
-    const dir = new THREE.Vector3(this._stick.x, 0, this._stick.y);
+    const dir = new THREE.Vector3(this._stick.x + this.virtualStick.x, 0, this._stick.y + this.virtualStick.y);
 
     if (this.isAction('moveForward') || this.isPressed('ArrowUp')) dir.z -= 1;
     if (this.isAction('moveBack') || this.isPressed('ArrowDown')) dir.z += 1;
