@@ -3,12 +3,17 @@ import { CollisionSystem } from '../collision/CollisionSystem';
 import { LightSource, createGlowSprite, createLightPool } from '../lighting/WorldLights';
 import { ToriiGenerator } from '../world/ToriiGenerator';
 import { SeededRandom } from '../utils/MathUtils';
-import { createSurfaceTextures } from '../utils/ProceduralTextures';
 import { Rect, inRect } from './LevelTypes';
 import { mergeStatic } from '../utils/MergeStatic';
 import { LightShafts, ShaftOptions, createHaloSprite } from '../rendering/LightShafts';
 import { HeatSource, HeatSources } from '../rendering/HeatSources';
 import { getGlowTexture } from '../utils/ProceduralTextures';
+import { surfaceEverything } from '../rendering/Surfaces';
+import { GroundPalette, createGroundMaterial } from '../rendering/GroundBlend';
+import { WaterSurface } from '../rendering/WaterSurface';
+import { DecalKind, createDecal } from '../rendering/Decals';
+import { applyClothWave, applySway, applyTranslucency } from '../utils/Wind';
+import { SettingsManager } from '../settings/SettingsManager';
 
 /**
  * LevelKit — Shared pieces for building the later levels: ground, buildings,
@@ -41,6 +46,10 @@ export class LevelBuilder {
   private animated: ((time: number, dt: number) => void)[] = [];
   private disposables = new Set<{ dispose: () => void }>();
   private shaftSets: LightShafts[] = [];
+  private waterRects: { rect: Rect; color: number }[] = [];
+  private waterOptions = { rain: false, sky: 0x24303c };
+  /** The level's water, once built. */
+  public waterSurface: WaterSurface | null = null;
   private heat: HeatSource[] = [];
 
   constructor(name: string, public readonly collision: CollisionSystem, seed: number) {
@@ -100,6 +109,7 @@ export class LevelBuilder {
     });
     for (const item of this.disposables) item.dispose();
     for (const shafts of this.shaftSets) shafts.dispose();
+    this.waterSurface?.dispose();
     for (const source of this.heat) HeatSources.remove(source);
     this.group.removeFromParent();
   }
@@ -116,7 +126,85 @@ export class LevelBuilder {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     });
+    // Wood, stone, lacquer and paper, guessed from each material's colour
+    surfaceEverything(this.group);
     mergeStatic(this.group, this.occluders);
+    this.buildWater();
+  }
+
+  // ─── Water ──────────────────────────────────────────────────────────────
+
+  /** One sheet for all the level's water, with foam painted wherever it meets something. */
+  private buildWater(): void {
+    if (this.waterRects.length === 0) return;
+    const rects = this.waterRects.map(w => w.rect);
+    const minX = Math.min(...rects.map(r => r.minX));
+    const maxX = Math.max(...rects.map(r => r.maxX));
+    const minZ = Math.min(...rects.map(r => r.minZ));
+    const maxZ = Math.max(...rects.map(r => r.maxZ));
+    const ppu = 4;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil((maxX - minX) * ppu);
+    canvas.height = Math.ceil((maxZ - minZ) * ppu);
+    const ctx = canvas.getContext('2d')!;
+    const px = (x: number) => (x - minX) * ppu;
+    const pz = (z: number) => (z - minZ) * ppu;
+
+    // Everything starts as shore; the water rectangles are cut out of it
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    for (const r of rects) ctx.fillRect(px(r.minX), pz(r.minZ), (r.maxX - r.minX) * ppu, (r.maxZ - r.minZ) * ppu);
+    // Then anything standing in the water: walls, posts, rocks, deck edges
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#fff';
+    for (const box of this.collision.boxes) {
+      if (box.max.x < minX || box.min.x > maxX || box.max.z < minZ || box.min.z > maxZ) continue;
+      ctx.fillRect(px(box.min.x), pz(box.min.z), (box.max.x - box.min.x) * ppu, (box.max.z - box.min.z) * ppu);
+    }
+    for (const sphere of this.collision.spheres) {
+      ctx.beginPath();
+      ctx.arc(px(sphere.center.x), pz(sphere.center.z), sphere.radius * ppu, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.lineWidth = 0.5 * ppu;
+    for (const deck of this.decks) {
+      const r = deck.rect;
+      ctx.strokeRect(px(r.minX), pz(r.minZ), (r.maxX - r.minX) * ppu, (r.maxZ - r.minZ) * ppu);
+    }
+    // Soften into a gradient the shader can turn into foam
+    const blurred = document.createElement('canvas');
+    blurred.width = canvas.width;
+    blurred.height = canvas.height;
+    const bctx = blurred.getContext('2d')!;
+    bctx.filter = `blur(${ppu * 0.9}px)`;
+    bctx.drawImage(canvas, 0, 0);
+    const foam = new THREE.CanvasTexture(blurred);
+    foam.colorSpace = THREE.NoColorSpace;
+    // Canvas rows run with z, so the texture mustn't be flipped
+    foam.flipY = false;
+
+    const colors = this.waterRects.map(w => new THREE.Color(w.color));
+    const luminance = (c: THREE.Color) => c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
+    colors.sort((a, b) => luminance(b) - luminance(a));
+    const quality = SettingsManager.getInstance().get().graphicsQuality;
+    this.waterSurface = new WaterSurface(rects, 0.14, {
+      shallow: colors[0].clone().multiplyScalar(2.2).getHex(),
+      deep: colors[colors.length - 1].clone().multiplyScalar(1.1).getHex(),
+      sky: this.waterOptions.sky,
+      rain: this.waterOptions.rain,
+      reflections: quality === 'HIGH',
+      foam,
+      foamRect: new THREE.Vector4(minX, minZ, maxX - minX, maxZ - minZ),
+    });
+    this.group.add(this.waterSurface.mesh);
+    const water = this.waterSurface;
+    this.onTick((time, dt) => water.update(time, dt));
+  }
+
+  /** How the level's water looks: rain on it, and the sky it reflects when there's no mirror. */
+  public waterStyle(options: { rain?: boolean; sky?: number }): void {
+    Object.assign(this.waterOptions, options);
   }
 
   // ─── Primitives ─────────────────────────────────────────────────────────
@@ -169,7 +257,7 @@ export class LevelBuilder {
   // ─── Ground ─────────────────────────────────────────────────────────────
 
   /** A broad plane with blotches of two colours, so it doesn't read as flat. */
-  public ground(rect: Rect, colorA: number, colorB: number, seed: number): THREE.Mesh {
+  public ground(rect: Rect, colorA: number, colorB: number, seed: number, palette?: GroundPalette): THREE.Mesh {
     const width = rect.maxX - rect.minX;
     const depth = rect.maxZ - rect.minZ;
     const geometry = new THREE.PlaneGeometry(width, depth, Math.ceil(width / 2), Math.ceil(depth / 2));
@@ -189,15 +277,15 @@ export class LevelBuilder {
     }
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
-    const textures = createSurfaceTextures([64, 16], seed, 2.2);
-    for (const t of [textures.map, textures.normalMap]) {
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(width / 8, depth / 8);
-      this.disposables.add(t);
-    }
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, map: textures.map, normalMap: textures.normalMap, roughness: 0.95 });
+    geometry.deleteAttribute('color');
+    // Mud, moss, stone and ash, blended by where you stand
+    const material = createGroundMaterial(palette ?? {
+      mud: colorA, moss: new THREE.Color(colorB).lerp(new THREE.Color(0x2e4020), 0.5).getHex(),
+      stone: 0x4a4a4c, ash: 0x1c1a18, amount: { moss: 0.6, stone: 0.4, ash: 0 },
+    });
     const mesh = this.mesh(geometry, material, (rect.minX + rect.maxX) / 2, 0, (rect.minZ + rect.maxZ) / 2);
     mesh.userData.noShadow = true;
+    mesh.userData.noSurface = true;
     mesh.receiveShadow = true;
     return mesh;
   }
@@ -274,29 +362,10 @@ export class LevelBuilder {
   }
 
   /** Water that slows anyone wading through it. */
-  public water(rect: Rect, color: number, factor: number): THREE.Mesh {
-    const w = rect.maxX - rect.minX;
-    const d = rect.maxZ - rect.minZ;
-    const textures = createSurfaceTextures([32, 8], 913, 3);
-    const normal = textures.normalMap;
-    normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
-    normal.repeat.set(w / 6, d / 6);
-    textures.map.dispose();
-    this.disposables.add(normal);
-    const material = new THREE.MeshStandardMaterial({
-      color, roughness: 0.08, metalness: 0.55, transparent: true, opacity: 0.78,
-      normalMap: normal, normalScale: new THREE.Vector2(0.6, 0.6),
-    });
-    const geometry = new THREE.PlaneGeometry(w, d);
-    geometry.rotateX(-Math.PI / 2);
-    const mesh = this.mesh(geometry, material, (rect.minX + rect.maxX) / 2, 0.14, (rect.minZ + rect.maxZ) / 2);
-    mesh.userData.noShadow = true;
-    mesh.receiveShadow = true;
-    this.onTick(time => {
-      normal.offset.set(time * 0.02, time * 0.035);
-    });
+  public water(rect: Rect, color: number, factor: number): void {
+    // Drawn as one sheet with the rest of the level's water, when the level is finished
+    this.waterRects.push({ rect, color });
     this.footings.push({ rect, factor });
-    return mesh;
   }
 
   /** A floor height with nothing drawn, for floors built some other way. */
@@ -371,7 +440,7 @@ export class LevelBuilder {
     this.group.add(g);
     this.mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.25, 6), stone, 0, 0.12, 0, g);
     this.mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.9, 6), stone, 0, 0.7, 0, g);
-    this.mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), std(0xffd08a, { emissive: color, emissiveIntensity: 1.4 }), 0, 1.35, 0, g);
+    this.mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), this.lanternPaper(color, 1.4), 0, 1.35, 0, g);
     this.mesh(new THREE.ConeGeometry(0.55, 0.4, 6), stone, 0, 1.75, 0, g);
     this.pillar(x, z, 0.4);
     this.light(x, y + 1.4, z, color, 14, 11, 0.12, 1.4);
@@ -382,10 +451,187 @@ export class LevelBuilder {
     const wood = std(0x2a1a10);
     this.box(x, z, 0.14, 2.8, 0.14, wood, { y });
     this.box(x + 0.4, z, 0.9, 0.1, 0.1, wood, { y: y + 2.7 });
-    const lantern = this.mesh(new THREE.SphereGeometry(0.28, 10, 8), std(0xe8c890, { emissive: color, emissiveIntensity: 1.6 }), x + 0.75, y + 2.3, z);
+    const lantern = this.mesh(new THREE.SphereGeometry(0.28, 10, 8), this.lanternPaper(color, 1.6), x + 0.75, y + 2.3, z);
+    lantern.userData.dynamic = true;
+    const swing = this.random.next() * 10;
+    this.onTick(time => {
+      lantern.rotation.z = Math.sin(time * 1.1 + swing) * 0.08;
+      lantern.position.x = x + 0.75 + Math.sin(time * 1.1 + swing) * 0.04;
+    });
     lantern.scale.y = 1.3;
     this.pillar(x, z, 0.2);
     this.light(x + 0.75, y + 2.3, z, color, 12, 10, 0.18, 1.3);
+  }
+
+  /** Paper with a flame inside: it flickers, and its colour shows through. */
+  private lanternPaper(color: number, intensity: number): THREE.MeshStandardMaterial {
+    const material = std(0xe8c890, { emissive: color, emissiveIntensity: intensity, roughness: 0.9 });
+    material.userData.surface = 'paper';
+    const phase = this.random.next() * 20;
+    this.onTick(time => {
+      material.emissiveIntensity = intensity * (0.86 + Math.sin(time * 9 + phase) * 0.07 + Math.sin(time * 23 + phase * 1.7) * 0.05);
+    });
+    return material;
+  }
+
+  // ─── Weather, cloth and plants ──────────────────────────────────────────
+
+  /** A mark painted on the ground, or on a wall facing `normal`. */
+  public decal(kind: DecalKind, x: number, z: number, size: number, options: { y?: number; normal?: THREE.Vector3; rotation?: number } = {}): void {
+    const y = options.y ?? this.heightAt(x, z);
+    const decal = createDecal(kind, new THREE.Vector3(x, y, z), size, {
+      normal: options.normal,
+      rotation: options.rotation ?? (options.normal ? 0 : this.random.next() * Math.PI * 2),
+      variant: Math.floor(this.random.next() * 3),
+    });
+    this.group.add(decal);
+  }
+
+  /**
+   * Grass or reeds swaying in the wind across an area, kept off decks, water
+   * (unless `inWater`) and anything solid.
+   */
+  public grass(rect: Rect, count: number, options: { colors: [number, number]; height: [number, number]; width?: number; inWater?: boolean }): void {
+    const blade = new THREE.BufferGeometry();
+    // A tapered blade of three segments, base at 0 and tip at 1
+    const w = options.width ?? 0.08;
+    const verts = [-w, 0, 0, w, 0, 0, -w * 0.7, 0.4, 0.01, w * 0.7, 0.4, 0.01, -w * 0.35, 0.75, 0.03, w * 0.35, 0.75, 0.03, 0, 1, 0.06];
+    blade.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    blade.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4, 3, 5, 4, 4, 5, 6]);
+    blade.computeVertexNormals();
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, side: THREE.DoubleSide });
+    material.userData.noSurface = true;
+    applySway(material, 0.22);
+    applyTranslucency(material, 0.5);
+
+    const placed: THREE.Matrix4[] = [];
+    const matrix = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const r = this.random;
+    // Grass grows in tufts, not evenly: pick a spot, then sprout several blades around it
+    for (let i = 0; i < count && placed.length < count; i++) {
+      const cx = r.range(rect.minX, rect.maxX);
+      const cz = r.range(rect.minZ, rect.maxZ);
+      const inWater = this.footingAt(cx, cz) < 1;
+      if (inWater !== !!options.inWater) continue;
+      if (this.isSolidAt(cx, cz)) continue;
+      const tuft = 4 + Math.floor(r.next() * 6);
+      const tuftHeight = r.range(options.height[0], options.height[1]);
+      for (let k = 0; k < tuft && placed.length < count; k++) {
+        const x = cx + r.range(-0.35, 0.35);
+        const z = cz + r.range(-0.35, 0.35);
+        const height = tuftHeight * r.range(0.7, 1.15);
+        // Blades lean outward from the middle of the tuft
+        q.setFromEuler(new THREE.Euler((z - cz) * 0.6, r.range(0, Math.PI * 2), -(x - cx) * 0.6));
+        matrix.compose(new THREE.Vector3(x, this.heightAt(x, z), z), q, new THREE.Vector3(1, height, 1));
+        placed.push(matrix.clone());
+      }
+    }
+    if (placed.length === 0) return;
+    const mesh = new THREE.InstancedMesh(blade, material, placed.length);
+    const tint = new THREE.Color();
+    const a = new THREE.Color(options.colors[0]);
+    const b = new THREE.Color(options.colors[1]);
+    placed.forEach((m, i) => {
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, tint.copy(a).lerp(b, r.next()));
+    });
+    mesh.userData.noShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    this.group.add(mesh);
+  }
+
+  private isSolidAt(x: number, z: number): boolean {
+    for (const box of this.collision.boxes) {
+      if (x > box.min.x - 0.2 && x < box.max.x + 0.2 && z > box.min.z - 0.2 && z < box.max.z + 0.2) return true;
+    }
+    for (const s of this.collision.spheres) {
+      if (Math.hypot(x - s.center.x, z - s.center.z) < s.radius + 0.2) return true;
+    }
+    return false;
+  }
+
+  /**
+   * A nobori: a tall banner on a pole, pinned along the pole and the crossbar,
+   * rippling in the wind. `mark` draws a brushed sigil on it.
+   */
+  public banner(x: number, z: number, height: number, color: number, options: { y?: number; rotY?: number; mark?: number; torn?: boolean } = {}): void {
+    const y = options.y ?? this.heightAt(x, z);
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    g.rotation.y = options.rotY ?? this.random.next() * Math.PI * 2;
+    this.group.add(g);
+    const wood = std(0x2a1a10, { roughness: 0.85 });
+    this.mesh(new THREE.CylinderGeometry(0.06, 0.07, height, 6), wood, 0, height / 2, 0, g);
+    this.mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 5), wood, 0.45, height - 0.12, 0, g).rotation.z = Math.PI / 2;
+
+    const cloth = new THREE.PlaneGeometry(0.9, height * 0.72, 8, 14);
+    cloth.translate(0.45 + 0.07, height - 0.15 - (height * 0.72) / 2, 0);
+    const material = new THREE.MeshStandardMaterial({
+      map: this.bannerTexture(color, options.mark ?? 0x111111, !!options.torn),
+      side: THREE.DoubleSide, roughness: 0.9, alphaTest: 0.5,
+    });
+    material.userData.noSurface = true;
+    applyClothWave(material, 0.12);
+    applyTranslucency(material, 0.35);
+    const clothMesh = this.mesh(cloth, material, 0, 0, 0, g);
+    clothMesh.userData.dynamic = true;
+    g.userData.dynamic = true;
+    this.pillar(x, z, 0.15);
+  }
+
+  private bannerTexture(color: number, mark: number, torn: boolean): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+    const r = this.random;
+    ctx.fillStyle = `#${new THREE.Color(color).getHexString()}`;
+    ctx.fillRect(0, 0, 64, 256);
+    // Weave, wear and a darker border
+    for (let i = 0; i < 400; i++) {
+      ctx.fillStyle = `rgba(0,0,0,${r.range(0.02, 0.08)})`;
+      ctx.fillRect(r.range(0, 64), r.range(0, 256), r.range(1, 3), r.range(2, 12));
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(0, 0, 64, 256);
+    // A brushed sigil: a few bold strokes down the middle
+    ctx.strokeStyle = `#${new THREE.Color(mark).getHexString()}`;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const top = 40 + i * 60;
+      ctx.lineWidth = r.range(5, 9);
+      ctx.beginPath();
+      ctx.moveTo(r.range(18, 30), top);
+      ctx.quadraticCurveTo(32 + r.range(-10, 10), top + r.range(10, 25), r.range(34, 48), top + r.range(25, 45));
+      ctx.stroke();
+      ctx.lineWidth = r.range(3, 6);
+      ctx.beginPath();
+      ctx.moveTo(r.range(14, 24), top + 30);
+      ctx.lineTo(r.range(40, 52), top + r.range(22, 40));
+      ctx.stroke();
+    }
+    if (torn) {
+      // Ragged holes and a frayed bottom edge, cut out with transparency
+      ctx.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 7; i++) {
+        ctx.beginPath();
+        ctx.arc(r.range(10, 60), r.range(60, 250), r.range(3, 10), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.moveTo(0, 256);
+      for (let x = 0; x <= 64; x += 6) ctx.lineTo(x, 256 - r.range(4, 30));
+      ctx.lineTo(64, 256);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    this.disposables.add(texture);
+    return texture;
   }
 
   /** A torii, solid at its pillars. */

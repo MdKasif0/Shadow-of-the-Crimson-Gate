@@ -16,7 +16,9 @@ export function buildTrialArena(collision: CollisionSystem): LevelRuntime {
   const paving = std(0x4a4248, { roughness: 0.85 });
   const cliff = std(0x221c22, { roughness: 1, flatShading: true });
 
-  b.ground({ minX: -40, maxX: 40, minZ: -40, maxZ: 40 }, 0x2a2026, 0x3a2a30, 51);
+  b.ground({ minX: -40, maxX: 40, minZ: -40, maxZ: 40 }, 0x2a2026, 0x3a2a30, 51, {
+    mud: 0x2a2024, moss: 0x2a2a1e, stone: 0x4a4248, ash: 0x1a1214, amount: { moss: 0.1, stone: 0.9, ash: 0.3 },
+  });
   const floor = b.mesh(new THREE.CylinderGeometry(RADIUS, RADIUS + 0.6, 0.3, 48), paving, 0, 0.15, 0);
   floor.receiveShadow = true;
   b.raise({ minX: -RADIUS, maxX: RADIUS, minZ: -RADIUS, maxZ: RADIUS }, 0.3);
@@ -46,6 +48,15 @@ export function buildTrialArena(collision: CollisionSystem): LevelRuntime {
     b.stoneLantern(Math.sin(a) * (RADIUS - 3), Math.cos(a) * (RADIUS - 3), 0xff5a4a);
   }
   b.boundaryCliffs({ minX: -36, maxX: 36, minZ: -36, maxZ: 36 }, cliff, 10);
+  for (let i = 0; i < 12; i++) {
+    const a = b.random.next() * Math.PI * 2;
+    const d = b.random.range(2, 18);
+    b.decal('blood', Math.sin(a) * d, Math.cos(a) * d, b.random.range(2.4, 4.6), { y: 0.31 });
+  }
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    b.banner(Math.sin(a) * (RADIUS - 1.2), Math.cos(a) * (RADIUS - 1.2), 5.4, 0x7a0e14, { y: 0.3, rotY: a + Math.PI / 2, mark: 0x0a0406 });
+  }
   const beams = b.shafts({ color: 0xff7a8a, opacity: 0.26, width: [2, 3.5], length: 20 });
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + 0.4;

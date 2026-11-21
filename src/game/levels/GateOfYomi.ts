@@ -78,7 +78,9 @@ export function buildGateOfYomi(collision: CollisionSystem): LevelRuntime {
   const cliff = std(0x2a2228, { roughness: 1, flatShading: true });
   const crimson = std(0x8a1a1a, { roughness: 0.6 });
 
-  b.ground(rect(-24, 24, -104, 56), 0x2a2026, 0x3a2a30, 31);
+  b.ground(rect(-24, 24, -104, 56), 0x2a2026, 0x3a2a30, 31, {
+    mud: 0x2a2024, moss: 0x2a2a1e, stone: 0x4a4248, ash: 0x1a1214, amount: { moss: 0.2, stone: 0.8, ash: 0.4 },
+  });
   b.boundaryCliffs(rect(-22, 22, -104, 56), cliff, 9);
   for (const side of [1, -1]) {
     // Sheer drops either side of the path, kept back by a low parapet
@@ -134,6 +136,17 @@ export function buildGateOfYomi(collision: CollisionSystem): LevelRuntime {
   // Crimson light spilling down the terraces from the gate
   const gateLight = b.shafts({ color: 0xff4a5a, opacity: 0.26, width: [2, 4], length: 22, direction: new THREE.Vector3(0, -0.55, 1) });
   for (const [x, z, y] of [[-6, -64, 3.2], [5, -70, 3.2], [-2, -78, 3.2], [8, -58, 3.2], [-9, -74, 3.2]]) gateLight.add(new THREE.Vector3(x, y, z), () => b.random.next());
+
+  // Blood on the stones, thickest in the arenas and before the gate
+  for (const [cz, count] of [[15, 8], [-13, 8], [-40, 7], [-70, 12]] as [number, number][]) {
+    for (let i = 0; i < count; i++) b.decal('blood', b.random.range(-12, 12), cz + b.random.range(-9, 9), b.random.range(2.6, 5.2));
+  }
+  b.grass(rect(-15.5, 15.5, -100, 52), 3200, { colors: [0x5a2e22, 0x7a5030], height: [0.25, 0.6] });
+  for (let i = 0; i < 6; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const z = 26 - i * 16;
+    b.banner(side * 14.5, z, 5.2, 0x7a0e14, { rotY: side > 0 ? Math.PI : 0, mark: 0x0a0406 });
+  }
 
   b.finish();
 

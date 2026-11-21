@@ -80,7 +80,9 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
   const stone = std(0x3a3638, { roughness: 1, flatShading: true });
   const lacquer = std(0x5a1410, { roughness: 0.6 });
 
-  b.ground(bounds, 0x2a201c, 0x3a2a22, 21);
+  b.ground(bounds, 0x2a201c, 0x3a2a22, 21, {
+    mud: 0x2e2620, moss: 0x2a2a1c, stone: 0x4a4440, ash: 0x161412, amount: { moss: 0.15, stone: 0.5, ash: 0.9 },
+  });
   b.boundaryCliffs(rect(-27, 27, -108, 56), stone, 7);
 
   // ─── The compound walls ─────────────────────────────────────────────
@@ -217,6 +219,23 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
 
   // Permanent fires, lit once the level is entered
   const standingFires: [number, number, number][] = [[8, 41, 1.8], [-9, 35, 1.6], [-10, -6, 2.4], [6, -24, 2], [-13, -18, 2]];
+
+  // Scorch marks under every fire and scattered where the roof has fallen
+  for (const [x, z, r] of standingFires) b.decal('scorch', x, z, r * 3.2);
+  for (const [x, z] of [[13, 36], [-14, 30.5], [12.5, -11], [-12, -2], [-10, -24], [13, 0], [-6, -30], [-14, -36], [14, -36], [-14, -68], [14, -68]]) b.decal('scorch', x, z, b.random.range(3, 5));
+  for (let i = 0; i < 18; i++) b.decal('scorch', b.random.range(-16, 16), b.random.range(-32, 2), b.random.range(1.5, 3.5));
+  for (let i = 0; i < 10; i++) b.decal('scorch', b.random.range(-15, 15), b.random.range(-68, -36), b.random.range(2, 4), { y: 0.11 });
+  // Soot climbing the walls of the long hall and the main hall
+  for (let z = 7; z < 28; z += 4.5) {
+    b.decal('soot', -4.18, z, 3.2, { y: 1.6, normal: new THREE.Vector3(1, 0, 0) });
+    b.decal('soot', 4.18, z + 2, 3.2, { y: 1.6, normal: new THREE.Vector3(-1, 0, 0) });
+  }
+  for (const x of [-12, -4, 6, 12]) b.decal('soot', x, -69.73, 4, { y: 2.2, normal: new THREE.Vector3(0, 0, 1) });
+  b.grass(rect(-18, 18, -33, 3), 1400, { colors: [0x5a4a2a, 0x7a6432], height: [0.25, 0.55] });
+  b.grass(rect(-22, 22, 31, 51), 1400, { colors: [0x5a4a2a, 0x7a6432], height: [0.25, 0.55] });
+  for (const [x, z, r] of [[-6, 45, 0.5], [6, 45, -0.5], [-3, 3, 1.2], [3, 3, 1.9], [-3.8, -36, 0], [3.8, -36, 0]] as [number, number, number][]) {
+    b.banner(x, z, 4.6, 0x6a1410, { rotY: r, mark: 0x0a0806, torn: true });
+  }
 
   b.finish();
   const embers = createMotes(160, 0xff8a3a, { rise: 1.6, size: 0.11, spread: 18, height: 9 });

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SeededRandom } from '../utils/MathUtils';
-import { applyWind } from '../utils/Wind';
+import { applyTranslucency, applyWind } from '../utils/Wind';
 
 // All trees of a kind share these materials, and each tree is merged into two
 // meshes (wood + leaves) to keep draw calls low.
@@ -15,6 +15,9 @@ const blossomMaterial = new THREE.MeshStandardMaterial({
 const needleMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
 applyWind(blossomMaterial, 0.045);
 applyWind(needleMaterial, 0.02);
+// Moonlight shines through the petals and needles when you look towards it
+applyTranslucency(blossomMaterial, 0.7);
+applyTranslucency(needleMaterial, 0.35);
 
 function paint(geometry: THREE.BufferGeometry, colorAt: (position: THREE.Vector3) => THREE.Color): void {
   const positions = geometry.attributes.position;

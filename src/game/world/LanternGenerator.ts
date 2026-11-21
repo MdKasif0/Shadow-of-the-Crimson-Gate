@@ -10,6 +10,9 @@ const LANTERN_COLOR = 0xffa24a;
 const LANTERN_CORE_HEIGHT = 2.5;
 
 export class LanternGenerator {
+  /** The glowing paper of every lantern, so the scene can make it flicker. */
+  public static flameMaterials: THREE.MeshBasicMaterial[] = [];
+
   public static generate(random: SeededRandom, collisionSystem: CollisionSystem): THREE.Group {
     const group = new THREE.Group();
     group.name = 'Lanterns';
@@ -49,6 +52,7 @@ export class LanternGenerator {
   public static generateSingle(): THREE.Group {
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0x59606a, roughness: 0.9, metalness: 0.02, flatShading: true });
     const emissiveMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(LANTERN_COLOR).multiplyScalar(4) });
+    LanternGenerator.flameMaterials.push(emissiveMat);
 
     const baseGeo = new THREE.BoxGeometry(1.2, 0.4, 1.2);
     baseGeo.translate(0, 0.2, 0);

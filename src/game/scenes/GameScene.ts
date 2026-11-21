@@ -92,6 +92,8 @@ import { EncounterConfig } from '../encounters/EncounterConfig';
 import { ParryFlash } from '../vfx/ParryFlash';
 import { ContactShadows, ShadowCaster } from '../rendering/ContactShadows';
 import { mergeStatic } from '../utils/MergeStatic';
+import { SurfaceUniforms, surfaceEverything } from '../rendering/Surfaces';
+import { LanternGenerator } from '../world/LanternGenerator';
 import { Run, Difficulty } from '../meta/Run';
 import { Records } from '../meta/Records';
 import { bindAchievementTracking, grantAchievement } from '../meta/Achievements';
@@ -659,6 +661,10 @@ export class GameScene {
    * and the arena are left as they are: they sway and change.
    */
   private mergeCourtyardMeshes(world: THREE.Group): void {
+    // Wood, stone, lacquer and paper on the courtyard's buildings, before they're merged
+    for (const group of world.children) {
+      if (['Torii', 'Temple', 'Shrines', 'Lanterns', 'Rocks', 'Path', 'CourtyardArena'].includes(group.name)) surfaceEverything(group);
+    }
     for (const group of world.children) {
       if (group.name === 'Torii' || group.name === 'Temple' || group.name === 'Mountains') mergeStatic(group);
       else if (group.name === 'Lanterns' || group.name === 'Shrines') mergeStatic(group, [...group.children]);
@@ -1015,6 +1021,8 @@ export class GameScene {
     this.atmosphere.sky.cloudiness = 0.42;
     this.courtyard?.exit?.update(this.time);
     this.courtyardExtras?.tick(this.time, dt, this.cameraController.camera);
+    this.flickerCourtyardLanterns();
+    SurfaceUniforms.uWetness.value += (0 - SurfaceUniforms.uWetness.value) * Math.min(1, dt * 0.5);
     this.courtyard?.exit?.setOpen(this.playerProgress.crimsonOniDefeated);
   }
 
@@ -1673,6 +1681,10 @@ export class GameScene {
       beams.add(new THREE.Vector3(x, 0, z), () => builder.random.next());
     }
     this.courtyardExtras = builder;
+    // Banners along the climb
+    for (const [x, z, r] of [[-5, 50, 0.4], [5, 50, -0.4], [-4.6, 23.5, 0.2], [4.6, 23.5, -0.2], [-3.6, -15, 0], [3.6, -15, 0]] as [number, number, number][]) {
+      builder.banner(x, z, 4.6, 0x8a1418, { rotY: r, mark: 0xe8dcc0 });
+    }
     builder.finish();
     world.add(builder.group);
     WorldLights.sources.push(...builder.lights);
@@ -2064,6 +2076,7 @@ export class GameScene {
     const frame = level.update(this.levelContext(dt)) || {};
     const air = { ...level.atmosphere, ...frame };
     this.atmosphere.sky.cloudiness = air.cloudiness ?? 0.5;
+    SurfaceUniforms.uWetness.value += ((air.wetness ?? 0) - SurfaceUniforms.uWetness.value) * Math.min(1, dt * 0.5);
     this.atmosphere.update(dt, position, air.fogDensity, new THREE.Color(air.fogColor));
     this.lighting.update(dt, new THREE.Color(air.ambientColor), air.ambientIntensity);
     this.lighting.setMoonIntensity(air.moonIntensity ?? 2.6);
@@ -2095,6 +2108,16 @@ export class GameScene {
     this.player.glow.flash(0.5);
     EventBus.emit('damageNumber', { position: this.player.root.position.clone(), text: String(damage), kind: 'player' });
     if (label) EventBus.emit('damageNumber', { position: this.player.root.position.clone().setY(this.player.root.position.y + 2.4), text: label, kind: 'label' });
+  }
+
+  /** Candlelight behind paper never burns quite steady. */
+  private flickerCourtyardLanterns(): void {
+    const t = this.time;
+    LanternGenerator.flameMaterials.forEach((material, i) => {
+      const base = (material.userData.base as THREE.Color | undefined) ?? (material.userData.base = material.color.clone());
+      const flicker = 0.85 + Math.sin(t * 8.7 + i * 2.1) * 0.08 + Math.sin(t * 21 + i * 4.3) * 0.05;
+      material.color.copy(base).multiplyScalar(flicker);
+    });
   }
 
   /** A soft shadow right under everyone standing on the ground. */

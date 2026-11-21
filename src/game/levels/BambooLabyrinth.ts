@@ -6,6 +6,8 @@ import { createMotes } from './LevelEffects';
 import { SecretDef } from '../world/WorldSecrets';
 import { EncounterConfig, EnemySpawnDef } from '../encounters/EncounterConfig';
 import { SeededRandom } from '../utils/MathUtils';
+import { applySway, applyTranslucency } from '../utils/Wind';
+import { applySurface } from '../rendering/Surfaces';
 
 const at = (x: number, z: number) => new THREE.Vector3(x, 0, z);
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number): Rect => ({ minX, maxX, minZ, maxZ });
@@ -115,7 +117,9 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
   const bounds = rect(-26, 26, -76, 52);
   const maze = carveMaze(new SeededRandom(4243));
 
-  b.ground(bounds, 0x1c2418, 0x2a3220, 11);
+  b.ground(bounds, 0x1c2418, 0x2a3220, 11, {
+    mud: 0x2a2418, moss: 0x24341c, stone: 0x3a3c36, ash: 0x1a1a16, amount: { moss: 1, stone: 0.25, ash: 0 },
+  });
   const rockMat = std(0x2a2e28, { roughness: 1, flatShading: true });
   b.boundaryCliffs(rect(-29, 29, -80, 56), rockMat, 8);
 
@@ -125,6 +129,13 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
   const leafGeometry = new THREE.IcosahedronGeometry(1, 0);
   const stalkMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
   const leafMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
+  // Stalks bend from the root, leaves ride along on top, and moonlight shines through them
+  stalkMaterial.userData.surface = 'bamboo';
+  applySurface(stalkMaterial, 'bamboo');
+  applySway(stalkMaterial, 0.35);
+  leafMaterial.userData.noSurface = true;
+  applySway(leafMaterial, 0.35, true);
+  applyTranslucency(leafMaterial, 0.9);
   const rows: { x: number; z: number; h: number; r: number }[][] = Array.from({ length: ROWS + 3 }, () => []);
   const r = b.random;
 
@@ -309,6 +320,10 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
     },
     { id: 'bamboo_cache', kind: 'cache', essence: 90, x: cx2, z: cz2 },
   ];
+
+  b.grass(bounds, 5000, { colors: [0x3a5a26, 0x6a7a34], height: [0.3, 0.7] });
+  b.banner(entryX - 4, 41, 4.4, 0x2a4a2a, { rotY: 0.3, mark: 0xd8d0b0 });
+  b.banner(entryX + 4, 41, 4.4, 0x2a4a2a, { rotY: -0.3, mark: 0xd8d0b0 });
 
   b.finish();
 

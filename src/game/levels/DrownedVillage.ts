@@ -48,7 +48,8 @@ const ENCOUNTERS: EncounterConfig[] = [
   },
   {
     id: 'enc_village_boss', center: at(0, -64), activationRadius: 10, leashRadius: 40, reward: 120,
-    waves: [{ enemies: [{ type: 'UMIBOZU', offset: at(0, -9) }], delayAfterComplete: 0 }],
+    // It rises from the flood beyond the platform's far edge, then wades in
+    waves: [{ enemies: [{ type: 'UMIBOZU', offset: at(-7, -17) }], delayAfterComplete: 0 }],
   },
 ];
 
@@ -66,7 +67,10 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
   const darkWood = std(0x22180f, { roughness: 0.9 });
   const rockMat = std(0x34383c, { roughness: 1, flatShading: true });
 
-  b.ground(bounds, 0x2a2b24, 0x3a3a2e, 3);
+  b.ground(bounds, 0x2a2b24, 0x3a3a2e, 3, {
+    mud: 0x3a3226, moss: 0x2e3a22, stone: 0x4a4c4e, ash: 0x222220, amount: { moss: 0.75, stone: 0.35, ash: 0 },
+  });
+  b.waterStyle({ rain: true, sky: 0x2e3e4e });
   b.boundaryCliffs(rect(-30, 30, -100, 56), rockMat, 7);
 
   // ─── The flood ──────────────────────────────────────────────────────
@@ -133,6 +137,15 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
   // ─── Secrets ────────────────────────────────────────────────────────
   b.deck(rect(-21, -17, -31, -27), 0.4, darkWood);
 
+  // ─── Life at the water's edge ───────────────────────────────────────
+  b.grass(rect(-26, 26, 30, 51), 2200, { colors: [0x4a5a2a, 0x6a7034], height: [0.35, 0.8] });
+  b.grass(rect(-26, 26, -45, 29), 1800, { colors: [0x5a6430, 0x7a7238], height: [0.9, 1.7], width: 0.05, inWater: true });
+  for (const [x, z, r] of [[-6, 36, 0.4], [7, 30, 2.6], [-12, 26, 1.2], [3, -48, 0], [-3, -48, 0]] as [number, number, number][]) {
+    b.banner(x, z, 4.2, 0xd8d0c0, { rotY: r, torn: true, mark: 0x3a2a24 });
+  }
+  // The flood's tide line on the houses and posts
+  for (let i = 0; i < 14; i++) b.decal('damp', b.random.range(-25, 25), b.random.range(26, 32), b.random.range(2, 4), { y: 0.03 });
+
   b.finish();
 
   // ─── Rules: rain, and lightning now and then ────────────────────────
@@ -147,7 +160,7 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
     occluders: b.occluders,
     spawn: at(0, 46),
     bounds: { MIN_X: bounds.minX, MAX_X: bounds.maxX, MIN_Z: bounds.minZ, MAX_Z: bounds.maxZ },
-    atmosphere: { fogColor: 0x24303c, fogDensity: 0.017, ambientColor: 0x5a7088, ambientIntensity: 1.2, cloudiness: 0.95 },
+    atmosphere: { fogColor: 0x24303c, fogDensity: 0.017, ambientColor: 0x5a7088, ambientIntensity: 1.2, cloudiness: 0.95, wetness: 1 },
     shrine: { id: 'village_shrine', name: 'Drowned Shrine', position: at(-10, 40), rest: at(-6.5, 40) },
     exit: at(0, -88),
     encounters: ENCOUNTERS,
@@ -161,6 +174,9 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
       exit.update(ctx.time);
       exit.setOpen(ctx.isBossDefeated);
       rain.update(ctx.dt, ctx.player.root.position, ctx.time);
+      // The water glows and rings where Umibōzu rises from it
+      const umibozu = ctx.enemies.find(e => e.enemyType === 'UMIBOZU' && !e.health.isDead);
+      b.waterSurface?.setGlow(umibozu ? umibozu.root.position : null);
 
       lightning -= ctx.dt;
       if (lightning <= 0) {
