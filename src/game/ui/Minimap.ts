@@ -139,7 +139,8 @@ export class Minimap {
     this.explored.width = width;
     this.explored.height = height;
     this.exploredCtx = this.explored.getContext('2d')!;
-    this.setVisible(true);
+    // Shown once play is under way, not over the title screen
+    this.setVisible(false);
   }
 
   public setVisible(isVisible: boolean): void {

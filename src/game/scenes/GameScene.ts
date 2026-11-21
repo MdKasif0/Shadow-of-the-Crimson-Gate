@@ -78,7 +78,8 @@ import { keyName } from '../settings/KeyBindings';
 import { Interactable } from '../interaction/Interactable';
 
 // ─── Levels ───────────────────────────────────────────────────────
-import { LEVEL_ORDER, LevelContext, LevelId, LevelProgressSave, LevelRuntime, createDefaultLevelProgress } from '../levels/LevelTypes';
+import { HauntTheme, LEVEL_ORDER, LevelContext, LevelId, LevelProgressSave, LevelRuntime, Rect, createDefaultLevelProgress } from '../levels/LevelTypes';
+import { TerrainGenerator } from '../world/TerrainGenerator';
 import { LEVELS } from '../levels/LevelCatalog';
 import { buildLevel } from '../levels/LevelFactory';
 import { LevelHazards } from '../levels/LevelHazards';
@@ -138,6 +139,15 @@ const CHAPTER_ORDER = [ChapterId.CHAPTER_1, ChapterId.CHAPTER_2, ChapterId.CHAPT
 
 /** Where the way on from the courtyard opens, once the Oni falls. */
 const COURTYARD_EXIT = new THREE.Vector3(0, 0, -131);
+const COURTYARD_ARENA = new THREE.Vector3(0, 0, -112);
+/** The courtyard's way up: the stone path's curve, then on into the arena. */
+const COURTYARD_GUIDE = routeGuide(
+  [...Array.from({ length: 26 }, (_, i) => 58 - i * 6).map(z => new THREE.Vector3(TerrainGenerator.pathOffset(z), 0, z)),
+    new THREE.Vector3(0, 0, -96), COURTYARD_ARENA],
+  [new THREE.Vector3(0, 0, -124), COURTYARD_EXIT],
+);
+/** The courtyard's yokai burn crimson, like the gate they serve. */
+const COURTYARD_HAUNT: HauntTheme = { color: 0xff3a4a, tint: 0x8a7a84, extra: 'none' };
 /** A loading card stays up at least this long, so it can be read. */
 const MIN_CARD_SECONDS = 2.2;
 const LEVEL_BOSS_RANGE = 40;
@@ -668,6 +678,9 @@ export class GameScene {
     this.lighting.buildEnvironment(renderer, this.scene);
     this.renderer = renderer;
     this.buildCourtyardExit(world);
+    // The game opens in the courtyard, which never goes through enterCourtyard the first time
+    this.haunting.setTheme(COURTYARD_HAUNT);
+    this.courtyardMap();
   }
 
   public updateOcclusion(dt: number): void {
@@ -1112,7 +1125,7 @@ export class GameScene {
     this.hitboxSystem.update();
     this.updateTelegraphs();
     this.playerFX.update(dt);
-    if (this.level) this.haunting.update(dt, this.enemies);
+    this.haunting.update(dt, this.enemies);
 
     // ─── Check Player Death ───────────────────────────────────────
     if (this.player.health.currentHealth <= 0) {
@@ -1923,8 +1936,8 @@ export class GameScene {
     this.occlusion.restore(courtyard.occluders as never);
     this.interactionSystem = courtyard.interactions;
     this.secrets.group.visible = true;
-    this.haunting.setTheme(null);
-    this.minimap.setLevel(null);
+    this.haunting.setTheme(COURTYARD_HAUNT);
+    this.courtyardMap();
     this.player.groundHeight = null;
     this.player.surfaceAt = null;
     this.resetBossEncounter();
@@ -1967,28 +1980,21 @@ export class GameScene {
    * a gold thread on the minimap, and the name and distance beneath it.
    */
   private updateWayfinding(dt: number, realDt: number): void {
-    const level = this.level;
     const state = GameStateManager.getInstance().getState();
     const isPlaying = state === GameState.PLAYING || state === GameState.BOSS;
     const isBusy = this.dialogueManager.isActive || this.storyManager.isIntroRunning || this.isCinematicActive;
-    if (!level || this.levelId === 'arena' || this.trial) {
+    const site = this.wayfindingSite();
+    if (!site) {
       this.guidePath = null;
       this.minimap.setVisible(false);
       return;
     }
     const position = this.player.root.position;
-    const bossCenter = level.encounters.find(c => c.id === level.bossEncounterId)?.center ?? level.exit;
-    const guide = level.guide ?? routeGuide([level.spawn, bossCenter], [level.exit]);
-    // Once the gate stands open there's nothing left but the way out; a level beaten twice needs no guide to its boss
-    const isDone = this.levelBossDefeated;
-    const isAtObjective = !isDone && this.isLevelBossFight;
-    this.guidePath = isAtObjective ? null : guide(position, isDone);
+    this.guidePath = site.isAtObjective ? null : site.guide(position, site.isDone);
 
-    const isCombat = this.combatMusicTimer > 0 || this.isLevelBossFight;
-    this.spiritGuide.update(dt, this.time, isBusy ? null : this.guidePath, (x, z) => level.groundHeight(x, z), isCombat);
+    const isCombat = this.combatMusicTimer > 0 || site.isAtObjective;
+    this.spiritGuide.update(dt, this.time, isBusy ? null : this.guidePath, site.groundHeight, isCombat);
 
-    const bossType = this.levelBossType();
-    const bossName = bossType ? LEVEL_ENEMIES[bossType]?.name ?? 'The guardian' : 'The guardian';
     this.minimap.setVisible(isPlaying && !isBusy);
     if (!isPlaying || isBusy) return;
     this.minimap.update(realDt, {
@@ -1996,13 +2002,80 @@ export class GameScene {
       facing: this.player.root.rotation.y,
       yaw: this.cameraController.yaw,
       path: this.guidePath,
-      objective: isDone
-        ? { position: level.exit, kind: 'gate', label: this.isExitOpen() ? 'The gate onward' : 'The gate' }
-        : { position: bossCenter, kind: 'boss', label: bossName },
+      objective: site.isDone
+        ? { position: site.exit, kind: 'gate', label: site.gateLabel }
+        : { position: site.bossCenter, kind: 'boss', label: site.bossName },
       enemies: this.enemies
         .filter(e => !e.health.isDead && e.root.visible)
         .map(e => ({ position: e.root.position, isElite: e.traits.isElite || (e instanceof LevelEnemy && e.isBoss) })),
+      shrine: site.shrine,
+    });
+  }
+
+  /** What the guide and minimap need to know about where the Ronin is, or null where they're not shown. */
+  private wayfindingSite(): {
+    guide: (from: THREE.Vector3, isBossDefeated: boolean) => THREE.Vector3[];
+    bossCenter: THREE.Vector3;
+    bossName: string;
+    exit: THREE.Vector3;
+    gateLabel: string;
+    shrine: THREE.Vector3;
+    groundHeight: (x: number, z: number) => number;
+    isDone: boolean;
+    isAtObjective: boolean;
+  } | null {
+    if (this.trial || this.levelId === 'arena') return null;
+    const position = this.player.root.position;
+    if (this.levelId === 'courtyard') {
+      // Up the stone path through the gates to the Crimson Oni's arena, then through the Crimson Gate
+      const isDone = this.playerProgress.crimsonOniDefeated;
+      const nearest = SHRINES.reduce((a, b) => a.position.distanceToSquared(position) < b.position.distanceToSquared(position) ? a : b);
+      return {
+        guide: COURTYARD_GUIDE,
+        bossCenter: COURTYARD_ARENA,
+        bossName: 'The Crimson Oni',
+        exit: COURTYARD_EXIT,
+        gateLabel: 'The Crimson Gate',
+        shrine: nearest.position,
+        groundHeight: (x, z) => Math.max(0, TerrainGenerator.heightAt(x, z)),
+        isDone,
+        isAtObjective: !isDone && !!this.boss && this.hasBossIntroPlayed && !this.boss.health.isDead,
+      };
+    }
+    const level = this.level;
+    if (!level) return null;
+    const bossCenter = level.encounters.find(c => c.id === level.bossEncounterId)?.center ?? level.exit;
+    const bossType = this.levelBossType();
+    return {
+      guide: level.guide ?? routeGuide([level.spawn, bossCenter], [level.exit]),
+      bossCenter,
+      bossName: bossType ? LEVEL_ENEMIES[bossType]?.name ?? 'The guardian' : 'The guardian',
+      exit: level.exit,
+      gateLabel: this.isExitOpen() ? 'The gate onward' : 'The gate',
       shrine: level.shrine.position,
+      groundHeight: (x, z) => level.groundHeight(x, z),
+      // Once the boss falls there's nothing left but the way out
+      isDone: this.levelBossDefeated,
+      isAtObjective: !this.levelBossDefeated && this.isLevelBossFight,
+    };
+  }
+
+  /** The courtyard's walls, its stone path and its pond, for the minimap. */
+  private courtyardMap(): void {
+    const b = GAME_CONFIG.WORLD.BOUNDS;
+    // The path drawn as a run of short slabs following its curve
+    const path: Rect[] = [];
+    for (let z = 67; z > -92; z -= 2) {
+      const x = TerrainGenerator.pathOffset(z);
+      path.push({ minX: x - 1.6, maxX: x + 1.6, minZ: z - 2.05, maxZ: z });
+    }
+    path.push({ minX: -1.6, maxX: 1.6, minZ: -135, maxZ: -92 });
+    this.minimap.setLevel({
+      bounds: { minX: b.MIN_X, maxX: b.MAX_X, minZ: b.MIN_Z, maxZ: b.MAX_Z },
+      water: [],
+      decks: path,
+      boxes: this.collisionSystem.boxes,
+      spheres: this.collisionSystem.spheres,
     });
   }
 
