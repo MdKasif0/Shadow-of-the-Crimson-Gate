@@ -14,6 +14,8 @@ export interface MinimapLayout {
   decks: Rect[];
   boxes: THREE.Box3[];
   spheres: { center: THREE.Vector3; radius: number }[];
+  /** Fires that never go out, drawn as embers to keep clear of. */
+  fires?: { x: number; z: number; radius: number }[];
   /** Colours for walls and open ground. */
   wall?: string;
   ground?: string;
@@ -120,6 +122,17 @@ export class Minimap {
     ctx.restore();
     ctx.fillStyle = layout.wall ?? 'rgba(214, 206, 182, 1)';
     drawWalls();
+
+    for (const fire of layout.fires ?? []) {
+      const glow = ctx.createRadialGradient(px(fire.x), pz(fire.z), 0, px(fire.x), pz(fire.z), fire.radius * PIXELS_PER_METRE * 1.3);
+      glow.addColorStop(0, 'rgba(255, 200, 90, 0.95)');
+      glow.addColorStop(0.45, 'rgba(255, 90, 30, 0.75)');
+      glow.addColorStop(1, 'rgba(160, 30, 10, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(px(fire.x), pz(fire.z), fire.radius * PIXELS_PER_METRE * 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     this.base = base;
     this.explored = document.createElement('canvas');

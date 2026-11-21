@@ -1958,6 +1958,7 @@ export class GameScene {
       decks: level.map?.decks ?? [],
       boxes: this.collisionSystem.boxes,
       spheres: this.collisionSystem.spheres,
+      fires: level.map?.fires,
     });
   }
 

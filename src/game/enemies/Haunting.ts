@@ -109,6 +109,10 @@ const PROFILES: Record<string, Partial<Profile>> = {
   JOROGUMO: { fade: 0, strength: 0.75 },
   UMIBOZU: { fade: 0, strength: 0.85 },
   AKANE: { fade: 0, strength: 0 },
+  BASIC_YOKAI: { fade: 0.4 },
+  SHIELDED_YOKAI: { fade: 0.3 },
+  POSSESSED_MONK: { fade: 0.22, ghosts: true },
+  FALLEN_SAMURAI: { fade: 0, strength: 0.8, ghosts: true },
 };
 
 interface Tracked {
@@ -170,7 +174,7 @@ export class Haunting {
     this.theme = theme ?? DEFAULT_THEME;
     this.color.setHex(this.theme.color).multiplyScalar(1.4);
     this.tint.setHex(this.theme.tint);
-    this.smokeColor.setHex(this.theme.tint).multiplyScalar(0.12);
+    this.smokeColor.setHex(this.theme.tint).multiplyScalar(0.22);
   }
 
   public update(dt: number, enemies: Enemy[]): void {
@@ -339,7 +343,7 @@ export class Haunting {
     const density = SoftParticles.density();
     const scale = Math.max(1, t.height / 2);
     const moving = Math.min(1, speed / 5);
-    t.emitSmoke += dt * (10 + moving * 16) * density * Math.min(scale, 3);
+    t.emitSmoke += dt * (5 + moving * 8) * density * Math.min(scale, 3);
     t.emitFire += dt * (5 + warning * 18) * density * Math.min(scale, 3);
     while (t.emitSmoke >= 1) {
       t.emitSmoke--;
@@ -347,7 +351,7 @@ export class Haunting {
       this.smoke.emit({
         position: at,
         velocity: new THREE.Vector3((Math.random() - 0.5) * 0.3, 0.35 + Math.random() * 0.5, (Math.random() - 0.5) * 0.3),
-        life: 1.1 + Math.random() * 1.1, size: 0.3 * scale, sizeEnd: 1.1 * scale, color: this.smokeColor, alpha: 0.42, drag: 0.4,
+        life: 1 + Math.random() * 0.9, size: 0.25 * scale, sizeEnd: 0.9 * scale, color: this.smokeColor, alpha: 0.16, drag: 0.4,
       });
     }
     while (t.emitFire >= 1) {
@@ -409,7 +413,7 @@ export class Haunting {
         this.smoke.emit({
           position: this.somewhereOn(t, 0, 1),
           velocity: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0.6 + Math.random() * 0.8, (Math.random() - 0.5) * 0.4),
-          life: 1.2 + Math.random(), size: 0.4 * scale, sizeEnd: 1.4 * scale, color: this.smokeColor, alpha: 0.5, drag: 0.5,
+          life: 1.2 + Math.random(), size: 0.4 * scale, sizeEnd: 1.4 * scale, color: this.smokeColor, alpha: 0.3, drag: 0.5,
         });
       }
     }

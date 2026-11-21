@@ -114,7 +114,7 @@ export interface LevelRuntime {
   /** Called when the boss fight begins. */
   onBossStart?: (ctx: LevelContext) => void;
   /** What the minimap draws beyond the walls: water, and decks over it. */
-  map?: { water: Rect[]; decks: Rect[] };
+  map?: { water: Rect[]; decks: Rect[]; fires?: { x: number; z: number; radius: number }[] };
   /**
    * The way from `from` to where the Ronin should go next: the boss while it
    * lives, then the gate. Without one, the guide heads straight there.

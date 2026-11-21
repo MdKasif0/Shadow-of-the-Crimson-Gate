@@ -7,6 +7,8 @@ import { SecretDef } from '../world/WorldSecrets';
 import { EncounterConfig } from '../encounters/EncounterConfig';
 import { SeededRandom } from '../utils/MathUtils';
 import { EventBus } from '../core/EventBus';
+import { routeGuide } from './Wayfinding';
+import { SoftParticles } from '../vfx/SoftParticles';
 
 const at = (x: number, z: number) => new THREE.Vector3(x, 0, z);
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number): Rect => ({ minX, maxX, minZ, maxZ });
@@ -147,18 +149,25 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
     plane.userData.noShadow = true;
   }
   const tiles: Tile[] = [];
+  /** The sound boards through each rotten floor, in the order you'd walk them. */
+  const safeLines: THREE.Vector3[][] = [];
   const layTiles = (area: Rect, seed: number, rottenShare: number) => {
+    const line: THREE.Vector3[] = [];
+    safeLines.push(line);
     const random = new SeededRandom(seed);
     const cols = Math.round((area.maxX - area.minX) / TILE);
     const rowsCount = Math.round((area.maxZ - area.minZ) / TILE);
     // A safe line through, wandering a column at a time
     let safeCol = Math.floor(cols / 2);
     const safe = new Set<string>();
+    const centre = (row: number, col: number) => at(area.minX + (col + 0.5) * TILE, area.maxZ - (row + 0.5) * TILE);
     for (let row = 0; row < rowsCount; row++) {
       safe.add(`${row},${safeCol}`);
+      line.push(centre(row, safeCol));
       if (random.next() > 0.55) {
         const next = THREE.MathUtils.clamp(safeCol + (random.next() > 0.5 ? 1 : -1), 0, cols - 1);
         safe.add(`${row},${next}`);
+        if (next !== safeCol) line.push(centre(row, next));
         safeCol = next;
       }
     }
@@ -237,7 +246,69 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
     b.banner(x, z, 4.6, 0x6a1410, { rotY: r, mark: 0x0a0806, torn: true });
   }
 
+  // ─── Fallen, still-smouldering beams in the courtyards ───────────────
+  const charred = std(0x120a06, { roughness: 1 });
+  const ember = new THREE.MeshStandardMaterial({ color: 0x2a0802, emissive: 0xff4a10, emissiveIntensity: 2.2, roughness: 1 });
+  ember.userData.noSurface = true;
+  for (const [x, z, length, yaw] of [[-12, 13, 4.6, 0.4], [11, 18, 3.8, -0.9], [-14, -12, 4.2, 1.2], [9, -27, 3.6, 0.3], [-9, 46, 3.2, -0.5], [15, 24, 3, 1.5], [-6, -48, 4.4, 0.8], [11, -60, 3.8, -0.4]]) {
+    const beam = new THREE.Group();
+    beam.position.set(x, 0.18, z);
+    beam.rotation.set(0, yaw, b.random.range(-0.12, 0.12));
+    b.group.add(beam);
+    b.mesh(new THREE.BoxGeometry(0.38, 0.36, length), charred, 0, 0, 0, beam);
+    // Its ends and cracks still glow
+    for (const end of [-1, 1]) b.mesh(new THREE.BoxGeometry(0.32, 0.3, 0.06), ember, 0, 0, end * length / 2, beam);
+    b.mesh(new THREE.BoxGeometry(0.4, 0.05, length * 0.35), ember, 0, 0.17, b.random.range(-0.3, 0.3) * length, beam);
+    b.decal('soot', x, z, length * 0.9, { y: 0.03 });
+  }
+
   b.finish();
+
+  // ─── Smoke pouring off every fire, and ash falling everywhere ───────
+  const fireSpots: [number, number, number][] = [
+    ...standingFires,
+    [13, 36, 1.2], [-14, 30.5, 0.9], [12.5, -11, 1.3], [-12, -2, 0.8], [-10, -24, 0.8], [13, 0, 0.8], [-6, -30, 0.8],
+    [-14, -36, 1.1], [14, -36, 1.1], [-14, -68, 1.1], [14, -68, 1.1],
+  ];
+  const smokeColumns = new SoftParticles(900, { blending: 'normal', softness: 2, noisy: true });
+  const ashFall = new SoftParticles(420, { blending: 'normal', softness: 2.4 });
+  b.group.add(smokeColumns.points, ashFall.points);
+  // Linear values: the particles light nothing and nothing lights them
+  const smokeTint = new THREE.Color(0.2, 0.17, 0.155);
+  const firelit = new THREE.Color(0.95, 0.38, 0.14);
+  const ashTint = new THREE.Color(0x8a8078);
+  let smokeDue = 0;
+  let ashDue = 0;
+  const updateSmoke = (dt: number, player: THREE.Vector3) => {
+    const density = SoftParticles.density();
+    smokeDue += dt * 7 * density;
+    while (smokeDue >= 1) {
+      smokeDue--;
+      for (const [x, z, size] of fireSpots) {
+        if (Math.hypot(x - player.x, z - player.z) > 48 || Math.random() > 0.45) continue;
+        // Low smoke glows with the fire under it; higher up it's grey against the night
+        const isLit = Math.random() < 0.35;
+        smokeColumns.emit({
+          position: new THREE.Vector3(x + (Math.random() - 0.5) * size, 1 + size * 0.8, z + (Math.random() - 0.5) * size),
+          velocity: new THREE.Vector3(0.35 + (Math.random() - 0.5) * 0.4, (isLit ? 0.9 : 1.4) + Math.random() * 0.8, -0.15 + (Math.random() - 0.5) * 0.4),
+          life: isLit ? 1.6 + Math.random() : 4 + Math.random() * 2.5, size: size * 1.1, sizeEnd: size * (isLit ? 2.4 : 4.5),
+          color: isLit ? firelit : smokeTint, alpha: isLit ? 0.28 : 0.24, drag: 0.15,
+        });
+      }
+    }
+    ashDue += dt * 40 * density;
+    while (ashDue >= 1) {
+      ashDue--;
+      ashFall.emit({
+        position: new THREE.Vector3(player.x + (Math.random() - 0.5) * 28, 7 + Math.random() * 4, player.z + (Math.random() - 0.5) * 28),
+        velocity: new THREE.Vector3(0.3 + (Math.random() - 0.5) * 0.5, -0.7 - Math.random() * 0.5, (Math.random() - 0.5) * 0.5),
+        life: 7 + Math.random() * 3, size: 0.05 + Math.random() * 0.04, color: ashTint, alpha: 0.75,
+      });
+    }
+    smokeColumns.update(dt);
+    ashFall.update(dt);
+  };
+
   const embers = createMotes(160, 0xff8a3a, { rise: 1.6, size: 0.11, spread: 18, height: 9 });
   b.group.add(embers.object);
 
@@ -313,11 +384,20 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
     groundHeight: b.heightAt,
     footing: b.footingAt,
     defersCompletion: true,
+    map: { ...b.mapData(), fires: standingFires.map(([x, z, radius]) => ({ x, z, radius })) },
+    // Through the gate, along the sound boards of the long hall, across the court to the master;
+    // then out the rear door and along the sound boards of the escape
+    guide: routeGuide(
+      [at(0, 46), at(0, 32), ...safeLines[0], at(0, 2), at(-2, -8), at(0, -20), at(0, -36), at(0, -48)],
+      [at(0, -66), ...safeLines[1], at(0, -98)],
+    ),
+    haunt: { color: 0xff7a34, tint: 0x8a6a5c, extra: 'embers' },
     update: ctx => {
       b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       exit.update(ctx.time);
       embers.update(ctx.dt, ctx.player.root.position, ctx.time);
       const p = ctx.player.root.position;
+      updateSmoke(ctx.dt, p);
 
       if (!firesLit) {
         firesLit = true;
@@ -383,6 +463,8 @@ export function buildBurningTemple(collision: CollisionSystem): LevelRuntime {
     },
     dispose: () => {
       embers.dispose();
+      smokeColumns.dispose();
+      ashFall.dispose();
       b.dispose();
     },
   };
