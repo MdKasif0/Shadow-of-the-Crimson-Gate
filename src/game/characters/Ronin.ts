@@ -282,6 +282,27 @@ export class Ronin {
    * Called when an attack would land. If the player has just dashed, the hit
    * misses and they're rewarded. Returns true if the hit should be ignored.
    */
+  /** Where the blade runs from guard to tip, in the world, for the trail behind it. */
+  public bladeEnds(base: THREE.Vector3, tip: THREE.Vector3): void {
+    const blade = this.katana.mesh;
+    blade.updateWorldMatrix(true, false);
+    blade.localToWorld(base.set(0, 0.01, 0.34));
+    blade.localToWorld(tip.set(0, 0.05, 1.06));
+  }
+
+  /** True through a cut's strike and the first moment after, while the blade is moving fastest. */
+  public get isCutting(): boolean {
+    const phase = this.state.combatPhase;
+    if (!this.katana.mesh.visible) return false;
+    return phase === CombatPhase.ACTIVE || (phase === CombatPhase.RECOVERY && this.combat.timer < 0.07)
+      || (phase === CombatPhase.WINDUP && this.combat.timer > 0.06 && this.state.currentAttackId === 'ATTACK_WHIRL');
+  }
+
+  /** The attack under way, from the table. */
+  public get currentAttack() {
+    return this.state.currentAttackId ? ATTACK_DATA[this.state.currentAttackId] : null;
+  }
+
   public tryPerfectDodge(): boolean {
     if (this.dodgeWindowTimer <= 0) return false;
 
@@ -427,7 +448,6 @@ export class Ronin {
       // Also instantly snap rotation to dash dir
       this.targetRotation = Math.atan2(this.dashSystem.dashDirection.x, this.dashSystem.dashDirection.z);
       this.animator.setState(AnimState.DASH);
-      if (vfx && Math.random() > 0.5) vfx.spawnDash(this.root.position, this.targetRotation);
     } else if (isAttacking) {
       // During an attack, standard movement is ignored.
       // But we can apply an attack lunge during the ACTIVE phase

@@ -49,6 +49,13 @@ export const CinematicGradeShader = {
     uAspect: { value: 1 },
     uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
     uFxaa: { value: 0 },
+    /** A perfect dodge: drained colour and a ripple, 0 to 1. */
+    uSpirit: { value: 0 },
+    /** How long ago the dodge's ripple started, in seconds. */
+    uSpiritAge: { value: 0 },
+    uSpiritOrigin: { value: new THREE.Vector2(0.5, 0.5) },
+    /** A heavy blow: split colour and a kick inwards, 0 to 1. */
+    uImpact: { value: 0 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -75,6 +82,10 @@ export const CinematicGradeShader = {
     uniform float uAspect;
     uniform vec2 uTexel;
     uniform float uFxaa;
+    uniform float uSpirit;
+    uniform float uSpiritAge;
+    uniform vec2 uSpiritOrigin;
+    uniform float uImpact;
     varying vec2 vUv;
 
     float random(vec2 p) {
@@ -126,7 +137,26 @@ export const CinematicGradeShader = {
         uv += wobble * mask * h.w * 0.012;
       }
 
+      // A perfect dodge: a ring of bent light spreads out from the Ronin
+      if (uSpirit > 0.001) {
+        vec2 d = (uv - uSpiritOrigin) * vec2(uAspect, 1.0);
+        float r = length(d);
+        float front = uSpiritAge * 1.6;
+        float ring = exp(-pow((r - front) * 9.0, 2.0)) * uSpirit;
+        uv -= normalize(d + 1e-5) / vec2(uAspect, 1.0) * ring * 0.018;
+      }
+      // A heavy blow pulls the image in towards the middle for a moment
+      if (uImpact > 0.001) uv = 0.5 + (uv - 0.5) * (1.0 - uImpact * 0.018);
+
       vec3 color = uFxaa > 0.5 ? fxaa(uv) : texture2D(tDiffuse, uv).rgb;
+
+      // Both split the colour channels, strongest towards the edges
+      float split = uImpact * 0.006 + uSpirit * 0.004;
+      if (split > 0.0001) {
+        vec2 dir = (uv - 0.5) * split * 2.0;
+        color.r = texture2D(tDiffuse, uv + dir).r;
+        color.b = texture2D(tDiffuse, uv - dir).b;
+      }
 
       // A streak of motion blur during a dash, strongest towards the edges of the screen
       if (uBlurAmount > 0.001) {
@@ -150,9 +180,15 @@ export const CinematicGradeShader = {
       luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
       color = mix(vec3(luma), color, uSaturation);
 
+      // In the dodge's slow moment the world drains to a cold blue, the brights left standing
+      if (uSpirit > 0.001) {
+        float l = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        vec3 cold = vec3(l) * vec3(0.72, 0.9, 1.25);
+        color = mix(color, cold + max(color - 0.85, 0.0), uSpirit * 0.75);
+      }
       // Vignette
       vec2 centered = vUv - 0.5;
-      color *= 1.0 - smoothstep(0.35, 0.95, length(centered) * 1.15) * uVignette;
+      color *= 1.0 - smoothstep(0.35, 0.95, length(centered) * 1.15) * min(1.0, uVignette + uSpirit * 0.5 + uImpact * 0.35);
 
       // Grain shows most in the shadows, as it does on film
       color += (random(vUv) - 0.5) * uGrain * (1.0 - luma * 0.7);

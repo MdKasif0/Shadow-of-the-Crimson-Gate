@@ -10,6 +10,7 @@ import { SettingsManager } from '../settings/SettingsManager';
 import { GRAPHICS_PRESETS, SettingsData } from '../settings/SettingsData';
 import { LoadReporter } from '../ui/LoadingScreen';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
+import { ScreenPulse } from '../rendering/ScreenPulse';
 import { CinematicGradeShader, ColorGrade, DEFAULT_GRADE, MAX_HAZE_SOURCES } from '../rendering/CinematicGrade';
 import { HeatSources } from '../rendering/HeatSources';
 import { applyHeightFog } from '../rendering/HeightFog';
@@ -151,6 +152,16 @@ export class Renderer {
     u.uContrast.value = g.contrast;
     u.uLift.value = g.lift;
     u.uVignette.value = g.vignette;
+
+    // A dodge's drained moment and a blow's kick both fade on their own
+    const reduceMotion = SettingsManager.getInstance().get().reduceMotion;
+    u.uSpirit.value = reduceMotion ? 0 : ScreenPulse.spirit;
+    ScreenPulse.spiritAge += dt;
+    u.uSpiritAge.value = ScreenPulse.spiritAge;
+    u.uSpiritOrigin.value.set(ScreenPulse.origin.x, ScreenPulse.origin.y);
+    u.uImpact.value = reduceMotion ? 0 : ScreenPulse.impact;
+    ScreenPulse.spirit = Math.max(0, ScreenPulse.spirit - dt * 1.1);
+    ScreenPulse.impact = Math.max(0, ScreenPulse.impact - dt * 6);
 
     // Motion blur dies away quickly
     this.blurAmount = Math.max(0, this.blurAmount - dt * 5);

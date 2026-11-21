@@ -5,6 +5,9 @@ import { LevelRuntime, Rect } from './LevelTypes';
 import { createRain } from './LevelEffects';
 import { SecretDef } from '../world/WorldSecrets';
 import { EncounterConfig } from '../encounters/EncounterConfig';
+import { routeGuide } from './Wayfinding';
+import { applySway } from '../utils/Wind';
+import { getGlowTexture } from '../utils/ProceduralTextures';
 
 const at = (x: number, z: number) => new THREE.Vector3(x, 0, z);
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number): Rect => ({ minX, maxX, minZ, maxZ });
@@ -146,6 +149,74 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
   // The flood's tide line on the houses and posts
   for (let i = 0; i < 14; i++) b.decal('damp', b.random.range(-25, 25), b.random.range(26, 32), b.random.range(2, 4), { y: 0.03 });
 
+  // ─── Cattails among the reeds ───────────────────────────────────────
+  const stemGeo = new THREE.CylinderGeometry(0.012, 0.018, 1, 4).translate(0, 0.5, 0);
+  const headGeo = new THREE.CapsuleGeometry(0.045, 0.22, 2, 6);
+  const stemMat = std(0x5a6a30, { roughness: 0.8 });
+  const headMat = std(0x4a2e18, { roughness: 0.95 });
+  stemMat.userData.noSurface = headMat.userData.noSurface = true;
+  applySway(stemMat, 0.25);
+  applySway(headMat, 0.25, true);
+  const tails: THREE.Matrix4[] = [];
+  const heads: THREE.Matrix4[] = [];
+  for (let i = 0; i < 900 && tails.length < 260; i++) {
+    const x = b.random.range(-26, 26);
+    const z = b.random.range(-45, 29);
+    if (b.footingAt(x, z) >= 1 || b.heightAt(x, z) > 0.2 || b.isSolidAt(x, z) || Math.abs(x) < 2.4) continue;
+    const h = b.random.range(1.2, 2.1);
+    const lean = new THREE.Quaternion().setFromEuler(new THREE.Euler(b.random.range(-0.12, 0.12), 0, b.random.range(-0.12, 0.12)));
+    tails.push(new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), lean, new THREE.Vector3(1, h, 1)));
+    const top = new THREE.Vector3(0, h - 0.22, 0).applyQuaternion(lean).add(new THREE.Vector3(x, 0, z));
+    heads.push(new THREE.Matrix4().compose(top, lean, new THREE.Vector3(1, 1, 1)));
+  }
+  const stems = new THREE.InstancedMesh(stemGeo, stemMat, tails.length);
+  const tops = new THREE.InstancedMesh(headGeo, headMat, heads.length);
+  tails.forEach((m, i) => stems.setMatrixAt(i, m));
+  heads.forEach((m, i) => tops.setMatrixAt(i, m));
+  stems.userData.noShadow = true;
+  b.group.add(stems, tops);
+
+  // ─── Lanterns for the drowned, drifting on the flood ────────────────
+  // Tōrō nagashi: set on the water for the dead. Most still burn warm; a few burn cold.
+  const floatBase = std(0x2a1c12, { roughness: 0.9 });
+  const glowTexture = getGlowTexture();
+  const floaters: { group: THREE.Group; x: number; z: number; phase: number; radius: number }[] = [];
+  for (let i = 0; i < 400 && floaters.length < 26; i++) {
+    const x = b.random.range(-25, 25);
+    const z = b.random.range(-94, 28);
+    if (b.footingAt(x, z) >= 1 || b.heightAt(x, z) > 0.2 || b.isSolidAt(x, z) || Math.abs(x) < 3) continue;
+    if (floaters.some(f => Math.hypot(f.x - x, f.z - z) < 3.2)) continue;
+    const isCold = b.random.next() < 0.3;
+    const color = isCold ? 0x9ad8ff : 0xffa850;
+    const group = new THREE.Group();
+    group.userData.dynamic = true;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.07, 0.42), floatBase);
+    const paper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.34, 0.3),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: isCold ? 1.6 : 1.9, roughness: 0.8 }));
+    paper.material.userData.noSurface = true;
+    paper.position.y = 0.2;
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.36), floatBase);
+    cap.position.y = 0.38;
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
+    halo.scale.setScalar(1.6);
+    halo.position.y = 0.22;
+    group.add(base, paper, cap, halo);
+    group.position.set(x, 0.12, z);
+    group.rotation.y = b.random.next() * Math.PI;
+    for (const m of [base, paper, cap]) m.userData.noShadow = true;
+    b.group.add(group);
+    floaters.push({ group, x, z, phase: b.random.next() * Math.PI * 2, radius: b.random.range(0.3, 0.9) });
+  }
+  b.onTick(time => {
+    for (const f of floaters) {
+      const t = time * 0.18 + f.phase;
+      f.group.position.set(f.x + Math.cos(t) * f.radius, 0.12 + Math.sin(time * 1.3 + f.phase) * 0.03, f.z + Math.sin(t * 0.8) * f.radius);
+      f.group.rotation.y += 0.002;
+      f.group.rotation.z = Math.sin(time * 1.1 + f.phase) * 0.05;
+      f.group.rotation.x = Math.cos(time * 0.9 + f.phase) * 0.05;
+    }
+  });
+
   b.finish();
 
   // ─── Rules: rain, and lightning now and then ────────────────────────
@@ -169,6 +240,13 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
     audioZone: 'FOREST',
     groundHeight: b.heightAt,
     footing: b.footingAt,
+    map: b.mapData(),
+    // Down the boardwalk to the drowned shrine, then on to the gate
+    guide: routeGuide(
+      [at(0, 46), at(0, 36), at(0, 26), at(0, -10), at(0, -30), at(0, -46), at(0, -62)],
+      [at(0, -78), at(0, -86)],
+    ),
+    haunt: { color: 0x6ae4ff, tint: 0x7a9aa6, extra: 'drip' },
     update: ctx => {
       b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       exit.update(ctx.time);
@@ -193,6 +271,8 @@ export function buildDrownedVillage(collision: CollisionSystem): LevelRuntime {
     reset: () => {},
     dispose: () => {
       rain.dispose();
+      stemGeo.dispose();
+      headGeo.dispose();
       b.dispose();
     },
   };

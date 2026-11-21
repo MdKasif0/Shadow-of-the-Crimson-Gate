@@ -724,6 +724,11 @@ export class LevelEnemy implements Enemy {
       this.isDeathVfxPlayed = true;
     }
     this.animate(dt, 'dead');
+    // A haunted yokai burns away instead, and the haunting hides it when it's gone
+    if (this.root.userData.haunted) {
+      this.applyVelocity(dt, collisionSystem);
+      return;
+    }
     const linger = this.def.isBoss ? 2.4 : 1;
     const shrinkTime = this.def.isBoss ? 1.6 : 0.5;
     if (this.stateTimer > linger) {

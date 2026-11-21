@@ -113,7 +113,26 @@ export interface LevelRuntime {
   defersCompletion?: boolean;
   /** Called when the boss fight begins. */
   onBossStart?: (ctx: LevelContext) => void;
+  /** What the minimap draws beyond the walls: water, and decks over it. */
+  map?: { water: Rect[]; decks: Rect[] };
+  /**
+   * The way from `from` to where the Ronin should go next: the boss while it
+   * lives, then the gate. Without one, the guide heads straight there.
+   */
+  guide?: (from: THREE.Vector3, isBossDefeated: boolean) => THREE.Vector3[];
+  /** The colour this level's yokai haunt in. */
+  haunt?: HauntTheme;
   dispose: () => void;
+}
+
+/** How the yokai of a level look: the colour of their spirit-fire, and what clings to them. */
+export interface HauntTheme {
+  /** Spirit-fire on their skin and in the air around them. */
+  color: number;
+  /** Their own colours wash out towards this. */
+  tint: number;
+  /** Drowned things drip; burnt things shed embers; the rest trail smoke. */
+  extra?: 'drip' | 'embers' | 'none';
 }
 
 /** Per-level record kept in the save. */

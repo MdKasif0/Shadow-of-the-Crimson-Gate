@@ -6,8 +6,7 @@ import { createMotes } from './LevelEffects';
 import { SecretDef } from '../world/WorldSecrets';
 import { EncounterConfig, EnemySpawnDef } from '../encounters/EncounterConfig';
 import { SeededRandom } from '../utils/MathUtils';
-import { applySway, applyTranslucency } from '../utils/Wind';
-import { applySurface } from '../rendering/Surfaces';
+import { BambooGrove, Culm } from '../world/BambooGrove';
 
 const at = (x: number, z: number) => new THREE.Vector3(x, 0, z);
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number): Rect => ({ minX, maxX, minZ, maxZ });
@@ -30,6 +29,8 @@ interface Maze {
   vertical: boolean[][];
   path: [number, number][];
   deadEnds: [number, number][];
+  /** The cells you can step to from this one. */
+  open: (r: number, c: number) => [number, number][];
 }
 
 /** A perfect maze carved by depth-first search, with a few walls knocked out to make loops. */
@@ -104,7 +105,7 @@ function carveMaze(random: SeededRandom): Maze {
       if (!onPath.has(`${r},${c}`) && open(r, c).length === 1) deadEnds.push([r, c]);
     }
   }
-  return { horizontal, vertical, path, deadEnds };
+  return { horizontal, vertical, path, deadEnds, open };
 }
 
 /**
@@ -123,31 +124,22 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
   const rockMat = std(0x2a2e28, { roughness: 1, flatShading: true });
   b.boundaryCliffs(rect(-29, 29, -80, 56), rockMat, 8);
 
-  // ─── The bamboo itself, in one batch per row so rows can fade ───────
-  const stalkGeometry = new THREE.CylinderGeometry(1, 1, 1, 6);
-  stalkGeometry.translate(0, 0.5, 0);
-  const leafGeometry = new THREE.IcosahedronGeometry(1, 0);
-  const stalkMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
-  const leafMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
-  // Stalks bend from the root, leaves ride along on top, and moonlight shines through them
-  stalkMaterial.userData.surface = 'bamboo';
-  applySurface(stalkMaterial, 'bamboo');
-  applySway(stalkMaterial, 0.35);
-  leafMaterial.userData.noSurface = true;
-  applySway(leafMaterial, 0.35, true);
-  applyTranslucency(leafMaterial, 0.9);
-  const rows: { x: number; z: number; h: number; r: number }[][] = Array.from({ length: ROWS + 3 }, () => []);
+  // ─── The bamboo itself: clumps, in one batch per row so rows can fade ─
+  const grove = new BambooGrove(b.random);
+  const rows: Culm[][] = Array.from({ length: ROWS + 3 }, () => []);
   const r = b.random;
 
+  /** A wall of bamboo between two points: clumps at uneven spacing, through a band, never a line. */
   const wallAlong = (row: number, x0: number, z0: number, x1: number, z1: number) => {
     const length = Math.hypot(x1 - x0, z1 - z0);
-    const count = Math.round(length / 0.9);
     const nx = -(z1 - z0) / length;
     const nz = (x1 - x0) / length;
-    for (let i = 0; i <= count; i++) {
-      const t = i / count;
-      const side = r.range(-0.45, 0.45);
-      rows[row].push({ x: x0 + (x1 - x0) * t + nx * side, z: z0 + (z1 - z0) * t + nz * side, h: r.range(4.5, 7), r: r.range(0.07, 0.12) });
+    for (let d = r.range(0, 0.5); d <= length + 0.3; d += r.range(0.75, 1.5)) {
+      const t = Math.min(1, d / length);
+      const side = r.range(-0.6, 0.6);
+      const x = x0 + (x1 - x0) * t + nx * side;
+      const z = z0 + (z1 - z0) * t + nz * side;
+      grove.clump(rows[row], x, z, { away: [nx * Math.sign(side || 1), nz * Math.sign(side || 1)] });
     }
     collision.addBox(new THREE.Box3(
       new THREE.Vector3(Math.min(x0, x1) - 0.5, 0, Math.min(z0, z1) - 0.5),
@@ -173,14 +165,16 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
   // Groves ringing the entrance and Jorōgumo's clearing
   /** A ring of bamboo; `isGap` leaves openings at the given angles (0 is north, π south). */
   const ring = (row: number, cx: number, cz: number, radius: number, isGap: (a: number) => boolean) => {
-    const count = Math.round((Math.PI * 2 * radius) / 0.8);
-    for (let i = 0; i < count; i++) {
-      const a = (i / count) * Math.PI * 2;
+    const circumference = Math.PI * 2 * radius;
+    let placed = 0;
+    for (let d = 0; d < circumference; d += r.range(0.9, 1.6)) {
+      const a = (d / circumference) * Math.PI * 2;
       if (isGap(a)) continue;
-      const x = cx + Math.sin(a) * radius + r.range(-0.5, 0.5);
-      const z = cz + Math.cos(a) * radius + r.range(-0.5, 0.5);
-      rows[row].push({ x, z, h: r.range(6, 9), r: r.range(0.08, 0.13) });
-      if (i % 3 === 0) collision.addSphere(new THREE.Vector3(x, 0, z), 1.3);
+      const out = r.range(-0.4, 0.9);
+      const x = cx + Math.sin(a) * (radius + out);
+      const z = cz + Math.cos(a) * (radius + out);
+      grove.clump(rows[row], x, z, { away: [Math.sin(a), Math.cos(a)], tall: [8, 12] });
+      if (placed++ % 2 === 0) collision.addSphere(new THREE.Vector3(cx + Math.sin(a) * radius, 0, cz + Math.cos(a) * radius), 1.4);
     }
   };
   // The entrance clearing opens south into the maze, and north so the camera can see in
@@ -190,41 +184,35 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
   const exitX = cellX(EXIT_COL);
   ring(ROWS + 1, exitX, -54, 15, () => false);
   // Leave gaps where the maze and the gate meet the clearing
-  const gapped = rows[ROWS + 1].filter(s => {
-    const north = s.z > -54 && Math.abs(s.x - exitX) < 3.4;
-    const south = s.z < -54 && Math.abs(s.x - exitX) < 3.4;
+  rows[ROWS + 1] = rows[ROWS + 1].filter(s => {
+    const north = s.z > -54 && Math.abs(s.x - exitX) < 3.6;
+    const south = s.z < -54 && Math.abs(s.x - exitX) < 3.6;
     return !north && !south;
   });
-  rows[ROWS + 1] = gapped;
   collision.spheres = collision.spheres.filter(sphere => {
     const z = sphere.center.z;
     if (z > -40 || z < -70) return true;
     return Math.abs(sphere.center.x - exitX) > 3.6 || Math.abs(z + 54) < 10;
   });
 
-  const tint = new THREE.Color();
-  rows.forEach((stalks, row) => {
-    if (stalks.length === 0) return;
-    const stalkMesh = new THREE.InstancedMesh(stalkGeometry, stalkMaterial, stalks.length);
-    const leafMesh = new THREE.InstancedMesh(leafGeometry, leafMaterial, stalks.length);
-    const matrix = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    stalks.forEach((s, i) => {
-      q.setFromEuler(new THREE.Euler(r.range(-0.05, 0.05), 0, r.range(-0.05, 0.05)));
-      matrix.compose(new THREE.Vector3(s.x, 0, s.z), q, new THREE.Vector3(s.r, s.h, s.r));
-      stalkMesh.setMatrixAt(i, matrix);
-      stalkMesh.setColorAt(i, tint.setHSL(0.24 + r.range(-0.03, 0.03), 0.42, r.range(0.22, 0.34)));
-      const leaf = r.range(0.9, 1.5);
-      matrix.compose(new THREE.Vector3(s.x + r.range(-0.4, 0.4), s.h - 0.4, s.z + r.range(-0.4, 0.4)), q, new THREE.Vector3(leaf * 1.3, leaf * 0.6, leaf * 1.3));
-      leafMesh.setMatrixAt(i, matrix);
-      leafMesh.setColorAt(i, tint.setHSL(0.28 + r.range(-0.04, 0.04), 0.45, r.range(0.12, 0.2)));
-    });
-    const chunk = new THREE.Group();
-    chunk.name = `BambooRow${row}`;
-    chunk.add(stalkMesh, leafMesh);
+  rows.forEach((culms, row) => {
+    if (culms.length === 0) return;
+    const chunk = grove.build(culms, `BambooRow${row}`);
     b.group.add(chunk);
     b.occluders.push(chunk);
   });
+
+  // Shoots coming up at the feet of the walls, and dry leaves over everything
+  const allCulms = rows.flat();
+  const shootSpots: [number, number][] = [];
+  for (let i = 0; i < 420; i++) {
+    const c = allCulms[Math.floor(r.next() * allCulms.length)];
+    shootSpots.push([c.x + r.range(-1.1, 1.1), c.z + r.range(-1.1, 1.1)]);
+  }
+  b.group.add(grove.shoots(shootSpots));
+  const litterSpots: [number, number][] = [];
+  for (let i = 0; i < 1400; i++) litterSpots.push([r.range(bounds.minX, bounds.maxX), r.range(bounds.minZ, bounds.maxZ)]);
+  b.group.add(grove.litter(litterSpots));
 
   // ─── Guidance and light ─────────────────────────────────────────────
   b.shrine(entryX + 5, 46, -Math.PI / 2);
@@ -327,6 +315,56 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
 
   b.finish();
 
+  // ─── The way through, from wherever you stand ─────────────────────
+  const mazeBottom = TOP - ROWS * CELL;
+  const bossPoint = at(exitX, clearingZ);
+  const gatePoint = at(exitX, -71);
+  let cachedFrom = '';
+  let cachedCells: THREE.Vector3[] = [];
+  /** The shortest way from a cell to the maze's exit, through open passages only. */
+  const cellsToExit = (start: [number, number]): THREE.Vector3[] => {
+    const key = `${start[0]},${start[1]}`;
+    if (key === cachedFrom) return cachedCells;
+    const previous = new Map<string, string | null>([[key, null]]);
+    const queue: [number, number][] = [start];
+    const goal = `${ROWS - 1},${EXIT_COL}`;
+    while (queue.length > 0) {
+      const [cr, cc] = queue.shift()!;
+      if (`${cr},${cc}` === goal) break;
+      for (const [nr, nc] of maze.open(cr, cc)) {
+        const k = `${nr},${nc}`;
+        if (previous.has(k)) continue;
+        previous.set(k, `${cr},${cc}`);
+        queue.push([nr, nc]);
+      }
+    }
+    const cells: THREE.Vector3[] = [];
+    let step: string | null | undefined = goal;
+    while (step) {
+      const [cr, cc] = step.split(',').map(Number);
+      cells.unshift(at(cellX(cc), cellZ(cr)));
+      step = previous.get(step);
+    }
+    cachedFrom = key;
+    cachedCells = previous.has(goal) ? cells : [];
+    return cachedCells;
+  };
+  const guide = (from: THREE.Vector3, isBossDefeated: boolean): THREE.Vector3[] => {
+    const end = isBossDefeated ? [bossPoint, gatePoint] : [bossPoint];
+    const out = at(cellX(EXIT_COL), mazeBottom - 1.5);
+    if (from.z < mazeBottom) return [from.clone(), ...end];
+    if (from.z > TOP) {
+      // Still in the entrance clearing: to the way in, then through
+      return [from.clone(), at(cellX(ENTRY_COL), TOP + 1.5), ...cellsToExit([0, ENTRY_COL]), out, ...end];
+    }
+    const row = THREE.MathUtils.clamp(Math.floor((TOP - from.z) / CELL), 0, ROWS - 1);
+    const col = THREE.MathUtils.clamp(Math.floor((from.x - LEFT) / CELL), 0, COLS - 1);
+    const cells = cellsToExit([row, col]);
+    // Skip the centre of the cell you're already in once you're past it
+    const rest = cells.length > 1 && from.distanceTo(cells[1]) < cells[0].distanceTo(cells[1]) ? cells.slice(1) : cells;
+    return [from.clone(), ...rest, out, ...end];
+  };
+
   const motes = createMotes(90, 0xb8ff8a, { rise: 0.25, size: 0.12, spread: 16, height: 5 });
   b.group.add(motes.object);
 
@@ -348,6 +386,9 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
     audioZone: 'FOREST',
     groundHeight: b.heightAt,
     footing: b.footingAt,
+    map: b.mapData(),
+    guide,
+    haunt: { color: 0x7affc4, tint: 0x6a8a7a, extra: 'none' },
     update: ctx => {
       b.tick(ctx.time, ctx.dt, ctx.camera.camera);
       exit.update(ctx.time);
@@ -357,8 +398,7 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
     reset: () => {},
     dispose: () => {
       motes.dispose();
-      stalkGeometry.dispose();
-      leafGeometry.dispose();
+      grove.dispose();
       b.dispose();
     },
   };

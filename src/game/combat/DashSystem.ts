@@ -15,6 +15,11 @@ export class DashSystem {
   
   public dashDirection: THREE.Vector3 = new THREE.Vector3();
 
+  /** How far through the dash, 0 to 1, while dashing. */
+  public get progress(): number {
+    return this.isDashing ? Math.min(1, this.dashTimer / this.dashDuration) : 0;
+  }
+
   constructor(state: PlayerState) {
     this.state = state;
   }
@@ -59,8 +64,10 @@ export class DashSystem {
         return null;
       }
       
-      // Return dash velocity vector this frame
-      return this.dashDirection.clone().multiplyScalar(this.dashSpeed * dt);
+      // Explodes off the mark and eases into the landing; the distance covered is the same
+      const t = Math.min(1, this.dashTimer / this.dashDuration);
+      const burst = 1.45 - 0.9 * t;
+      return this.dashDirection.clone().multiplyScalar(this.dashSpeed * burst * dt);
     }
     
     return null;

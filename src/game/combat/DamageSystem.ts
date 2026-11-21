@@ -182,6 +182,7 @@ export class DamageSystem {
       // Sparks from where the blade met the target, not from the player's feet
       const hitPoint = hit.hurtbox.position.clone().addScaledVector(hitbox.direction, -hit.hurtbox.radius * 0.7);
       vfx.spawnHit(hitPoint, hitbox.direction, isHeavy);
+      EventBus.emit('playerHitLanded', { position: hitPoint.clone(), direction: hitbox.direction.clone(), isHeavy, isKill });
 
       const weight = isEnemy ? 1 : 1.25;
       cameraController.addShake((hitbox.shake ?? 0.5) * weight);

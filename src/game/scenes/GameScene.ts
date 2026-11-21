@@ -101,6 +101,12 @@ import { RunTimer } from '../ui/MetaHUD';
 import { TrialMode, openTrialResults } from '../ui/MetaScreens';
 import { NG_PLUS_DROPS } from '../progression/PlayerBuild';
 import { EnemyKind, EnemySpawnDef } from '../encounters/EncounterConfig';
+import { PlayerFX } from '../vfx/PlayerFX';
+import { Haunting } from '../enemies/Haunting';
+import { SpiritGuide } from '../vfx/SpiritGuide';
+import { Minimap } from '../ui/Minimap';
+import { routeGuide } from '../levels/Wayfinding';
+import { LEVEL_ENEMIES } from '../enemies/LevelEnemyDefs';
 
 /** Enemies this close pull the camera's framing towards them. */
 const COMBAT_FRAMING_RANGE = 12;
@@ -230,6 +236,11 @@ export class GameScene {
   private worldMap = new WorldMap();
   private loadingCard = new LevelLoadingCard();
   private countdown = new LevelCountdown();
+  private playerFX!: PlayerFX;
+  private haunting!: Haunting;
+  private spiritGuide!: SpiritGuide;
+  private minimap = new Minimap();
+  private guidePath: THREE.Vector3[] | null = null;
   /** The original mountain, kept aside while the Ronin is elsewhere. */
   private courtyard: {
     world: THREE.Group | null;
@@ -306,6 +317,14 @@ export class GameScene {
     }
 
     this.vfx = new VFXManager(this.scene, this.cameraController);
+    this.playerFX = new PlayerFX(this.scene, this.player, () => this.cameraController.camera);
+    this.haunting = new Haunting(this.scene);
+    this.spiritGuide = new SpiritGuide(this.scene);
+    // The minimap stays off the pause menu and the title screen
+    EventBus.on('gameStateChanged', (data: { current: GameState }) => {
+      const next = data.current;
+      if (next !== GameState.PLAYING && next !== GameState.BOSS) this.minimap.setVisible(false);
+    });
     this.attackTelegraph = new AttackTelegraph(this.scene);
     this.lockMarker = createLockOnMarker(this.scene);
     this.telegraphVfx = new EncounterTelegraphVFX(this.scene, this.encounterManager);
@@ -890,6 +909,7 @@ export class GameScene {
     }
 
     this.vfx.update(dt, this.time);
+    this.updateWayfinding(dt, realDt);
     this.parryFlash.update(realDt);
     this.updateContactShadows();
     this.telegraphVfx.update(dt, this.time);
@@ -1091,6 +1111,8 @@ export class GameScene {
     }
     this.hitboxSystem.update();
     this.updateTelegraphs();
+    this.playerFX.update(dt);
+    if (this.level) this.haunting.update(dt, this.enemies);
 
     // ─── Check Player Death ───────────────────────────────────────
     if (this.player.health.currentHealth <= 0) {
@@ -1122,6 +1144,7 @@ export class GameScene {
     this.hitboxSystem.clearHurtboxes();
     this.hitStopTimer = 0;
     this.spiritWaves.clear();
+    this.playerFX.clear();
 
     this.resetBossEncounter();
     this.level?.reset();
@@ -1853,6 +1876,9 @@ export class GameScene {
     this.hazardTimers.clear();
     this.vfx.clear();
     this.telegraphVfx.clear();
+    this.playerFX.clear();
+    this.haunting.clear();
+    this.spiritGuide.reset();
     EventBus.emit('hideInteractPrompt', {});
 
     if (this.levelId === 'courtyard') {
@@ -1897,6 +1923,8 @@ export class GameScene {
     this.occlusion.restore(courtyard.occluders as never);
     this.interactionSystem = courtyard.interactions;
     this.secrets.group.visible = true;
+    this.haunting.setTheme(null);
+    this.minimap.setLevel(null);
     this.player.groundHeight = null;
     this.player.surfaceAt = null;
     this.resetBossEncounter();
@@ -1921,6 +1949,60 @@ export class GameScene {
     for (const secret of level.secrets) interactions.register(this.createSecretInteraction(secret));
     interactions.register(this.createExitInteraction(level.exit.clone().setZ(level.exit.z + 2.5), () => this.isExitOpen()));
     this.interactionSystem = interactions;
+
+    this.haunting.setTheme(level.haunt ?? null);
+    const bounds = { minX: level.bounds.MIN_X, maxX: level.bounds.MAX_X, minZ: level.bounds.MIN_Z, maxZ: level.bounds.MAX_Z };
+    this.minimap.setLevel(id === 'arena' ? null : {
+      bounds,
+      water: level.map?.water ?? [],
+      decks: level.map?.decks ?? [],
+      boxes: this.collisionSystem.boxes,
+      spheres: this.collisionSystem.spheres,
+    });
+  }
+
+  /**
+   * Where to go next, shown three ways: a spirit floating ahead along the way,
+   * a gold thread on the minimap, and the name and distance beneath it.
+   */
+  private updateWayfinding(dt: number, realDt: number): void {
+    const level = this.level;
+    const state = GameStateManager.getInstance().getState();
+    const isPlaying = state === GameState.PLAYING || state === GameState.BOSS;
+    const isBusy = this.dialogueManager.isActive || this.storyManager.isIntroRunning || this.isCinematicActive;
+    if (!level || this.levelId === 'arena' || this.trial) {
+      this.guidePath = null;
+      this.minimap.setVisible(false);
+      return;
+    }
+    const position = this.player.root.position;
+    const bossCenter = level.encounters.find(c => c.id === level.bossEncounterId)?.center ?? level.exit;
+    const guide = level.guide ?? routeGuide([level.spawn, bossCenter], [level.exit]);
+    // Once the gate stands open there's nothing left but the way out; a level beaten twice needs no guide to its boss
+    const isDone = this.levelBossDefeated;
+    const isAtObjective = !isDone && this.isLevelBossFight;
+    this.guidePath = isAtObjective ? null : guide(position, isDone);
+
+    const isCombat = this.combatMusicTimer > 0 || this.isLevelBossFight;
+    this.spiritGuide.update(dt, this.time, isBusy ? null : this.guidePath, (x, z) => level.groundHeight(x, z), isCombat);
+
+    const bossType = this.levelBossType();
+    const bossName = bossType ? LEVEL_ENEMIES[bossType]?.name ?? 'The guardian' : 'The guardian';
+    this.minimap.setVisible(isPlaying && !isBusy);
+    if (!isPlaying || isBusy) return;
+    this.minimap.update(realDt, {
+      player: position,
+      facing: this.player.root.rotation.y,
+      yaw: this.cameraController.yaw,
+      path: this.guidePath,
+      objective: isDone
+        ? { position: level.exit, kind: 'gate', label: this.isExitOpen() ? 'The gate onward' : 'The gate' }
+        : { position: bossCenter, kind: 'boss', label: bossName },
+      enemies: this.enemies
+        .filter(e => !e.health.isDead && e.root.visible)
+        .map(e => ({ position: e.root.position, isElite: e.traits.isElite || (e instanceof LevelEnemy && e.isBoss) })),
+      shrine: level.shrine.position,
+    });
   }
 
   /** The way on is open once the guardian falls, or, for the temple, once you've escaped. */

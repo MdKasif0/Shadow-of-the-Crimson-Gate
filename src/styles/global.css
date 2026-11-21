@@ -1486,3 +1486,51 @@ input:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .achievement-toast { animation: none; }
 }
+
+/* ── Minimap ─────────────────────────────────────────────────────────── */
+
+.minimap {
+  position: fixed;
+  top: 16px;
+  right: 18px;
+  z-index: 60;
+  width: 176px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.6));
+}
+
+.minimap--visible { display: flex; animation: minimap-in 0.6s ease-out; }
+.minimap__canvas { width: 176px; height: 176px; }
+.minimap__label {
+  min-height: 14px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffdca0;
+  text-shadow: 0 1px 4px #000, 0 0 10px rgba(255, 170, 80, 0.35);
+  white-space: nowrap;
+}
+
+body.has-minimap .run-timer { right: 214px; }
+body.has-minimap .hud-notices { top: 232px; }
+
+@keyframes minimap-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+
+@media (pointer: coarse) {
+  .minimap { top: 66px; right: 12px; width: 124px; }
+  .minimap__canvas { width: 124px; height: 124px; }
+  body.has-minimap .run-timer { right: 150px; }
+}
+
+@media (max-width: 640px) {
+  .minimap { width: 120px; }
+  .minimap__canvas { width: 120px; height: 120px; }
+  body.has-minimap .run-timer { right: 146px; }
+}
+
+body.hud-hidden .minimap { display: none; }

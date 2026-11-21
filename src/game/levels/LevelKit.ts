@@ -368,6 +368,14 @@ export class LevelBuilder {
     this.footings.push({ rect, factor });
   }
 
+  /** What the minimap draws: the water, and the decks and roofs standing over it. */
+  public mapData(): { water: Rect[]; decks: Rect[] } {
+    return {
+      water: this.waterRects.map(w => w.rect),
+      decks: [...this.decks.filter(d => d.height > 0.2).map(d => d.rect), ...this.ramps.map(r => r.rect)],
+    };
+  }
+
   /** A floor height with nothing drawn, for floors built some other way. */
   public raise(rect: Rect, height: number): void {
     this.decks.push({ rect, height });
@@ -542,7 +550,7 @@ export class LevelBuilder {
     this.group.add(mesh);
   }
 
-  private isSolidAt(x: number, z: number): boolean {
+  public isSolidAt(x: number, z: number): boolean {
     for (const box of this.collision.boxes) {
       if (x > box.min.x - 0.2 && x < box.max.x + 0.2 && z > box.min.z - 0.2 && z < box.max.z + 0.2) return true;
     }
