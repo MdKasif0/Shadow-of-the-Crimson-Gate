@@ -189,10 +189,11 @@ export function buildBambooLabyrinth(collision: CollisionSystem): LevelRuntime {
     const south = s.z < -54 && Math.abs(s.x - exitX) < 3.6;
     return !north && !south;
   });
+  // Clear the clearing's own colliders out of both openings, wherever on the ring they fall
   collision.spheres = collision.spheres.filter(sphere => {
-    const z = sphere.center.z;
-    if (z > -40 || z < -70) return true;
-    return Math.abs(sphere.center.x - exitX) > 3.6 || Math.abs(z + 54) < 10;
+    const fromCentre = Math.hypot(sphere.center.x - exitX, sphere.center.z + 54);
+    const isOnRing = Math.abs(fromCentre - 15) < 3;
+    return !isOnRing || Math.abs(sphere.center.x - exitX) > 3.6;
   });
 
   rows.forEach((culms, row) => {
